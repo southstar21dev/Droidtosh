@@ -1,0 +1,9 @@
+protocol_version: 2
+message_id: "fixture-resume"
+sent_at_ms: 1730000000000
+ack: 7
+resume {
+  stream_id: "s-mac-1"
+  last_received_seq: 7
+  peer_stream_id: "s-phone-1"
+}

@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package droidsync.v1;
+
+option java_package = "dev.southstar21.droidtosh.protocol.v1";
+option java_multiple_files = true;
+option swift_prefix = "DS";
+
+enum CallKind {
+  CALL_KIND_UNSPECIFIED = 0;
+  CALL_KIND_CELLULAR = 1;
+  CALL_KIND_VOIP = 2;
+}
+
+enum CallDirection {
+  CALL_DIRECTION_UNSPECIFIED = 0;
+  CALL_DIRECTION_INCOMING = 1;
+  CALL_DIRECTION_OUTGOING = 2;
+}
+
+enum CallPhase {
+  CALL_PHASE_UNSPECIFIED = 0;
+  CALL_PHASE_RINGING = 1;
+  CALL_PHASE_DIALING = 2;
+  CALL_PHASE_ACTIVE = 3;
+  CALL_PHASE_ENDED = 4;
+  CALL_PHASE_MISSED = 5;
+}
+
+enum CallActionType {
+  CALL_ACTION_UNSPECIFIED = 0;
+  CALL_ACTION_ACCEPT = 1;
+  CALL_ACTION_DECLINE = 2;
+  CALL_ACTION_END = 3;
+  CALL_ACTION_MUTE_RING = 4;
+}
+
+enum CallLogType {
+  CALL_LOG_TYPE_UNSPECIFIED = 0;
+  CALL_LOG_TYPE_INCOMING = 1;
+  CALL_LOG_TYPE_OUTGOING = 2;
+  CALL_LOG_TYPE_MISSED = 3;
+  CALL_LOG_TYPE_REJECTED = 4;
+}
+
+message CallState {
+  string call_id = 1;
+  CallKind kind = 2;
+  string package_name = 3;
+  CallDirection direction = 4;
+  CallPhase phase = 5;
+  string number = 6;
+  string contact_name = 7;
+  string phone_account_id = 8;
+  string sim_label = 9;
+  uint64 started_at_ms = 10;
+  uint64 ended_at_ms = 11;
+}
+
+message PhoneAccount {
+  string id = 1;
+  string label = 2;
+}
+
+message CallAction {
+  string call_id = 1;
+  CallActionType action = 2;
+  string request_id = 3;
+}
+
+message DialRequest {
+  string number = 1;
+  string phone_account_id = 2;
+  string request_id = 3;
+}
+
+message CallLogRequest {
+  uint32 offset = 1;
+  uint32 limit = 2;
+  uint64 since_ms = 3;
+}
+
+message CallLogEntry {
+  string id = 1;
+  string number = 2;
+  string contact_name = 3;
+  CallLogType type = 4;
+  uint64 started_at_ms = 5;
+  uint32 duration_s = 6;
+  string sim_label = 7;
+  string phone_account_id = 8;
+}
+
+message CallLogPage {
+  repeated CallLogEntry entries = 1;
+  bool has_more = 2;
+}

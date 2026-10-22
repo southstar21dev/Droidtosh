@@ -1,0 +1,18 @@
+protocol_version: 2
+message_id: "fixture-device-status"
+sent_at_ms: 1760000000000
+device_status {
+  battery_percent: 57
+  charging: true
+  charge_source: CHARGE_SOURCE_WIRELESS
+  power_save: false
+  network_type: NETWORK_TYPE_CELLULAR
+  wifi_level: -1
+  cellular_level: 3
+  cellular_generation: "5G"
+  carrier: "Telekom.de"
+  airplane_mode: false
+  ringer_mode: RINGER_MODE_VIBRATE
+  do_not_disturb: true
+  sampled_at_ms: 1759999999500
+}

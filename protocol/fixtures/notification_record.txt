@@ -1,0 +1,22 @@
+protocol_version: 2
+message_id: "fixture-notification"
+sent_at_ms: 1730000000001
+notification_posted {
+  record {
+    key: "0|com.whatsapp|1|null|10123"
+    package_name: "com.whatsapp"
+    app_label: "WhatsApp"
+    title: "Alice"
+    text: "See you at 7"
+    big_text: "See you at 7"
+    sub_text: "Chat"
+    category: "msg"
+    posted_at_ms: 1730000000001
+    actions {
+      index: 0
+      title: "Reply"
+      has_remote_input: true
+    }
+    remote_input_hint: "Message"
+  }
+}

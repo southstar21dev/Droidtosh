@@ -1,0 +1,17 @@
+services:
+  relay:
+    build: .
+    ports:
+      - "7443:7443"
+    environment:
+      PORT: "7443"
+      STATE_FILE: /data/state.json
+      # The TLS certificate is generated in /data on first start. Keep it, or
+      # every paired phone has to re-pair. Defaults:
+      # CERT_FILE: /data/relay-cert.pem
+      # KEY_FILE: /data/relay-key.pem
+      # FCM_SERVICE_ACCOUNT: '{"type":"service_account",...}'
+      # FCM_PROJECT_ID: "your-project-id"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

@@ -1,0 +1,58 @@
+{
+  "generic": {
+    "accept": ["answer", "accept", "接听", "annehmen", "répondre", "contestar", "rispondi", "ответить", "принять", "cavab", "qəbul", "yanıtla", "kabul", "پاسخ", "відповісти", "απάντηση", "atender"],
+    "decline": ["decline", "reject", "dismiss", "ablehnen", "refuser", "rechazar", "rifiuta", "отклонить", "rədd", "imtina", "reddet", "رفض", "رد کردن", "відхилити", "απόρριψη", "recusar"],
+    "end": ["end", "end call", "hang up", "hangup", "auflegen", "raccrocher", "colgar", "结束通话", "chiudi", "завершить", "положить трубку", "dayandır", "sonlandır", "kapat", "إنهاء", "پایان", "завершити", "τερματισμός", "encerrar"]
+  },
+  "profiles": [
+    {
+      "package": "com.whatsapp",
+      "label": "WhatsApp",
+      "accept": ["answer", "accept", "接听", "annehmen", "répondre", "contestar"],
+      "decline": ["decline", "reject", "ablehnen", "refuser", "rechazar"],
+      "end": ["end call", "hang up", "auflegen", "raccrocher", "colgar"]
+    },
+    {
+      "package": "com.whatsapp.w4b",
+      "label": "WhatsApp Business",
+      "accept": ["answer", "accept", "接听", "annehmen", "répondre", "contestar"],
+      "decline": ["decline", "reject", "ablehnen", "refuser", "rechazar"],
+      "end": ["end call", "hang up", "auflegen", "raccrocher", "colgar"]
+    },
+    {
+      "package": "org.telegram.messenger",
+      "label": "Telegram",
+      "accept": ["answer", "accept", "接听", "annehmen"],
+      "decline": ["decline", "reject", "ablehnen"],
+      "end": ["end call", "hang up", "auflegen"]
+    },
+    {
+      "package": "org.thoughtcrime.securesms",
+      "label": "Signal",
+      "accept": ["answer", "accept"],
+      "decline": ["decline", "reject"],
+      "end": ["end call", "hang up"]
+    },
+    {
+      "package": "com.facebook.orca",
+      "label": "Messenger",
+      "accept": ["answer", "accept"],
+      "decline": ["decline", "ignore"],
+      "end": ["end call", "hang up"]
+    },
+    {
+      "package": "com.google.android.apps.meetings",
+      "label": "Google Meet",
+      "accept": ["answer", "join"],
+      "decline": ["decline"],
+      "end": ["leave call", "hang up"]
+    },
+    {
+      "package": "us.zoom.xos",
+      "label": "Zoom",
+      "accept": ["answer", "accept", "join"],
+      "decline": ["decline"],
+      "end": ["end call", "leave"]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+protocol_version: 2
+message_id: "fixture-hello"
+sent_at_ms: 1730000000000
+hello {
+  device_name: "Pixel 8"
+  android_version: "15"
+  app_version: "0.1.0"
+  capabilities: "notifications"
+  capabilities: "calls"
+}

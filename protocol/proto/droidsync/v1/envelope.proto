@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package droidsync.v1;
+
+import "droidsync/v1/calls.proto";
+import "droidsync/v1/clipboard.proto";
+import "droidsync/v1/device.proto";
+import "droidsync/v1/files.proto";
+import "droidsync/v1/notifications.proto";
+
+option java_package = "dev.southstar21.droidtosh.protocol.v1";
+option java_multiple_files = true;
+option swift_prefix = "DS";
+
+message Envelope {
+  uint32 protocol_version = 1;
+  string message_id = 2;
+  uint64 sent_at_ms = 3;
+  // v2 reliable delivery (see protocol/PROTOCOL-v2.md). seq = 0 means unreliable.
+  uint64 seq = 4;
+  // Highest contiguous seq received from the peer on its current stream; 0 = none.
+  uint64 ack = 5;
+
+  oneof payload {
+    AuthChallenge auth_challenge = 10;
+    AuthResponse auth_response = 11;
+    AuthOk auth_ok = 12;
+    Hello hello = 13;
+    Ping ping = 14;
+    Pong pong = 15;
+    ProtocolError error = 16;
+    Resume resume = 17;
+    Ack ack_only = 18;
+
+    NotificationPosted notification_posted = 20;
+    NotificationUpdated notification_updated = 21;
+    NotificationRemoved notification_removed = 22;
+    NotificationAction notification_action = 23;
+    NotificationDismiss notification_dismiss = 24;
+    ActionResult action_result = 25;
+    SnapshotRequest snapshot_request = 26;
+    SnapshotReply snapshot_reply = 27;
+    AppsListRequest apps_list_request = 28;
+    AppsList apps_list = 29;
+    AppIcon app_icon = 30;
+    MuteListSet mute_list_set = 31;
+    OpenAppRequest open_app_request = 45;
+    RelayStatus relay_status = 46;
+    ServerInfo server_info = 47;
+    HostStatus host_status = 48;
+
+    ClipboardText clipboard_text = 50;
+    ClipboardBlobStart clipboard_blob_start = 51;
+    ClipboardBlobChunk clipboard_blob_chunk = 52;
+    ClipboardBlobEnd clipboard_blob_end = 53;
+    PhoneStatus phone_status = 54;
+
+    FileOffer file_offer = 60;
+    FileAccept file_accept = 61;
+    FileReject file_reject = 62;
+    FileChunk file_chunk = 63;
+    FileProgress file_progress = 64;
+    FileEnd file_end = 65;
+    FileComplete file_complete = 66;
+    FileCancel file_cancel = 67;
+
+    DeviceStatus device_status = 80;
+    FindPhoneRequest find_phone_request = 81;
+    FindPhoneState find_phone_state = 82;
+
+    CallState call_state = 40;
+    CallAction call_action = 41;
+    DialRequest dial_request = 42;
+    CallLogRequest calllog_request = 43;
+    CallLogPage calllog_page = 44;
+  }
+}
+
+message AuthChallenge {
+  bytes server_nonce = 1;
+  uint32 min_version = 2;
+  uint32 max_version = 3;
+  repeated string capabilities = 4;
+}
+message AuthResponse {
+  bytes client_nonce = 1;
+  bytes mac = 2;
+  uint32 min_version = 3;
+  uint32 max_version = 4;
+  repeated string capabilities = 5;
+}
+// Sent by the Mac: the negotiated version and the intersection of both capability lists.
+message AuthOk {
+  bytes mac = 1;
+  uint32 version = 2;
+  repeated string capabilities = 3;
+}
+
+// Sent by each side right after AuthOk.
+message Resume {
+  // Random per process start; a change tells the peer to reset its receive state.
+  string stream_id = 1;
+  // Highest contiguous seq this side has processed from the peer's stream_id (0 if unknown).
+  uint64 last_received_seq = 2;
+  // The peer stream this last_received_seq refers to.
+  string peer_stream_id = 3;
+}
+
+// Standalone acknowledgement when there is nothing else to piggyback the ack on.
+message Ack {}
+
+message Hello {
+  string device_name = 1;
+  string android_version = 2;
+  string app_version = 3;
+  repeated string capabilities = 4;
+}
+
+message Ping { uint64 sent_at_ms = 1; }
+message Pong { uint64 sent_at_ms = 1; }
+message ProtocolError { string code = 1; string message = 2; }
+message HostStatus { bool sleeping = 1; }

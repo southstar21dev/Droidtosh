@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package droidsync.v1;
+
+option java_package = "dev.southstar21.droidtosh.protocol.v1";
+option java_multiple_files = true;
+option swift_prefix = "DS";
+
+// File transfer ("files" capability). Flow: Offer → Accept|Reject → Chunk* → End → Complete.
+// Either side may Cancel. See protocol/PROTOCOL-v2.md §7.
+
+message FileOffer {
+  string transfer_id = 1;   // UUID chosen by the sender; reused when re-offering after a reconnect
+  string name = 2;          // display name only; receivers must sanitize before using it as a path
+  string mime_type = 3;     // may be empty
+  uint64 size = 4;
+  uint64 modified_at_ms = 5;
+}
+
+message FileAccept {
+  string transfer_id = 1;
+  uint64 resume_offset = 2; // bytes the receiver already has (0 for a fresh transfer)
+}
+
+message FileReject {
+  string transfer_id = 1;
+  string reason = 2;        // too_large | disk_full | disabled | busy | invalid
+}
+
+message FileChunk {
+  string transfer_id = 1;
+  uint64 offset = 2;
+  bytes data = 3;
+}
+
+// Receiver → sender flow control: total contiguous bytes written so far.
+message FileProgress {
+  string transfer_id = 1;
+  uint64 received = 2;
+}
+
+message FileEnd {
+  string transfer_id = 1;
+  bytes sha256 = 2;         // of the whole file
+}
+
+message FileComplete {
+  string transfer_id = 1;
+  bool ok = 2;
+  string error = 3;         // checksum_mismatch | write_failed | ...
+  string saved_as = 4;      // display name the receiver saved it under
+}
+
+message FileCancel {
+  string transfer_id = 1;
+  string reason = 2;        // user | timeout | error
+}

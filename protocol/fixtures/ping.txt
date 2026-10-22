@@ -1,0 +1,4 @@
+protocol_version: 2
+message_id: "fixture-ping"
+sent_at_ms: 1730000000003
+ping { sent_at_ms: 1730000000003 }
