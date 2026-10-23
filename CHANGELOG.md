@@ -5,6 +5,8 @@ see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Unreleased
 
+## 0.1.0 – 2026-10-23
+
 First public release.
 
 - Notifications from the phone as native macOS banners, with replies, actions and per-app muting.
