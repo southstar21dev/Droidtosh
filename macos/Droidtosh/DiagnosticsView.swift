@@ -61,13 +61,13 @@ struct DiagnosticsView: View {
         HStack(spacing: 16) {
             metric("State", value: snapshot.state.capitalized, symbol: "dot.radiowaves.left.and.right", tint: stateTint)
             Divider().frame(height: 34)
-            metric("Round trip", value: snapshot.rtt.last.map(DiagnosticsReport.ms) ?? "—", symbol: "timer", tint: .blue)
+            metric("Round trip", value: snapshot.rtt.last.map(DiagnosticsReport.ms) ?? "—", symbol: "timer", tint: nil)
             Divider().frame(height: 34)
             metric("Uptime", value: snapshot.sessionStartedAt.map {
                 DiagnosticsReport.duration(snapshot.capturedAt.timeIntervalSince($0))
-            } ?? "—", symbol: "clock", tint: .purple)
+            } ?? "—", symbol: "clock", tint: nil)
             Divider().frame(height: 34)
-            metric("Outbox", value: "\(context.outboxDepth)", symbol: "tray.full", tint: context.outboxDepth > 0 ? .orange : .gray)
+            metric("Outbox", value: "\(context.outboxDepth)", symbol: "tray.full", tint: context.outboxDepth > 0 ? .orange : nil)
         }
         .padding(.vertical, 4)
     }
@@ -79,7 +79,7 @@ struct DiagnosticsView: View {
         return .orange
     }
 
-    private func metric(_ title: String, value: String, symbol: String, tint: Color) -> some View {
+    private func metric(_ title: String, value: String, symbol: String, tint: Color?) -> some View {
         HStack(spacing: 8) {
             IconTile(symbol: symbol, color: tint, size: 28)
             VStack(alignment: .leading, spacing: 1) {

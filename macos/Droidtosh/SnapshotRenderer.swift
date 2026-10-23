@@ -45,7 +45,7 @@ enum SnapshotRenderer {
                 try? data.write(to: url)
                 print("snapshot: \(url.path)")
             }
-            let windowSize = NSSize(width: 1040, height: 720)
+            let windowSize = NSSize(width: 1040, height: 780)
             for section in MainSection.allCases {
                 save("main-\(section.rawValue)", await window(MainView(model: connected, initialSection: section), size: windowSize, title: "Droidtosh", appearance: appearance))
             }
@@ -195,8 +195,8 @@ private struct SnapshotBackdrop<Content: View>: View {
         .background(
             LinearGradient(
                 colors: colorScheme == .dark
-                    ? [Color(red: 0.10, green: 0.12, blue: 0.22), Color(red: 0.05, green: 0.22, blue: 0.26)]
-                    : [Color(red: 0.72, green: 0.84, blue: 0.95), Color(red: 0.86, green: 0.80, blue: 0.93)],
+                    ? [Color(hex: 0x2A2320), Color(hex: 0x4A3F33)]
+                    : [Color(hex: 0xF5ECD7), Color(hex: 0xD8C8A4)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )

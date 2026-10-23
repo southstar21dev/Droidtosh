@@ -162,7 +162,7 @@ struct AppMonogram: View {
     let seed: String
     var size: CGFloat = 28
 
-    private static let palette: [Color] = [.blue, .green, .orange, .pink, .purple, .teal, .indigo, .red, .mint, .brown]
+    private static let palette = Brand.monograms
 
     var body: some View {
         let color = Self.palette[Int(seed.utf8.reduce(UInt32(5381)) { ($0 &* 33) &+ UInt32($1) } % UInt32(Self.palette.count))]
@@ -170,7 +170,7 @@ struct AppMonogram: View {
             .font(.system(size: size * 0.46, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous).fill(color.gradient))
+            .background(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous).fill(color))
             .accessibilityHidden(true)
     }
 }

@@ -4,8 +4,8 @@ import DroidsyncKit
 /// Battery, network and sound at a glance. Greyed with "last seen …" when the status is stale.
 struct PhoneStatusChips: View {
     @ObservedObject var device: DeviceController
-    /// White text for the brand gradient hero.
-    var onGradient = false
+    /// Text in `Brand.onHero`, for the hero surface.
+    var onHero = false
 
     var body: some View {
         if let status = device.status {
@@ -35,12 +35,12 @@ struct PhoneStatusChips: View {
         } else {
             Text(device.phoneSupportsStatus ? "Waiting for phone status…" : "Phone status not available")
                 .font(.callout)
-                .foregroundStyle(onGradient ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                .foregroundStyle(onHero ? AnyShapeStyle(Brand.onHero.opacity(0.8)) : AnyShapeStyle(.secondary))
         }
     }
 
     private var foreground: AnyShapeStyle {
-        if onGradient { return AnyShapeStyle(.white) }
+        if onHero { return AnyShapeStyle(Brand.onHero) }
         return device.isStale ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary)
     }
 
@@ -55,7 +55,7 @@ struct PhoneStatusChips: View {
     }
 
     private func batteryTint(_ status: DSDeviceStatus) -> Color? {
-        if device.isStale || onGradient { return nil }
+        if device.isStale || onHero { return nil }
         if status.charging { return .green }
         return PhoneStatusDisplay.isLowBattery(status) ? .red : nil
     }

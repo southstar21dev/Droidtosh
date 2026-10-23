@@ -1,27 +1,52 @@
 import AppKit
 import SwiftUI
 
-// The shared look of Droidtosh's windows, popover and panels: brand colours, cards, banners
+// The shared look of Droidtosh's windows, popover and panels: the Roast & Cream brand colours, cards, banners
 // and the Liquid Glass helpers (with material fallbacks before macOS 26).
 
 enum Brand {
-    /// Lagoon #0E9F8E, the brand tint (also the app's accent colour asset).
-    static let lagoon = Color("Lagoon")
-    /// Indigo #4B5BD7, the secondary brand colour.
-    static let indigo = Color("Indigo")
-    /// Lagoon → Indigo at 135°. Only for the app icon and hero or illustration surfaces.
-    /// Fixed sRGB values (not the appearance-adaptive assets), so it reads the same in dark mode.
-    static let gradient = LinearGradient(
-        colors: [Color(red: 0x0E / 255, green: 0x9F / 255, blue: 0x8E / 255), Color(red: 0x4B / 255, green: 0x5B / 255, blue: 0xD7 / 255)],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
     /// Cream #F5ECD7, the app-icon tile behind the logo.
-    static let cream = Color(red: 0xF5 / 255, green: 0xEC / 255, blue: 0xD7 / 255)
+    static let cream = Color(hex: 0xF5ECD7)
     /// Dark roast #1F1A17, the logo itself.
-    static let darkRoast = Color(red: 0x1F / 255, green: 0x1A / 255, blue: 0x17 / 255)
+    static let darkRoast = Color(hex: 0x1F1A17)
+    /// Ring cream #E6D8B8, a deeper cream for containers on light.
+    static let ringCream = Color(hex: 0xE6D8B8)
+    /// Tan #A8946A, the quiet accent of the southstar21 family.
+    static let tan = Color(hex: 0xA8946A)
     /// The Droid Mac logo from the app icon, as a template image.
     static let glyph = Image("BrandGlyph")
+
+    // Roast & Cream, as on Android: the hero is the inverse surface (dark roast on light, cream
+    // on dark), and icon tiles are tonal cream–roast containers. Flat colour only, no gradients.
+
+    /// The window background behind the content, as Android's surface.
+    static let surface = Color(light: 0xFBF7EE, dark: 0x1F1A17)
+    /// Cards and grouped content on `surface`, as Android's surface container.
+    static let card = Color(light: 0xF5ECD7, dark: 0x2A2320)
+    /// The hero surface: dark roast in light mode, cream in dark mode.
+    static let hero = Color(light: 0x1F1A17, dark: 0xF5ECD7)
+    /// Text and symbols on `hero`.
+    static let onHero = Color(light: 0xF5ECD7, dark: 0x1F1A17)
+    /// The fill of icon tiles and other tonal containers.
+    static let tile = Color(light: 0xE6D8B8, dark: 0x4A3F33)
+    /// Symbols on `tile`.
+    static let onTile = Color(light: 0x1F1A17, dark: 0xF5ECD7)
+    /// Warm tones for per-app monograms, from the cream–roast ramp; white text reads on each.
+    static let monograms: [Color] = [0x6E5E44, 0x8A5300, 0x4A3F33, 0x7A4E2D, 0x5E6B4A, 0x8C6A4F, 0x3A3129, 0x96743A].map { Color(hex: $0) }
+}
+
+extension Color {
+    init(hex: UInt32) {
+        self.init(.sRGB, red: Double(hex >> 16 & 0xFF) / 255, green: Double(hex >> 8 & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
+    }
+
+    /// A colour that follows the view's appearance.
+    init(light: UInt32, dark: UInt32) {
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let hex = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+            return NSColor(srgbRed: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        })
+    }
 }
 
 // MARK: Glass and materials
@@ -71,8 +96,8 @@ struct GlassGroup<Content: View>: View {
 
 // MARK: Cards
 
-/// A content card in a window: a quiet fill like a grouped form section, so content stays in
-/// the content layer and glass is kept for controls.
+/// A content card in a window: a quiet cream (or roast) fill like a grouped form section, so
+/// content stays in the content layer and glass is kept for controls.
 struct Card<Content: View>: View {
     var padding: CGFloat = 16
     @ViewBuilder var content: Content
@@ -91,7 +116,7 @@ struct CardBackground: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(Color(nsColor: .quaternarySystemFill))
+            .fill(Brand.card)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(contrast == .increased ? AnyShapeStyle(.secondary) : AnyShapeStyle(.separator), lineWidth: contrast == .increased ? 1 : 0.5)
@@ -140,20 +165,21 @@ struct TintedIconLabelStyle: LabelStyle {
     }
 }
 
-/// A white SF Symbol on a coloured rounded square, as in System Settings.
+/// An SF Symbol on a rounded square: roast on a cream tile by default, or white on a status
+/// colour (green, orange, red) when the tile reports a state.
 struct IconTile: View {
     let symbol: String
-    var color: Color = .accentColor
+    var color: Color? = nil
     var size: CGFloat = 26
 
     var body: some View {
         Image(systemName: symbol)
             .font(.system(size: size * 0.5, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(color == nil ? Brand.onTile : .white)
             .frame(width: size, height: size)
             .background(
                 RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
-                    .fill(color.gradient)
+                    .fill(color ?? Brand.tile)
             )
             .accessibilityHidden(true)
     }
@@ -256,15 +282,15 @@ extension Banner where Actions == EmptyView {
 /// Coloured dot and label for the connection state.
 struct StatusBadge: View {
     let status: DroidtoshStatus
-    var onGradient = false
+    var onHero = false
 
     var body: some View {
         HStack(spacing: 5) {
             Circle()
-                .fill(onGradient ? Color.white : status.color)
+                .fill(onHero ? Brand.onHero : status.color)
                 .frame(width: 7, height: 7)
                 .overlay {
-                    if status == .connected && !onGradient {
+                    if status == .connected && !onHero {
                         Circle().stroke(status.color.opacity(0.35), lineWidth: 3)
                     }
                 }
@@ -273,8 +299,8 @@ struct StatusBadge: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .foregroundStyle(onGradient ? AnyShapeStyle(.white) : AnyShapeStyle(status.color))
-        .background(Capsule().fill(onGradient ? Color.white.opacity(0.2) : status.color.opacity(0.14)))
+        .foregroundStyle(onHero ? AnyShapeStyle(Brand.onHero) : AnyShapeStyle(status.color))
+        .background(Capsule().fill(onHero ? Brand.onHero.opacity(0.16) : status.color.opacity(0.14)))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Status: \(status.title)")
     }

@@ -64,6 +64,8 @@ struct MainView: View {
             }
         } detail: {
             detail
+                .scrollContentBackground(.hidden)
+                .background(Brand.surface)
                 .frame(minWidth: 560, minHeight: 480)
         }
         .environment(\.selectSection, { selection = $0 })

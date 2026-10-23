@@ -5,6 +5,9 @@ see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Unreleased
 
+- The Mac app now uses the same Roast & Cream palette as the Android app: dark roast and cream
+  surfaces, a matching accent colour, and tonal icon tiles.
+
 ## 0.1.0 – 2026-10-23
 
 First public release.
