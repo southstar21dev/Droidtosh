@@ -31,21 +31,46 @@
 </p>
 
 <p align="center">
-  <img alt="Welcome screen" src=".github/screenshots/android-welcome.png" width="240">
-  &nbsp;
-  <img alt="Home screen" src=".github/screenshots/android-home.png" width="240">
-  &nbsp;
-  <img alt="Transfers" src=".github/screenshots/android-transfers.png" width="240">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/mac-overview-dark.png">
+    <img alt="The Mac app's overview of the paired phone" src=".github/screenshots/mac-overview-light.png" width="820">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/android-home-dark.png">
+    <img alt="Home screen on Android" src=".github/screenshots/android-home-light.png" width="260">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/android-transfers-dark.png">
+    <img alt="File transfers on Android" src=".github/screenshots/android-transfers-light.png" width="260">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/android-settings-dark.png">
+    <img alt="Connection settings on Android" src=".github/screenshots/android-settings-light.png" width="260">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/mac-menu-bar-dark.png">
+    <img alt="The Mac menu bar popover" src=".github/screenshots/mac-menu-bar-light.png" width="400">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/mac-call-dark.png">
+    <img alt="An incoming call on the Mac" src=".github/screenshots/mac-call-light.png" width="400">
+  </picture>
 </p>
 
 ## Features
 
-- **🔔 Notifications.** Your phone's notifications as native macOS banners. Reply inline, use their actions, dismiss them on either side, and mute apps you don't want on the Mac.
-- **📞 Calls.** Answer, decline and mute incoming calls from the Mac, place calls (choosing the SIM on dual-SIM phones) and browse recent calls.
-- **📋 Clipboard.** Copy text or an image on one device, paste it on the other. Password-manager copies are never sent.
-- **📁 Files.** Send files and folders both ways, up to 2 GB, from the Mac's menu bar or any Android share sheet. Interrupted transfers resume.
-- **🔋 Phone status.** Battery, network and sound mode in the menu bar, low-battery alerts, and **Find my phone** to ring it at full volume.
-- **⬆️ Updates.** Both apps update themselves from GitHub releases when you say so, with an opt-in beta channel.
+- **Notifications.** Your phone's notifications as native macOS banners. Reply inline, use their actions, dismiss them on either side, and mute apps you don't want on the Mac.
+- **Calls.** Answer, decline and mute incoming calls from the Mac, place calls (choosing the SIM on dual-SIM phones) and browse recent calls.
+- **Clipboard.** Copy text or an image on one device, paste it on the other. Password-manager copies are never sent.
+- **Files.** Send files and folders both ways, up to 2 GB, from the Mac's menu bar or any Android share sheet. Interrupted transfers resume.
+- **Phone status.** Battery, network and sound mode in the menu bar, low-battery alerts, and **Find my phone** to ring it at full volume.
+- **Updates.** Both apps update themselves from GitHub releases when you say so, with an opt-in beta channel.
 
 ## Install
 
