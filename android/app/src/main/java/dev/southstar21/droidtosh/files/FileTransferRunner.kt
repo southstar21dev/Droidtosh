@@ -7,8 +7,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -34,9 +34,9 @@ class FileTransferRunner(private val engine: FileTransferEngine) {
             }
         }
         jobs += scope.launch {
-            combine(TransportHub.isConnected, TransportHub.capabilities) { connected, capabilities ->
+            TransportHub.sessionCapabilities.map { capabilities ->
                 when {
-                    !connected -> Session.NONE
+                    capabilities == null -> Session.NONE
                     Capabilities.FILES in capabilities -> Session.FILES
                     else -> Session.WITHOUT_FILES
                 }

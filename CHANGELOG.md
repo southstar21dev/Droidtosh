@@ -7,6 +7,8 @@ see [docs/RELEASING.md](docs/RELEASING.md).
 
 - The Mac app now uses the same Roast & Cream palette as the Android app: dark roast and cream
   surfaces, a matching accent colour, and tonal icon tiles.
+- A file the phone was sending no longer fails with "Not supported by the Mac" when the connection
+  drops; it waits and resumes after the reconnect.
 - The relay answers `ERROR upgrade` to a join line for any protocol version other than the current one.
 
 ## 0.1.0 – 2026-10-23

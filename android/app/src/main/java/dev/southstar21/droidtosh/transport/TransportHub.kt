@@ -54,6 +54,14 @@ object TransportHub {
     /** Capabilities negotiated with the Mac for the current session; empty while disconnected. */
     val capabilities: StateFlow<Set<String>> = mutableCapabilities.asStateFlow()
 
+    private val mutableSessionCapabilities = MutableStateFlow<Set<String>?>(null)
+
+    /**
+     * The current session's capabilities, or null while disconnected. One flow, so a collector never
+     * sees [isConnected] and [capabilities] out of step (connected with the empty set of a teardown).
+     */
+    val sessionCapabilities: StateFlow<Set<String>?> = mutableSessionCapabilities.asStateFlow()
+
     /** A session whose feature traffic flows (Resume exchanged, §5); [id] is new for every session. */
     data class ReadySession(val id: Long, val capabilities: Set<String>)
 
@@ -93,6 +101,7 @@ object TransportHub {
         mutableReadySession.value = null
         mutableCapabilities.value = capabilities
         mutableConnected.value = true
+        mutableSessionCapabilities.value = capabilities
         if (ready) startWriter(client)
     }
 
@@ -129,6 +138,7 @@ object TransportHub {
         writerJob = null
         client = null
         mutableReadySession.value = null
+        mutableSessionCapabilities.value = null
         mutableConnected.value = false
         mutableCapabilities.value = emptySet()
         // Queued reliable envelopes move into the outbox so the next session retransmits them.
