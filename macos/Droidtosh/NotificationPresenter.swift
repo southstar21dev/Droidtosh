@@ -162,7 +162,7 @@ final class NotificationPresenter: NSObject, NotificationPresenting, UNUserNotif
         if response.actionIdentifier == UNNotificationDismissActionIdentifier {
             onResponse?(key, "", nil, true)
         } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
-            // Tapping the banner is a no-op on the phone in v1.
+            // Tapping the banner does nothing on the phone.
         } else {
             let text = (response as? UNTextInputNotificationResponse)?.userText
             onResponse?(key, response.actionIdentifier, text, false)

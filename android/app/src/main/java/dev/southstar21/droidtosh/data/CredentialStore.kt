@@ -95,7 +95,7 @@ class CredentialStore(private val context: Context) {
             val plaintext = cipher.doFinal(AndroidBase64.decode(ciphertext, AndroidBase64.NO_WRAP))
                 .toString(Charsets.UTF_8)
             decode(plaintext) ?: run {
-                // Decrypted fine but in an older format (e.g. a v1 pairing without the relay
+                // Decrypted fine but in an older format (e.g. a pairing without the relay
                 // fingerprint): it can't connect any more, so ask the user to re-pair.
                 clear()
                 meta.edit().putBoolean(KEY_REPAIR_NEEDED, true).apply()

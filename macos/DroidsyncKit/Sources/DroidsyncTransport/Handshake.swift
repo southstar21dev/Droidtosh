@@ -18,7 +18,7 @@ public struct Negotiation: Equatable {
     }
 
     /// Picks the highest version both ranges contain, or nil when they don't overlap.
-    /// A zero `max` means the peer sent no range (a v1 peer).
+    /// A zero `max` means the peer sent no range, which never matches.
     static func version(
         localMin: UInt32, localMax: UInt32,
         peerMin: UInt32, peerMax: UInt32
