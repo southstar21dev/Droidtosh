@@ -185,7 +185,7 @@ private final class RelayJoinHandler: ChannelInboundHandler, RemovableChannelHan
 
     private func handle(line: String, leftover: ByteBuffer, channel: Channel) {
         let parts = line.split(separator: " ", omittingEmptySubsequences: true)
-        if parts.first == "DROIDSYNC/1" {
+        if let tag = parts.first, tag != "DROIDSYNC/2", tag.hasPrefix("DROIDSYNC/") {
             let write = channel.eventLoop.makePromise(of: Void.self)
             channel.writeAndFlush(Self.buffer("ERROR upgrade\n", for: channel), promise: write)
             write.futureResult.whenComplete { _ in channel.close(promise: nil) }

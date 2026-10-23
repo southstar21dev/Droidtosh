@@ -1,7 +1,7 @@
 # Droidtosh protocol v2
 
-v2 is a clean break: v1 peers are rejected. The proto package stays `droidsync.v1` to avoid
-renaming every generated type; the wire version is the `protocol_version` field, now `2`.
+The wire version is the `protocol_version` field, `2`; peers on any other version are rejected.
+The proto package is named `droidsync.v1`, which is only a package name and not the wire version.
 
 The phone reaches the Mac through the relay (§1.1–1.3), directly on the local network (§1.4), or
 through the relay with the local network as a fallback (§1.5).
@@ -30,10 +30,10 @@ phone ── TCP ── [outer TLS: client ↔ relay] ── relay ── [outer
 ### 1.2 Join line (inside outer TLS)
 `DROIDSYNC/2 <room> mac|phone [fcm-token]\n`
 
-The format is otherwise unchanged from v1: max 512 bytes, 5 s deadline, the same responses (`PAIRED`, `WAIT`, `ERROR <reason>`) and the same room format. The relay answers `ERROR upgrade` to a `DROIDSYNC/1` line.
+Max 512 bytes, 5 s deadline. The relay answers with exactly one line: `PAIRED`, `WAIT` or `ERROR <reason>`. The room is 43 characters of base64url (`[A-Za-z0-9_-]`). A join line for any other protocol version (`DROIDSYNC/<n>`) gets `ERROR upgrade`.
 
 ### 1.3 Pipe
-After `PAIRED`, the relay pipes the decrypted outer-TLS byte streams between the two clients. Those bytes are the inner TLS, so the relay still never sees plaintext. The inner TLS, its pinning to the Mac's certificate, and the framing are unchanged from v1 (4-byte big-endian length, max 1 MiB).
+After `PAIRED`, the relay pipes the decrypted outer-TLS byte streams between the two clients. Those bytes are the inner TLS, so the relay still never sees plaintext. The inner TLS is pinned to the Mac's certificate, and frames are length-prefixed (4-byte big-endian length, max 1 MiB).
 
 ### 1.4 Local network (direct)
 The phone can also reach the Mac directly on the local network, with no relay in the path:
@@ -68,7 +68,7 @@ Both apps have a connection mode setting:
 ## 2. Pairing URI
 `droidsync://pair?v=2&did=…&name=…&host=…&port=…&fp=<mac cert sha256>&rfp=<relay cert sha256>&psk=…&room=…&mode=…&lhost=…&lport=…`
 
-- `v=2` is required. The phone rejects `v=1` with "Pairing code is from an older version — re-pair".
+- `v=2` is required. The phone rejects an older code with "Pairing code is from an older version — re-pair".
 - `mode` is `relay`, `local` or `both` (§1.5). It defaults to `relay` when absent, so older codes stay valid.
 - `host`, `port` and `rfp` are required unless `mode=local`, where they are omitted.
 - `room` is always present.
@@ -76,7 +76,7 @@ Both apps have a connection mode setting:
 
 ## 3. Auth and negotiation (inner, first frames)
 1. **Mac → `AuthChallenge`:** `server_nonce`, `min_version=2`, `max_version=2`, and the Mac's `capabilities`.
-2. **Phone → `AuthResponse`:** `client_nonce`, `mac` (HMAC unchanged from v1), its `min_version`, `max_version` and `capabilities`.
+2. **Phone → `AuthResponse`:** `client_nonce`, `mac` (the HMAC), its `min_version`, `max_version` and `capabilities`.
 3. **Mac chooses** `version = min(mac.max, phone.max)` and requires it to be at least `max(mac.min, phone.min)`.
    - If no version fits, the Mac sends `ProtocolError{code:"unsupported_version"}` and closes.
    - Otherwise it sends `AuthOk{mac, version, capabilities = intersection}`.

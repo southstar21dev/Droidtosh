@@ -164,7 +164,7 @@ func handleConn(ctx context.Context, registry *Registry, raw net.Conn, cfg *tls.
 		return
 	}
 	join, err := ParseJoinLine(line)
-	if errors.Is(err, ErrOldProtocol) {
+	if errors.Is(err, ErrUnsupportedVersion) {
 		_, _ = conn.Write([]byte(FormatError("upgrade")))
 		return
 	}

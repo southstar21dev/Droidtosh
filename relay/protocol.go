@@ -13,9 +13,10 @@ const (
 	maxJoinLine    = 512
 )
 
-// ErrOldProtocol marks a v1 join line, answered with `ERROR upgrade` so old
-// clients can tell the user to update.
-var ErrOldProtocol = errors.New("protocol v1 is no longer supported")
+// ErrUnsupportedVersion marks a join line for a protocol version this relay
+// doesn't speak, answered with `ERROR upgrade` so the client can tell the user
+// to update the relay or the app.
+var ErrUnsupportedVersion = errors.New("unsupported protocol version")
 
 type Role string
 
@@ -38,8 +39,8 @@ func ParseJoinLine(raw string) (JoinLine, error) {
 		return JoinLine{}, fmt.Errorf("malformed join line")
 	}
 	fields := strings.Split(line, " ")
-	if fields[0] == "DROIDSYNC/1" {
-		return JoinLine{}, ErrOldProtocol
+	if fields[0] != protocolPrefix && strings.HasPrefix(fields[0], "DROIDSYNC/") {
+		return JoinLine{}, ErrUnsupportedVersion
 	}
 	if len(fields) < 3 || len(fields) > 4 || fields[0] != protocolPrefix {
 		return JoinLine{}, fmt.Errorf("malformed join line")

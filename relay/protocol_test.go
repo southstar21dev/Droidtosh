@@ -28,10 +28,10 @@ func TestParseJoinLinePhoneWithToken(t *testing.T) {
 	}
 }
 
-func TestParseJoinLineFlagsV1(t *testing.T) {
-	_, err := ParseJoinLine("DROIDSYNC/1 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA mac\n")
-	if !errors.Is(err, ErrOldProtocol) {
-		t.Fatalf("v1 join: got %v, want ErrOldProtocol", err)
+func TestParseJoinLineFlagsOtherVersions(t *testing.T) {
+	_, err := ParseJoinLine("DROIDSYNC/3 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA mac\n")
+	if !errors.Is(err, ErrUnsupportedVersion) {
+		t.Fatalf("other-version join: got %v, want ErrUnsupportedVersion", err)
 	}
 }
 

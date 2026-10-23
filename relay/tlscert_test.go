@@ -111,12 +111,12 @@ func TestRelayRejectsPlainTCP(t *testing.T) {
 	}
 }
 
-func TestRelayAnswersV1JoinWithUpgrade(t *testing.T) {
+func TestRelayAnswersOtherVersionJoinWithUpgrade(t *testing.T) {
 	addr := startTestServer(t, nil)
-	conn, resp := joinAndRead(t, addr, "DROIDSYNC/1 "+room+" phone\n")
+	conn, resp := joinAndRead(t, addr, "DROIDSYNC/3 "+room+" phone\n")
 	defer conn.Close()
 	if resp != "ERROR upgrade" {
-		t.Fatalf("v1 join response: %q", resp)
+		t.Fatalf("other-version join response: %q", resp)
 	}
 }
 

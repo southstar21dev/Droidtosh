@@ -88,7 +88,7 @@ final class DiagnosticsTests: XCTestCase {
     func testRejectedFramesAndClipboardOutcomes() {
         let recorder = makeRecorder()
         recorder.recordRejectedFrame(.oversize, detail: "too big")
-        recorder.recordRejectedFrame(.wrongVersion, detail: "v1")
+        recorder.recordRejectedFrame(.wrongVersion, detail: "version 3")
         recorder.recordClipboardTransfer(.completed)
         recorder.recordClipboardTransfer(.timedOut)
         let snapshot = recorder.snapshot()
@@ -110,7 +110,7 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertEqual(device.findNoResponses, 1)
         XCTAssertEqual(device.lowBatteryAlerts, 1)
         XCTAssertEqual(device.findRings, 0)
-        XCTAssertEqual(snapshot.lastError?.message, "v1")
+        XCTAssertEqual(snapshot.lastError?.message, "version 3")
     }
 
     func testDeviceEnvelopesAreCountedAsDevice() {

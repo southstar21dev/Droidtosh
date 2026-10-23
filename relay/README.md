@@ -18,7 +18,7 @@ apps pin by fingerprint, so the room ID and the phone's FCM token in the join
 line are no longer visible on the network path. Plain TCP is not accepted.
 
 - Join line, sent inside TLS: `DROIDSYNC/2 <room> mac|phone [fcm-token]\n`
-  (max 512 bytes). A `DROIDSYNC/1` line gets `ERROR upgrade`.
+  (max 512 bytes). A join line for any other protocol version gets `ERROR upgrade`.
 - Responses: exactly one line, `PAIRED\n`, `WAIT\n`, or `ERROR <reason>\n`
 - Default port: `7443` (TLS over TCP)
 - The TLS handshake and join line must complete within 5 seconds.

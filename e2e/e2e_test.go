@@ -281,19 +281,20 @@ func TestRelayRestart(t *testing.T) {
 	assertStillConnected(t, s)
 }
 
-// (7) Rejections: the relay refuses v1 join lines; both clients refuse a relay whose
-// certificate doesn't match the pin; the phone refuses a v1 pairing code.
+// (7) Rejections: the relay refuses join lines for other protocol versions; both clients
+// refuse a relay whose certificate doesn't match the pin; the phone refuses an outdated
+// pairing code.
 func TestRejections(t *testing.T) {
 	r := startRelay(t)
 
-	t.Run("v1 join line", func(t *testing.T) {
+	t.Run("other-version join line", func(t *testing.T) {
 		conn, err := tls.Dial("tcp", r.addr(), &tls.Config{InsecureSkipVerify: true})
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer conn.Close()
 		conn.SetDeadline(time.Now().Add(5 * time.Second))
-		fmt.Fprintf(conn, "DROIDSYNC/1 %s mac\n", randomRoom())
+		fmt.Fprintf(conn, "DROIDSYNC/3 %s mac\n", randomRoom())
 		line, err := io.ReadAll(io.LimitReader(conn, 64))
 		if err != nil && !strings.Contains(string(line), "\n") {
 			t.Fatalf("reading relay reply: %v (got %q)", err, line)
@@ -322,7 +323,7 @@ func TestRejections(t *testing.T) {
 		}
 	})
 
-	t.Run("phone with v1 pairing code", func(t *testing.T) {
+	t.Run("phone with outdated pairing code", func(t *testing.T) {
 		mac := startMacPeer(t, r)
 		uri := mac.waitFor(20*time.Second, "pairing URI", isEvent("pairing")).str("uri")
 		phone := startPhonePeer(t)
