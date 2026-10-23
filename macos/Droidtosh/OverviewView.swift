@@ -96,23 +96,23 @@ struct OverviewView: View {
         Card {
             CardHeader("Quick Actions", symbol: "bolt.fill")
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                QuickActionTile(title: "Send File…", symbol: "square.and.arrow.up", color: .blue) {
+                QuickActionTile(title: "Send File…", symbol: "square.and.arrow.up") {
                     model.files.pickAndSend()
                 }
                 .disabled(!model.files.phoneSupportsFiles)
-                QuickActionTile(title: "Pairing Code", symbol: "qrcode", color: Brand.lagoon) {
+                QuickActionTile(title: "Pairing Code", symbol: "qrcode") {
                     showPairing()
                 }
-                QuickActionTile(title: "Refresh Apps", symbol: "arrow.clockwise", color: .purple) {
+                QuickActionTile(title: "Refresh Apps", symbol: "arrow.clockwise") {
                     model.notifications.requestAppsList()
                 }
-                QuickActionTile(title: "Call Log", symbol: "phone.fill", color: .green) {
+                QuickActionTile(title: "Call Log", symbol: "phone.fill") {
                     selectSection(.calls)
                 }
-                QuickActionTile(title: "Notification Settings", symbol: "bell.badge.fill", color: .red) {
+                QuickActionTile(title: "Notification Settings", symbol: "bell.badge.fill") {
                     SystemSettings.openNotifications()
                 }
-                QuickActionTile(title: "Settings…", symbol: "gearshape.fill", color: .gray) {
+                QuickActionTile(title: "Settings…", symbol: "gearshape.fill") {
                     openSettings()
                 }
             }
@@ -128,13 +128,13 @@ struct OverviewView: View {
                     .controlSize(.small)
             }
             VStack(spacing: 0) {
-                mirrorRow("Notifications from phone", symbol: "bell.fill", color: .red, on: model.notifications.notificationsRelayEnabled, detail: model.notifications.notificationsRelayEnabled ? "On" : "Off on phone")
+                mirrorRow("Notifications from phone", symbol: "bell.fill", on: model.notifications.notificationsRelayEnabled, detail: model.notifications.notificationsRelayEnabled ? "On" : "Off on phone")
                 Divider().padding(.leading, 36)
-                mirrorRow("Notification banners on this Mac", symbol: "macwindow.badge.plus", color: .orange, on: model.notifications.notificationsAuthorized, detail: authorizationText)
+                mirrorRow("Notification banners on this Mac", symbol: "macwindow.badge.plus", on: model.notifications.notificationsAuthorized, detail: authorizationText)
                 Divider().padding(.leading, 36)
-                mirrorRow("Clipboard sync", symbol: "doc.on.clipboard.fill", color: .blue, on: model.clipboard.enabled, detail: model.clipboard.enabled ? "On" : "Off")
+                mirrorRow("Clipboard sync", symbol: "doc.on.clipboard.fill", on: model.clipboard.enabled, detail: model.clipboard.enabled ? "On" : "Off")
                 Divider().padding(.leading, 36)
-                mirrorRow("Receive files", symbol: "tray.and.arrow.down.fill", color: .teal, on: model.files.receivingEnabled, detail: model.files.receivingEnabled ? "Saved to Downloads" : "Off")
+                mirrorRow("Receive files", symbol: "tray.and.arrow.down.fill", on: model.files.receivingEnabled, detail: model.files.receivingEnabled ? "Saved to Downloads" : "Off")
             }
         }
     }
@@ -148,9 +148,9 @@ struct OverviewView: View {
     }
 
     /// `on` nil means unknown (e.g. notification permission not asked yet).
-    private func mirrorRow(_ title: String, symbol: String, color: Color, on: Bool?, detail: String) -> some View {
+    private func mirrorRow(_ title: String, symbol: String, on: Bool?, detail: String) -> some View {
         HStack(spacing: 10) {
-            IconTile(symbol: symbol, color: color, size: 24)
+            IconTile(symbol: symbol, size: 24)
             Text(title)
             Spacer()
             Text(detail)
@@ -181,11 +181,10 @@ private struct OverviewWarning: View, Identifiable {
     }
 }
 
-/// A square-ish button with a coloured icon over its title, like Control Center tiles.
+/// A square-ish button with a tile icon beside its title, like Control Center tiles.
 struct QuickActionTile: View {
     let title: String
     let symbol: String
-    var color: Color = .accentColor
     let action: () -> Void
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
@@ -193,7 +192,8 @@ struct QuickActionTile: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                IconTile(symbol: symbol, color: isEnabled ? color : .gray, size: 28)
+                IconTile(symbol: symbol, size: 28)
+                    .opacity(isEnabled ? 1 : 0.5)
                 Text(title)
                     .font(.callout.weight(.medium))
                     .foregroundStyle(isEnabled ? .primary : .secondary)
@@ -216,7 +216,7 @@ struct QuickActionTile: View {
 
 // MARK: Heroes
 
-/// The paired phone on the brand gradient: name, state, and battery, network and sound.
+/// The paired phone on the hero surface: name, state, and battery, network and sound.
 private struct DeviceHero: View {
     @ObservedObject var model: AppModel
 
@@ -225,27 +225,27 @@ private struct DeviceHero: View {
         HStack(alignment: .center, spacing: 18) {
             Image(systemName: "iphone.gen3")
                 .font(.system(size: 40, weight: .light))
-                .foregroundStyle(.white)
+                .foregroundStyle(Brand.onHero)
                 .frame(width: 64, height: 64)
-                .background(Circle().fill(.white.opacity(0.16)))
+                .background(Circle().fill(Brand.onHero.opacity(0.12)))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
                     Text(model.connection.connectedDevice ?? "Your phone")
                         .font(.title2.weight(.semibold))
                         .lineLimit(1)
-                    StatusBadge(status: status, onGradient: true)
+                    StatusBadge(status: status, onHero: true)
                 }
                 Text(subtitle(status))
                     .font(.callout)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(Brand.onHero.opacity(0.78))
                     .lineLimit(2)
                 if model.device.showsStatus {
-                    PhoneStatusChips(device: model.device, onGradient: true)
+                    PhoneStatusChips(device: model.device, onHero: true)
                         .padding(.top, 4)
                 }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Brand.onHero)
             Spacer(minLength: 0)
         }
         .padding(22)
@@ -263,25 +263,24 @@ private struct DeviceHero: View {
     }
 }
 
-/// The brand gradient with a large faint glyph: the only gradient surface in the window.
+/// The hero surface (dark roast on light, cream on dark) with a large faint glyph, as on Android.
 struct HeroBackground: View {
     var cornerRadius: CGFloat = 16
 
     var body: some View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(Brand.gradient)
+            .fill(Brand.hero)
             .overlay(alignment: .trailing) {
                 Brand.glyph
                     .resizable()
                     .renderingMode(.template)
                     .scaledToFit()
-                    .foregroundStyle(.white.opacity(0.1))
+                    .foregroundStyle(Brand.onHero.opacity(0.08))
                     .frame(width: 190)
                     .offset(x: 30, y: 10)
                     .accessibilityHidden(true)
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: Brand.indigo.opacity(0.18), radius: 10, y: 4)
     }
 }
 
@@ -308,10 +307,10 @@ private struct SetupHero: View {
                         .font(.title2.weight(.semibold))
                     Text("Pair your Android phone to get its notifications, calls, clipboard and files on this Mac.")
                         .font(.callout)
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(Brand.onHero.opacity(0.78))
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(Brand.onHero)
             }
             .padding(22)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -334,7 +333,7 @@ private struct SetupHero: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-            .background(Color(nsColor: .quaternarySystemFill))
+            .background(Brand.card)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.separator, lineWidth: 0.5))

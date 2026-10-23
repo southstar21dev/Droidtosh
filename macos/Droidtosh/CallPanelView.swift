@@ -74,8 +74,8 @@ struct CallPanelView: View {
     }
 
     private var avatar: some View {
-        ContactAvatar(name: call?.contactName ?? "", number: call?.number ?? "", size: 48, onGradient: true)
-            .background(Circle().fill(Brand.gradient))
+        ContactAvatar(name: call?.contactName ?? "", number: call?.number ?? "", size: 48, onHero: true)
+            .background(Circle().fill(Brand.hero))
             .overlay(alignment: .bottomTrailing) {
                 // The phone doesn't say whether a VoIP call is voice or video, so no video badge.
                 Image(systemName: "phone.circle.fill")

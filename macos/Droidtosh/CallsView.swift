@@ -265,7 +265,7 @@ struct ContactAvatar: View {
     let name: String
     let number: String
     var size: CGFloat = 32
-    var onGradient = false
+    var onHero = false
 
     var body: some View {
         Group {
@@ -277,9 +277,9 @@ struct ContactAvatar: View {
                     .font(.system(size: size * 0.45))
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(onHero ? Brand.onHero : Brand.onTile)
         .frame(width: size, height: size)
-        .background(Circle().fill(onGradient ? AnyShapeStyle(.white.opacity(0.22)) : AnyShapeStyle(Color.gray.gradient)))
+        .background(Circle().fill(onHero ? Brand.onHero.opacity(0.18) : Brand.tile))
         .accessibilityHidden(true)
     }
 
