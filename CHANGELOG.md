@@ -5,6 +5,9 @@ see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Unreleased
 
+- The Mac menu bar popover is cleaner on Liquid Glass: its sections and quick actions share one
+  translucent fill, corner radius and spacing instead of opaque cards next to glass buttons.
+
 ## 0.1.1 – 2026-10-23
 
 - The Mac app now uses the same Roast & Cream palette as the Android app: dark roast and cream
