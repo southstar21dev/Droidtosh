@@ -63,8 +63,11 @@ struct MainView: View {
                 SidebarDeviceFooter(model: model)
             }
         } detail: {
+            // Fill the column first: empty states size to their content, and the surface would
+            // otherwise paint only behind them.
             detail
                 .scrollContentBackground(.hidden)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Brand.surface)
                 .frame(minWidth: 560, minHeight: 480)
         }

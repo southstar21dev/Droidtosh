@@ -35,22 +35,27 @@ struct NotificationsView: View {
     var body: some View {
         Group {
             if notifications.installedApps.isEmpty {
-                ContentUnavailableView {
-                    Label(
-                        model.connection.connectedDevice == nil ? "No Phone Connected" : "No Apps Yet",
-                        systemImage: "bell.slash"
-                    )
-                } description: {
-                    Text(
-                        model.connection.connectedDevice == nil
-                            ? "Connect your phone to choose which apps mirror their notifications."
-                            : "Your phone hasn't reported its apps yet."
-                    )
-                } actions: {
-                    if model.connection.connectedDevice != nil {
-                        Button("Refresh App List") { notifications.requestAppsList() }
+                // Over an empty list, as on the other screens, so the toolbar blends into the window.
+                List {}
+                    .listStyle(.inset)
+                    .overlay {
+                        ContentUnavailableView {
+                            Label(
+                                model.connection.connectedDevice == nil ? "No Phone Connected" : "No Apps Yet",
+                                systemImage: "bell.slash"
+                            )
+                        } description: {
+                            Text(
+                                model.connection.connectedDevice == nil
+                                    ? "Connect your phone to choose which apps mirror their notifications."
+                                    : "Your phone hasn't reported its apps yet."
+                            )
+                        } actions: {
+                            if model.connection.connectedDevice != nil {
+                                Button("Refresh App List") { notifications.requestAppsList() }
+                            }
+                        }
                     }
-                }
             } else {
                 List {
                     if hasStatusBanner {

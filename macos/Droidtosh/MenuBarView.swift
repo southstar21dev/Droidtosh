@@ -14,13 +14,15 @@ struct MenuBarView: View {
     private var status: DroidtoshStatus { DroidtoshStatus(statusText: model.connection.statusText) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             header
+                .padding(.bottom, 4)
             if model.device.showsStatus {
                 PhoneStatusChips(device: model.device)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, PopoverMetrics.padding)
                     .padding(.vertical, 9)
-                    .background(CardBackground(cornerRadius: 10))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .popoverSection()
             }
             quickActions
             if let text = FindPhoneText.status(model.device), model.device.showsFind {
@@ -33,10 +35,10 @@ struct MenuBarView: View {
                 transfers
             }
             banners
-            Divider()
             footer
+                .padding(.top, 2)
         }
-        .padding(14)
+        .padding(PopoverMetrics.padding)
         .frame(width: 340)
         .overlay { if dropTargeted { dropOverlay } }
         .sendFilesOnDrop(files: model.files, isTargeted: $dropTargeted)
@@ -95,27 +97,25 @@ struct MenuBarView: View {
     // MARK: Quick actions
 
     private var quickActions: some View {
-        GlassGroup(spacing: 8) {
-            HStack(spacing: 8) {
-                PopoverActionButton(title: "Send File", symbol: "square.and.arrow.up") {
-                    model.files.pickAndSend()
-                }
-                .disabled(!model.files.phoneSupportsFiles)
-                .help(model.files.phoneSupportsFiles ? "Choose files or folders to send" : "Connect your phone to send files")
-                PopoverActionButton(
-                    title: model.device.findCanStop ? "Stop Ringing" : "Find Phone",
-                    symbol: FindPhoneText.symbol(model.device),
-                    tint: model.device.findCanStop ? .red : nil
-                ) {
-                    model.device.toggleFind()
-                }
-                .disabled(!model.device.showsFind)
-                .help(model.device.showsFind ? model.device.findButtonTitle : "Find My Phone isn't available for this phone")
-                PopoverActionButton(title: "Open App", symbol: "macwindow") {
-                    windows.main()
-                }
-                .help("Open the Droidtosh window")
+        HStack(spacing: 8) {
+            PopoverActionButton(title: "Send File", symbol: "square.and.arrow.up") {
+                model.files.pickAndSend()
             }
+            .disabled(!model.files.phoneSupportsFiles)
+            .help(model.files.phoneSupportsFiles ? "Choose files or folders to send" : "Connect your phone to send files")
+            PopoverActionButton(
+                title: model.device.findCanStop ? "Stop Ringing" : "Find Phone",
+                symbol: FindPhoneText.symbol(model.device),
+                tint: model.device.findCanStop ? .red : nil
+            ) {
+                model.device.toggleFind()
+            }
+            .disabled(!model.device.showsFind)
+            .help(model.device.showsFind ? model.device.findButtonTitle : "Find My Phone isn't available for this phone")
+            PopoverActionButton(title: "Open App", symbol: "macwindow") {
+                windows.main()
+            }
+                .help("Open the Droidtosh window")
         }
     }
 
@@ -157,8 +157,8 @@ struct MenuBarView: View {
                 }
             }
         }
-        .padding(10)
-        .background(CardBackground(cornerRadius: 10))
+        .padding(PopoverMetrics.padding)
+        .popoverSection()
     }
 
     private var dropOverlay: some View {
@@ -229,7 +229,24 @@ struct MenuBarView: View {
     }
 }
 
-/// A popover quick action: an icon over a short title, on glass (macOS 26) or a quiet fill.
+/// Shared sizes, so every block in the popover lines up.
+enum PopoverMetrics {
+    static let padding: CGFloat = 12
+    static let cornerRadius: CGFloat = 12
+}
+
+extension View {
+    /// A block in the popover. The popover is already glass (macOS 26) or a material, so its
+    /// blocks are a translucent tint of it rather than opaque cards or a second layer of glass.
+    func popoverSection(tint: Color? = nil, highlight: Double = 0) -> some View {
+        background(
+            RoundedRectangle(cornerRadius: PopoverMetrics.cornerRadius, style: .continuous)
+                .fill((tint ?? .primary).opacity((tint == nil ? 0.06 : 0.16) + highlight))
+        )
+    }
+}
+
+/// A popover quick action: an icon over a short title.
 struct PopoverActionButton: View {
     let title: String
     let symbol: String
@@ -240,48 +257,35 @@ struct PopoverActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 Image(systemName: symbol)
-                    .font(.system(size: 17, weight: .medium))
-                    .frame(height: 20)
-                    .foregroundStyle(iconStyle)
+                    .font(.system(size: 15, weight: .medium))
+                    .frame(height: 18)
+                    .foregroundStyle(tint ?? .primary)
                 Text(title)
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .foregroundStyle(.primary)
+            .opacity(isEnabled ? 1 : 0.4)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .modifier(PopoverActionBackground(tint: tint, hovering: hovering && isEnabled))
+            .padding(.vertical, 9)
+            .contentShape(RoundedRectangle(cornerRadius: PopoverMetrics.cornerRadius, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PopoverActionStyle(tint: tint, hovering: hovering && isEnabled))
         .onHover { hovering = $0 }
         .accessibilityLabel(title)
     }
-
-    private var iconStyle: AnyShapeStyle {
-        guard isEnabled else { return AnyShapeStyle(.tertiary) }
-        return AnyShapeStyle(tint ?? .accentColor)
-    }
 }
 
-private struct PopoverActionBackground: ViewModifier {
+private struct PopoverActionStyle: ButtonStyle {
     let tint: Color?
     let hovering: Bool
 
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.glassEffect(
-                tint.map { Glass.regular.tint($0.opacity(0.25)).interactive() } ?? .regular.interactive(),
-                in: .rect(cornerRadius: 12)
-            )
-        } else {
-            content.background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill((tint ?? Color.primary).opacity(hovering ? 0.12 : 0.06))
-            )
-        }
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .popoverSection(tint: tint, highlight: configuration.isPressed ? 0.08 : hovering ? 0.04 : 0)
+            .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }

@@ -80,20 +80,6 @@ extension View {
     }
 }
 
-/// Groups glass shapes so neighbouring ones blend and morph together (macOS 26).
-struct GlassGroup<Content: View>: View {
-    var spacing: CGFloat = 8
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing) { content }
-        } else {
-            content
-        }
-    }
-}
-
 // MARK: Cards
 
 /// A content card in a window: a quiet cream (or roast) fill like a grouped form section, so
