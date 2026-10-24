@@ -5,6 +5,8 @@ see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Unreleased
 
+## 0.1.2 – 2026-10-25
+
 - The Mac menu bar popover is cleaner on Liquid Glass: its sections and quick actions share one
   translucent fill, corner radius and spacing instead of opaque cards next to glass buttons.
 - The Mac Notifications screen with no apps yet fills the window with the app's background instead
