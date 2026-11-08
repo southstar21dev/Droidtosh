@@ -280,7 +280,7 @@ class ConnectionService : Service() {
     private fun closeInBackground(client: ProtocolClient) = PhoneConnectionLoop.closeInBackground(client)
 
     companion object {
-        const val APP_VERSION = "0.1.0"
+        val APP_VERSION: String = BuildConfig.VERSION_NAME
         private const val DISCOVERY_GRACE_MS = 2_000L
         private const val CHANNEL_ID = "connection"
         const val NOTIFICATION_ID = 1
