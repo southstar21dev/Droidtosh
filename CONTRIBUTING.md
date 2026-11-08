@@ -52,7 +52,7 @@ The canonical schema lives in `protocol/proto/droidsync/v1/`. Never edit `*.prot
 
 ## Branches
 
-`dev` is where work happens, `staging` holds release candidates, and `master` is what releases are tagged from. CI runs on all three and on pull requests.
+`dev` is where work happens and `master` is what releases are tagged from. CI runs on both and on pull requests.
 
 ## Pull requests
 
@@ -62,6 +62,8 @@ The canonical schema lives in `protocol/proto/droidsync/v1/`. Never edit `*.prot
 - Run the tests for what you changed (`make test-android`, `make test-swift`, `make test-relay`,
   and `make e2e` for anything that crosses the network). CI runs them all.
 - Add an entry under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
+- Write commit messages as [Conventional Commits](https://www.conventionalcommits.org)
+  (`feat(android): …`, `fix(macos): …`, `docs: …`); releases are cut from them.
 
 Releases are covered in [docs/RELEASING.md](docs/RELEASING.md).
 

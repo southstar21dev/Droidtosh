@@ -1,0 +1,54 @@
+name: Semantic release
+
+# docs/RELEASING.md: every push to master is checked for feat/fix/perf/breaking commits since the
+# last release. If there are any, semantic-release picks the next version, moves the Unreleased
+# notes in CHANGELOG.md under it, sets VERSION, commits, tags and publishes the GitHub release;
+# then the release workflow builds, signs and attaches both apps.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: semantic-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - id: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          npx --yes \
+            -p semantic-release@25.0.9 \
+            -p @semantic-release/exec@7.1.0 \
+            -p @semantic-release/git@11.0.1 \
+            -p conventional-changelog-conventionalcommits@8.0.0 \
+            semantic-release
+
+  # A release published with the workflow token doesn't trigger release.yml's `release` event,
+  # so build it here.
+  build:
+    needs: release
+    if: needs.release.outputs.version != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release.outputs.version }}
+    secrets: inherit

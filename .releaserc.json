@@ -1,0 +1,22 @@
+{
+  "branches": ["master"],
+  "tagFormat": "${version}",
+  "plugins": [
+    ["@semantic-release/commit-analyzer", { "preset": "conventionalcommits" }],
+    ["@semantic-release/exec", {
+      "generateNotesCmd": "scripts/release-changelog.sh notes '${lastRelease.gitTag}'",
+      "prepareCmd": "scripts/release-changelog.sh prepare '${nextRelease.version}' '${lastRelease.gitTag}'",
+      "successCmd": "echo 'version=${nextRelease.version}' >> \"$GITHUB_OUTPUT\""
+    }],
+    ["@semantic-release/git", {
+      "assets": ["VERSION", "CHANGELOG.md"],
+      "message": "chore(release): ${nextRelease.version} [skip ci]"
+    }],
+    ["@semantic-release/github", {
+      "releaseNameTemplate": "Droidtosh <%= nextRelease.version %>",
+      "successComment": false,
+      "failComment": false,
+      "releasedLabels": false
+    }]
+  ]
+}
