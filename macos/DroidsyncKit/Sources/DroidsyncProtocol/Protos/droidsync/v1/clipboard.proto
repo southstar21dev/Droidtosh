@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package droidsync.v1;
+
+option java_package = "dev.southstar21.droidtosh.protocol.v1";
+option java_multiple_files = true;
+option swift_prefix = "DS";
+
+message ClipboardText {
+  string text = 1;
+  uint64 copied_at_ms = 2;
+}
+
+message ClipboardBlobStart {
+  string transfer_id = 1;
+  string mime_type = 2;
+  uint64 total_size = 3;
+  uint64 copied_at_ms = 4;
+}
+
+message ClipboardBlobChunk {
+  string transfer_id = 1;
+  uint32 offset = 2;
+  bytes data = 3;
+}
+
+message ClipboardBlobEnd {
+  string transfer_id = 1;
+}
+
+message PhoneStatus {
+  bool metered = 1;
+}

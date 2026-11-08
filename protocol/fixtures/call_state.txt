@@ -1,0 +1,14 @@
+protocol_version: 2
+message_id: "fixture-call"
+sent_at_ms: 1730000000002
+call_state {
+  call_id: "call-abc-123"
+  kind: CALL_KIND_CELLULAR
+  direction: CALL_DIRECTION_INCOMING
+  phase: CALL_PHASE_RINGING
+  number: "+15551234567"
+  contact_name: "Bob"
+  phone_account_id: "sim-1"
+  sim_label: "Personal"
+  started_at_ms: 1730000000002
+}

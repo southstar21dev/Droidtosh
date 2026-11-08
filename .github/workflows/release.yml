@@ -1,0 +1,257 @@
+name: Release
+
+# docs/RELEASING.md. semantic-release on master, as in the other southstar21dev apps:
+#
+#   push to master   a dry run picks the version from the Conventional Commits since the last tag
+#                    (fix:/perf: patch, feat: minor, `!` or BREAKING CHANGE: major; chore:, docs:,
+#                    refactor: etc. release nothing). Both apps are built and signed with it, and
+#                    only then is the tag vX.Y.Z and the GitHub release created, so a failed build
+#                    never leaves a release. Nothing is committed back to master.
+#   release          a release published by hand (pre-releases: vX.Y.Z-beta.N and so on) gets the
+#                    same builds attached.
+#   workflow_dispatch  rebuilds and re-attaches the assets of an existing release tag.
+#
+# The update manifest, droidtosh-update.json, is attached last: the in-app updaters ignore a release
+# until it has one, so they never see a manifest whose files aren't uploaded yet.
+on:
+  push:
+    branches: [master]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild and attach assets to
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+env:
+  SEMANTIC_RELEASE: semantic-release@25.0.9 @semantic-release/exec@7.1.0 conventional-changelog-conventionalcommits@8.0.0
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      # The dry run checks that it could push the tag.
+      contents: write
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      build: ${{ steps.v.outputs.build }}
+      ref: ${{ steps.v.outputs.ref }}
+      commit: ${{ steps.v.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        if: github.event_name == 'push'
+        with:
+          node-version: '24'
+      - name: Decide the version
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # $SEMANTIC_RELEASE is a list of packages: split on purpose.
+          # shellcheck disable=SC2086
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/semrel" $SEMANTIC_RELEASE
+          "$RUNNER_TEMP/semrel/node_modules/.bin/semantic-release" --dry-run
+      # Semantic versioning (docs/RELEASING.md): a hand-made release's tag must be vX.Y.Z or
+      # vX.Y.Z-(alpha|beta|rc).N and be marked as a pre-release exactly when it has a suffix.
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            if [ ! -f .release-version ]; then
+              echo "No release-worthy commits since the last tag." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            tag="v$(cat .release-version)"
+            ref="$GITHUB_SHA"
+          else
+            tag="$TAG"
+            ref="$TAG"
+            git checkout -q "$TAG"
+            prerelease="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq .isPrerelease)"
+          fi
+          read -r version build <<< "$(scripts/version.sh "$tag")"
+          if [ "$GITHUB_EVENT_NAME" != push ]; then
+            if [ "$version" != "${version%%-*}" ] && [ "$prerelease" != "true" ]; then
+              echo "::error::$TAG is a pre-release version; mark the GitHub release as a pre-release."
+              exit 1
+            fi
+            if [ "$version" = "${version%%-*}" ] && [ "$prerelease" = "true" ]; then
+              echo "::error::$TAG is a final version; untick \"Set as a pre-release\" on the GitHub release."
+              exit 1
+            fi
+          fi
+          echo "Releasing $version (build $build)" >> "$GITHUB_STEP_SUMMARY"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse --short "$ref")" >> "$GITHUB_OUTPUT"
+
+  android:
+    needs: plan
+    if: needs.plan.outputs.version != ''
+    runs-on: ubuntu-latest
+    env:
+      DROIDTOSH_VERSION: ${{ needs.plan.outputs.version }}
+      DROIDTOSH_BUILD: ${{ needs.plan.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      # The action's default package list includes `tools`, which current SDK repositories no
+      # longer carry.
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Release key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set; see docs/RELEASING.md"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+      - name: Build
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: ./gradlew :app:assembleRelease
+      - name: Rename
+        run: |
+          mkdir dist
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/Droidtosh-${DROIDTOSH_VERSION}-${DROIDTOSH_BUILD}.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/
+
+  mac:
+    needs: plan
+    if: needs.plan.outputs.version != ''
+    runs-on: macos-26
+    env:
+      DROIDTOSH_VERSION: ${{ needs.plan.outputs.version }}
+      DROIDTOSH_BUILD: ${{ needs.plan.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Signing identity
+        env:
+          P12_BASE64: ${{ secrets.MAC_SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_SIGNING_P12_PASSWORD }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then
+            echo "::error::MAC_SIGNING_P12_BASE64 is not set; see docs/RELEASING.md"
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(openssl rand -hex 16)"
+          echo "$P12_BASE64" | base64 -d > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+      - name: Build
+        working-directory: macos
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -project Droidtosh.xcodeproj -scheme Droidtosh -configuration Release \
+            -derivedDataPath build/release \
+            MARKETING_VERSION="${DROIDTOSH_VERSION%%-*}" CURRENT_PROJECT_VERSION="$DROIDTOSH_BUILD" \
+            DROIDTOSH_VERSION="$DROIDTOSH_VERSION" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $SIGNING_KEYCHAIN" build
+      - name: Check the signature and zip
+        run: |
+          app=macos/build/release/Build/Products/Release/Droidtosh.app
+          codesign --verify --deep --strict "$app"
+          # The in-app updater pins this certificate (docs/RELEASING.md).
+          codesign -d -r- "$app" 2>&1 | grep 'certificate leaf = H"40925259b86c734a3f001ded61bd741ea01d9f98"'
+          mkdir dist
+          ditto -c -k --keepParent "$app" "dist/Droidtosh-${DROIDTOSH_VERSION}-${DROIDTOSH_BUILD}-mac.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: dist/
+
+  publish:
+    needs: [plan, android, mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      BUILD: ${{ needs.plan.outputs.build }}
+      COMMIT: ${{ needs.plan.outputs.commit }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Manifest
+        run: |
+          mkdir manifest
+          apk="Droidtosh-${VERSION}-${BUILD}.apk"
+          zip="Droidtosh-${VERSION}-${BUILD}-mac.zip"
+          jq -n --arg version "$VERSION" --argjson build "$BUILD" --arg commit "$COMMIT" \
+            --arg apk "$apk" --arg apk_sha "$(sha256sum "release-assets/$apk" | cut -d' ' -f1)" \
+            --arg zip "$zip" --arg zip_sha "$(sha256sum "release-assets/$zip" | cut -d' ' -f1)" \
+            '{version: $version, build: $build, commit: $commit,
+              android: {file: $apk, sha256: $apk_sha}, mac: {file: $zip, sha256: $zip_sha}}' \
+            > manifest/droidtosh-update.json
+          cat manifest/droidtosh-update.json
+      - uses: actions/setup-node@v4
+        if: github.event_name == 'push'
+        with:
+          node-version: '24'
+      - name: Tag and publish the GitHub release
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # shellcheck disable=SC2086
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/semrel" $SEMANTIC_RELEASE
+          "$RUNNER_TEMP/semrel/node_modules/.bin/semantic-release"
+          released="$(cat .release-version 2>/dev/null || true)"
+          if [ "$released" != "$VERSION" ]; then
+            echo "::error::Planned $VERSION but released '${released:-nothing}' (did master move?)."
+            exit 1
+          fi
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
+      - name: Attach the apps to the hand-made release
+        if: github.event_name != 'push'
+        run: gh release upload "$TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
+      - name: Attach the manifest
+        run: gh release upload "$TAG" manifest/droidtosh-update.json --clobber --repo "$GITHUB_REPOSITORY"

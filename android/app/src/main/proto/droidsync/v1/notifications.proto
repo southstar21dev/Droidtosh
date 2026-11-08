@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package droidsync.v1;
+
+import "droidsync/v1/calls.proto";
+
+option java_package = "dev.southstar21.droidtosh.protocol.v1";
+option java_multiple_files = true;
+option swift_prefix = "DS";
+
+message ActionInfo {
+  uint32 index = 1;
+  string title = 2;
+  bool has_remote_input = 3;
+}
+
+message NotificationRecord {
+  string key = 1;
+  string package_name = 2;
+  string app_label = 3;
+  string title = 4;
+  string text = 5;
+  string big_text = 6;
+  string sub_text = 7;
+  string category = 8;
+  bool is_ongoing = 9;
+  bool is_group_summary = 10;
+  uint64 posted_at_ms = 11;
+  repeated ActionInfo actions = 12;
+  string remote_input_hint = 13;
+  bytes icon_png = 14;
+}
+
+message NotificationPosted { NotificationRecord record = 1; }
+message NotificationUpdated { NotificationRecord record = 1; }
+message NotificationRemoved { string key = 1; string reason = 2; }
+message NotificationAction {
+  string key = 1;
+  uint32 action_index = 2;
+  string reply_text = 3;
+  string request_id = 4;
+}
+message NotificationDismiss { string key = 1; }
+message ActionResult {
+  string request_id = 1;
+  bool ok = 2;
+  string error_code = 3;
+  string message = 4;
+}
+message SnapshotRequest {}
+message SnapshotReply {
+  repeated NotificationRecord notifications = 1;
+  repeated PhoneAccount phone_accounts = 2;
+  CallState call_state = 3;
+}
+message AppsListRequest {}
+message AppInfo {
+  string package_name = 1;
+  string label = 2;
+}
+message AppsList { repeated AppInfo apps = 1; }
+message AppIcon {
+  string package_name = 1;
+  bytes png = 2;
+}
+message MuteListSet { repeated string packages = 1; }
+message OpenAppRequest { string package_name = 1; }
+message RelayStatus { bool notifications_enabled = 1; }
+
+message ServerInfo {
+  string device_name = 1;
+  string model = 2;
+  string model_identifier = 3;
+}

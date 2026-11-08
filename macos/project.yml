@@ -1,0 +1,49 @@
+name: Droidtosh
+options:
+  bundleIdPrefix: dev.southstar21.droidtosh
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+packages:
+  DroidsyncKit:
+    path: DroidsyncKit
+
+targets:
+  Droidtosh:
+    type: application
+    platform: macOS
+    sources:
+      - Droidtosh
+    dependencies:
+      - package: DroidsyncKit
+        product: DroidsyncKit
+    info:
+      path: Droidtosh/Info.plist
+      properties:
+        CFBundleDisplayName: Droidtosh
+        CFBundleIconName: AppIcon
+        # docs/RELEASING.md: the build scripts take all three from scripts/version.sh.
+        # DroidtoshVersion is the full semantic version; Apple's fields hold X.Y.Z and the build number.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        DroidtoshVersion: $(DROIDTOSH_VERSION)
+        DroidtoshUpdateRepo: southstar21dev/Droidtosh
+        LSUIElement: true
+        LSMinimumSystemVersion: "15.0"
+        NSLocalNetworkUsageDescription: Droidtosh lets your phone connect to this Mac directly over the local network.
+        NSBonjourServices:
+          - _droidtosh._tcp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.southstar21.droidtosh.mac
+        # Overridden by the build scripts; a build straight from Xcode reports build 0.
+        MARKETING_VERSION: "0.0.0"
+        CURRENT_PROJECT_VERSION: "0"
+        DROIDTOSH_VERSION: "0.0.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Droidtosh Dev"
+        CODE_SIGNING_REQUIRED: YES
+        DEVELOPMENT_TEAM: ""

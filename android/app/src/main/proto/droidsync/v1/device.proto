@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package droidsync.v1;
+
+option java_package = "dev.southstar21.droidtosh.protocol.v1";
+option java_multiple_files = true;
+option swift_prefix = "DS";
+
+// Phone status ("phone.status" capability) and Find my phone ("find" capability).
+// See protocol/PROTOCOL-v2.md §8 and §9.
+
+enum ChargeSource {
+  CHARGE_SOURCE_UNSPECIFIED = 0;  // not plugged in, or unknown
+  CHARGE_SOURCE_AC = 1;
+  CHARGE_SOURCE_USB = 2;
+  CHARGE_SOURCE_WIRELESS = 3;
+  CHARGE_SOURCE_DOCK = 4;
+}
+
+enum NetworkType {
+  NETWORK_TYPE_UNSPECIFIED = 0;
+  NETWORK_TYPE_NONE = 1;
+  NETWORK_TYPE_WIFI = 2;
+  NETWORK_TYPE_CELLULAR = 3;
+  NETWORK_TYPE_ETHERNET = 4;
+  NETWORK_TYPE_OTHER = 5;         // VPN-only, Bluetooth tethering, ...
+}
+
+enum RingerMode {
+  RINGER_MODE_UNSPECIFIED = 0;
+  RINGER_MODE_NORMAL = 1;
+  RINGER_MODE_VIBRATE = 2;
+  RINGER_MODE_SILENT = 3;
+}
+
+// Phone → Mac, latest wins. A field the phone can't read keeps its "unknown" value.
+message DeviceStatus {
+  int32 battery_percent = 1;      // 0–100, -1 unknown
+  bool charging = 2;              // true while the battery is actually charging (or full and plugged in)
+  ChargeSource charge_source = 3;
+  bool power_save = 4;
+  NetworkType network_type = 5;   // the default network the phone is using
+  int32 wifi_level = 6;           // 0–4 bars, -1 when not on Wi-Fi or unknown
+  int32 cellular_level = 7;       // 0–4 bars, -1 when unknown or no SIM
+  string cellular_generation = 8; // "5G", "LTE", "3G", "2G" or empty
+  string carrier = 9;             // operator name of the data SIM, may be empty
+  bool airplane_mode = 10;
+  RingerMode ringer_mode = 11;
+  bool do_not_disturb = 12;
+  uint64 sampled_at_ms = 13;      // phone clock
+}
+
+enum FindAction {
+  FIND_ACTION_UNSPECIFIED = 0;
+  FIND_ACTION_START = 1;
+  FIND_ACTION_STOP = 2;
+}
+
+// Mac → phone.
+message FindPhoneRequest {
+  string request_id = 1;
+  FindAction action = 2;
+}
+
+enum FindEndReason {
+  FIND_END_UNSPECIFIED = 0;
+  FIND_END_STOPPED_ON_PHONE = 1;  // Stop button, notification dismissed, or a volume / power key
+  FIND_END_STOPPED_FROM_MAC = 2;
+  FIND_END_TIMEOUT = 3;           // rang for the full 60 s
+  FIND_END_FAILED = 4;            // could not play; see error
+}
+
+// Phone → Mac, sent when ringing starts and when it ends.
+message FindPhoneState {
+  string request_id = 1;          // the START request this ring belongs to
+  bool ringing = 2;
+  FindEndReason ended = 3;         // set when ringing is false
+  string error = 4;               // disabled | audio_failed | stale
+}
