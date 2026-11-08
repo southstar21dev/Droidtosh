@@ -4,8 +4,9 @@
 #   scripts/version.sh [VERSION]   prints "<version> <build>"
 #
 # VERSION is a semantic version, X.Y.Z or X.Y.Z-(alpha|beta|rc).N, optionally with a leading "v"
-# (a tag). Without an argument it is read from the VERSION file, and the local build gets the
-# build metadata "+<commit count>.<short sha>", which semver ignores when ordering versions.
+# (a tag). Without an argument it is the latest release tag (vX.Y.Z, or 0.0.0 before the first
+# release), and the local build gets the build metadata "+<commit count>.<short sha>", which semver
+# ignores when ordering versions.
 #
 # The build number is Android's versionCode and the Mac's CFBundleVersion. It rises with every
 # version in semver order: X*10000000 + Y*100000 + Z*1000 + a pre-release rank, where alpha.N is N,
@@ -17,7 +18,9 @@ local_build=0
 if [ $# -ge 1 ] && [ -n "$1" ]; then
   version="${1#v}"
 else
-  version="$(tr -d '[:space:]' < "$root/VERSION")"
+  tag="$(git -C "$root" describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+  version="${tag#v}"
+  version="${version:-0.0.0}"
   local_build=1
 fi
 

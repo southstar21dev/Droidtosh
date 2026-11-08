@@ -78,3 +78,7 @@ android/keystore.properties
 *.key
 .env
 .env.*
+
+# semantic-release (.github/workflows/release.yml)
+.release-version
+release-assets/

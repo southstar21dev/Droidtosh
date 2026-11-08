@@ -1,18 +1,15 @@
 {
   "branches": ["master"],
-  "tagFormat": "${version}",
+  "tagFormat": "v${version}",
   "plugins": [
     ["@semantic-release/commit-analyzer", { "preset": "conventionalcommits" }],
-    ["@semantic-release/exec", {
-      "generateNotesCmd": "scripts/release-changelog.sh notes '${lastRelease.gitTag}'",
-      "prepareCmd": "scripts/release-changelog.sh prepare '${nextRelease.version}' '${lastRelease.gitTag}'",
-      "successCmd": "echo 'version=${nextRelease.version}' >> \"$GITHUB_OUTPUT\""
-    }],
-    ["@semantic-release/git", {
-      "assets": ["VERSION", "CHANGELOG.md"],
-      "message": "chore(release): ${nextRelease.version} [skip ci]"
-    }],
+    ["@semantic-release/release-notes-generator", { "preset": "conventionalcommits" }],
+    ["@semantic-release/exec", { "verifyReleaseCmd": "echo ${nextRelease.version} > .release-version" }],
     ["@semantic-release/github", {
+      "assets": [
+        { "path": "release-assets/*.apk", "label": "Droidtosh ${nextRelease.version} for Android (APK)" },
+        { "path": "release-assets/*-mac.zip", "label": "Droidtosh ${nextRelease.version} for Mac" }
+      ],
       "releaseNameTemplate": "Droidtosh <%= nextRelease.version %>",
       "successComment": false,
       "failComment": false,

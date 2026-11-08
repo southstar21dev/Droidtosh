@@ -18,7 +18,7 @@
   <a href="docs/PRIVACY.md">Privacy</a> ·
   <a href="relay/README.md">Self-host a relay</a> ·
   <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> ·
-  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="https://github.com/southstar21dev/Droidtosh/releases">Changelog</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 

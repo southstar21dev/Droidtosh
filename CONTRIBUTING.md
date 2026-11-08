@@ -61,9 +61,9 @@ The canonical schema lives in `protocol/proto/droidsync/v1/`. Never edit `*.prot
   protocol, update [`protocol/PROTOCOL-v2.md`](protocol/PROTOCOL-v2.md) and both apps together.
 - Run the tests for what you changed (`make test-android`, `make test-swift`, `make test-relay`,
   and `make e2e` for anything that crosses the network). CI runs them all.
-- Add an entry under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
 - Write commit messages as [Conventional Commits](https://www.conventionalcommits.org)
-  (`feat(android): …`, `fix(macos): …`, `docs: …`); releases are cut from them.
+  (`feat(android): …`, `fix(macos): …`, `docs: …`); releases and their notes are generated from
+  them, so describe user-visible changes in the subject.
 
 Releases are covered in [docs/RELEASING.md](docs/RELEASING.md).
 

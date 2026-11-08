@@ -1,8 +1,8 @@
 import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// docs/RELEASING.md: scripts/version.sh turns the semantic version (the VERSION file, or the release
-// tag that CI passes in DROIDTOSH_VERSION) into the versionName and the versionCode.
+// docs/RELEASING.md: scripts/version.sh turns the semantic version (the latest release tag, or the
+// version CI passes in DROIDTOSH_VERSION) into the versionName and the versionCode.
 val versionInfo = providers.exec {
     commandLine(rootProject.file("../scripts/version.sh").path, System.getenv("DROIDTOSH_VERSION") ?: "")
 }.standardOutput.asText.get().trim().split(" ")
