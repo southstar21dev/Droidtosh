@@ -32,34 +32,15 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/mac-overview-dark.png">
-    <img alt="The Mac app's overview of the paired phone" src=".github/screenshots/mac-overview-light.png" width="820">
+    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/mac-dark.png">
+    <img alt="The Mac app's overview, menu bar popover and incoming call banner" src=".github/screenshots/mac-light.png" width="860">
   </picture>
 </p>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/android-home-dark.png">
-    <img alt="Home screen on Android" src=".github/screenshots/android-home-light.png" width="260">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/android-transfers-dark.png">
-    <img alt="File transfers on Android" src=".github/screenshots/android-transfers-light.png" width="260">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/android-settings-dark.png">
-    <img alt="Connection settings on Android" src=".github/screenshots/android-settings-light.png" width="260">
-  </picture>
-</p>
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/mac-menu-bar-dark.png">
-    <img alt="The Mac menu bar popover" src=".github/screenshots/mac-menu-bar-light.png" width="400">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/mac-call-dark.png">
-    <img alt="An incoming call on the Mac" src=".github/screenshots/mac-call-light.png" width="400">
+    <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/android-dark.png">
+    <img alt="Home, file transfers and connection settings on Android" src=".github/screenshots/android-light.png" width="860">
   </picture>
 </p>
 
