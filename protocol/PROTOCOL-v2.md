@@ -73,6 +73,7 @@ Both apps have a connection mode setting:
 
 - **Phone, `both`:** if a local session comes up it is used. Otherwise a relay `WAIT` leads to the usual WAIT handling, and a relay failure to the usual backoff. Once a session ends, the next attempt starts with the relay again.
 - **Phone, `local`:** failures back off up to 30 s. With no relay there is no FCM, so the Mac-asleep wait uses the no-FCM probe (60 s). Bonjour seeing the Mac appear, or the network changing, ends any wait early.
+- **Phone, no local network:** a phone with no Wi-Fi or Ethernet network does not try local candidates. In `local` mode it does not connect at all and does not run Bonjour discovery or backoff timers until such a network appears, and then resumes at once; in `both` mode it only skips the local candidates and still uses the relay.
 - The Mac's mode at pairing time goes in the QR code and becomes the phone's initial mode; either side can change its own mode later.
 
 ## 2. Pairing URI
@@ -233,4 +234,5 @@ Either side can send `OpenUrl{url}` to the other. It is reliable (§4), so it su
 
 - **Validation (receiver, strict):** at most 2048 bytes of UTF-8, no control characters (U+0000 to U+001F, U+007F to U+009F) and no whitespace, a scheme and (for http and https) a host. The Mac accepts only `http` and `https`. The phone accepts `http` and `https`, and also `tel:` (after `tel:` only digits, `+`, `*`, `#`, `-`, `.`, parentheses and spaces). Anything else is dropped silently and counted in diagnostics.
 - **Never opened automatically:** the receiver shows a notification, "Open link from phone: <host>" on the Mac or "Open link from Mac: <host>" on the phone, and opens the link only when the user clicks or taps it. For `tel:` the phone notification says "Call <number> (from Mac)" and the tap opens the dialer with the number filled in, it does not place the call.
+- **Mac services:** the Mac's "Send to Phone" service sends a selected single link as `OpenUrl` and other selected text as clipboard text; "Send File to Phone" uses the file transfer (section 7). A `tel:` link opened with the Mac app asks first, then sends the existing `DialRequest`, not `OpenUrl`.
 - **Senders:** the phone sends a shared URL from "Send to Mac" (other shared text still goes through the clipboard), and the Mac sends from its "Send to Phone" service. Mac `tel:` links are not sent as `OpenUrl`: they use the existing `DialRequest`.

@@ -50,7 +50,9 @@
 - **Calls.** Answer, decline and mute incoming calls from the Mac, place calls (choosing the SIM on dual-SIM phones) and browse recent calls.
 - **Clipboard.** Copy text or an image on one device, paste it on the other. Password-manager copies are never sent.
 - **Files.** Send files and folders both ways, up to 2 GB, from the Mac's menu bar or any Android share sheet. Interrupted transfers resume.
+- **Links and numbers.** Share a link from Android to the Mac, or send selected text or a file from the Mac's Services menu to the phone. Links open only when you tap or click the notification, and a `tel:` link on the Mac can dial from the phone.
 - **Phone status.** Battery, network and sound mode in the menu bar, low-battery alerts, and **Find my phone** to ring it at full volume.
+- **Connection health.** Plain-words reasons when the devices are not connected, a Reconnect now button, and a Background checklist on the phone that the Mac warns about when Android or the phone maker may stop the connection.
 - **Updates.** Both apps update themselves from GitHub releases when you say so, with an opt-in beta channel.
 
 ## Install

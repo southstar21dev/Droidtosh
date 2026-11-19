@@ -45,9 +45,38 @@ home network, and the pairing key still authenticates every connection. To use i
 
 ## The phone disconnects when the screen is off
 
-Allow Droidtosh to run in the background: Settings › Connection & pairing › Battery optimization on
-the phone. Some manufacturers add their own battery managers; set Droidtosh to "unrestricted" there
-too.
+Open Droidtosh on the phone, then **Connection > Background**. That checklist lists everything that
+can stop the connection while the phone is idle, each with a **Fix** button that opens the right
+settings screen:
+
+- **Battery optimization.** Set Droidtosh to unrestricted so Android doesn't pause it.
+- **Your phone maker's battery manager.** Xiaomi, Samsung, Huawei and Honor, OnePlus, Oppo and
+  Realme, and Vivo and iQOO add their own manager on top of Android's, which kills background apps
+  more aggressively. **Fix** opens its screen where it can (the exact screen varies by model and
+  system version, so it falls back to Droidtosh's app settings, then to the guide for your maker at
+  [dontkillmyapp.com](https://dontkillmyapp.com)). Allow Droidtosh to run in the background, or
+  autostart, or lock it in the recent apps list, depending on what your phone offers. Android can't
+  tell whether you changed anything there, so this item counts as done once you have opened it.
+- **Notification access and notification permission.** Without them notifications don't reach the
+  Mac and the connection status can't be shown.
+
+While the first two are open, the Mac shows "Your phone may disconnect when idle" on the Home page
+and in the menu bar popover, with the way back to this checklist.
+
+## The Mac says why the phone isn't connected
+
+The Home page, the popover and the Connection page say it in plain words, with **Reconnect now** to
+try again at once. On the phone it is on Home and the Connection page.
+
+- **Mac is waiting for the phone.** The relay has the Mac, and the phone is asleep, offline or out
+  of range. It connects by itself when the phone is back.
+- **Mac asleep or offline** (phone). No Mac is waiting at the relay: it is asleep, or Droidtosh is not
+  running on it.
+- **Relay unreachable.** Check the internet connection of the device that shows it, and the relay.
+- **Phone not on this network (local mode)** / **No Wi-Fi (local mode)**. Local mode only works on
+  the same Wi-Fi or Ethernet network. The phone stops trying until it is on one, and starts again
+  as soon as it is.
+- **Pairing expired.** See above.
 
 ## An update fails to install
 
