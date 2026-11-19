@@ -158,7 +158,7 @@ private struct PhoneCard: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                if status != .connected {
+                if status != .connected && status != .notPaired {
                     if let detail = model.connection.disconnectCause?.detail {
                         Text(detail)
                             .font(.caption)
