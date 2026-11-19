@@ -53,10 +53,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -88,6 +88,7 @@ import dev.southstar21.droidtosh.ui.theme.DroidIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 
 /** The paired app: Home, Transfers and Settings, with Diagnostics as a detail page of Settings. */
 @Composable
@@ -372,7 +373,7 @@ fun MainScaffold(
     var shownPage by remember { mutableStateOf(page) }
     if (page != null) shownPage = page
     PageOverlay(
-        visible = page != null,
+        page = page,
         onDismiss = { onPageChange(if (page == Page.Diagnostics) Page.Connection else null) },
     ) {
         AnimatedContent(
@@ -397,10 +398,20 @@ fun MainScaffold(
 
 /** A page slides over the shell and follows the predictive-back gesture as it goes. */
 @Composable
-private fun PageOverlay(visible: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+private fun PageOverlay(page: Page?, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    val visible = page != null
     val backProgress = remember { Animatable(0f) }
     // The edge of the gesture in flight; null for the back key and 3-button navigation.
     var swipeEdge by remember { mutableStateOf<Int?>(null) }
+    val scope = rememberCoroutineScope()
+    // Settles the page back to rest. It runs in the composition's scope because the handler's own
+    // coroutine is already cancelled when a gesture is abandoned, and a new gesture's snapTo cuts it short.
+    fun settle() {
+        scope.launch {
+            backProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+            swipeEdge = null
+        }
+    }
     PredictiveBackHandler(enabled = visible) { events: Flow<BackEventCompat> ->
         try {
             events.collect { event ->
@@ -408,17 +419,26 @@ private fun PageOverlay(visible: Boolean, onDismiss: () -> Unit, content: @Compo
                 backProgress.snapTo(event.progress)
             }
             // Committed: keep the dragged pose and let the exit carry on from it, toward the same side.
+            // Back from Diagnostics lands on Connection, which stays open and settles in LaunchedEffect(page).
             onDismiss()
         } catch (cancelled: CancellationException) {
-            backProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
-            swipeEdge = null
+            settle()
             throw cancelled
         }
     }
-    LaunchedEffect(visible) {
-        if (visible) {
-            backProgress.snapTo(0f)
-            swipeEdge = null
+    val lastPage = remember { arrayOfNulls<Page>(1) }
+    LaunchedEffect(page) {
+        val previous = lastPage[0]
+        lastPage[0] = page
+        when {
+            page == null -> Unit
+            // Opened fresh: drop whatever pose the last exit left behind.
+            previous == null -> {
+                backProgress.snapTo(0f)
+                swipeEdge = null
+            }
+            // Moved between pages while open (Diagnostics back to Connection): spring back to full size.
+            else -> settle()
         }
     }
     val density = LocalDensity.current
