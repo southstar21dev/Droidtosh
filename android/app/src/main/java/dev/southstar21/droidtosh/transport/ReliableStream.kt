@@ -126,6 +126,10 @@ class ReliableStream(
         return outbox.map { it.envelope.toBuilder().setAck(lastProcessed).build() }
     }
 
+    /** Whether an ack is owed but not yet sent (see [ackDue] for when it becomes overdue). */
+    @Synchronized
+    fun ackPending(): Boolean = ackPendingSince != null
+
     /** Whether a standalone ack is owed (something reliable arrived and no envelope carried its ack). */
     @Synchronized
     fun ackDue(): Boolean {

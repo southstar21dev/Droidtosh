@@ -43,7 +43,7 @@ class PhoneConnectionLoop(
 ) {
     data class Timing(
         val pingIntervalMs: Long = 45_000L,
-        val ackPollMs: Long = 250L,
+        val ackCheckMs: Long = 1_000L,
         val resumeTimeoutMs: Long = 10_000L,
     )
 
@@ -226,19 +226,24 @@ class PhoneConnectionLoop(
             TransportHub.attach(client, null, capabilities, ready = true)
         }
         host.onState(ConnectionState.Connected(deviceName, path = path), "Connected$via")
+        val ackSignal = Channel<Unit>(Channel.CONFLATED)
         val pinger = scope.launch {
-            var sincePing = 0L
             while (isActive) {
-                delay(timing.ackPollMs)
-                sincePing += timing.ackPollMs
+                delay(timing.pingIntervalMs)
                 runCatching {
-                    if (sincePing >= timing.pingIntervalMs) {
-                        sincePing = 0
-                        client.send(newEnvelope {
-                            setPing(Ping.newBuilder().setSentAtMs(System.currentTimeMillis()))
-                        })
-                    } else if (stream?.ackDue() == true) {
-                        client.send(newEnvelope { setAckOnly(Ack.getDefaultInstance()) })
+                    client.send(newEnvelope {
+                        setPing(Ping.newBuilder().setSentAtMs(System.currentTimeMillis()))
+                    })
+                }
+            }
+        }
+        // The ack check only runs while an ack is owed, instead of polling for the whole session.
+        val acker = if (stream == null) null else scope.launch {
+            for (signal in ackSignal) {
+                while (isActive && stream.ackPending()) {
+                    delay(timing.ackCheckMs)
+                    runCatching {
+                        if (stream.ackDue()) client.send(newEnvelope { setAckOnly(Ack.getDefaultInstance()) })
                     }
                 }
             }
@@ -247,6 +252,7 @@ class PhoneConnectionLoop(
             while (currentCoroutineContext().isActive) {
                 val envelope = client.receive()
                 if (stream?.onReceive(envelope) == ReliableStream.Decision.DUPLICATE) continue
+                if (envelope.seq > 0L) ackSignal.trySend(Unit)
                 when {
                     envelope.hasResume() && stream != null -> {
                         val retransmit = stream.onPeerResume(envelope.resume)
@@ -289,6 +295,8 @@ class PhoneConnectionLoop(
             }
         } finally {
             pinger.cancel()
+            acker?.cancel()
+            ackSignal.close()
         }
         return false
     }
