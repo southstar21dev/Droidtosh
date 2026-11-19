@@ -432,7 +432,7 @@ func TestPipeMacReaderExitsOnTeardown(t *testing.T) {
 	registry := NewRegistry(nil)
 	pipeDone := make(chan struct{})
 	go func() {
-		registry.pipeMac(ctx, "room", macConn, parked)
+		registry.pipeMac(ctx, "room", macConn, parked, nil)
 		close(pipeDone)
 	}()
 
@@ -619,4 +619,41 @@ func TestRelayRejectsInsteadOfBlockingWhenFull(t *testing.T) {
 	addr := startTestServerWithConfig(t, Config{MaxConns: 2, MaxConnsPerIP: 16})
 	parkMacs(t, addr, 2)
 	readBusyWithin(t, addr)
+}
+
+func TestHostKeyGroupsIPv6ByPrefix(t *testing.T) {
+	cases := map[string]string{
+		"203.0.113.7":           "203.0.113.7",
+		"::ffff:203.0.113.7":    "203.0.113.7",
+		"2001:db8:1:2:aaaa::1":  "2001:db8:1:2::/64",
+		"2001:db8:1:2:bbbb::99": "2001:db8:1:2::/64",
+		"2001:db8:1:3::1":       "2001:db8:1:3::/64",
+		"fe80::1%eth0":          "fe80::/64",
+		"not-an-ip":             "not-an-ip",
+	}
+	for in, want := range cases {
+		if got := hostKey(in); got != want {
+			t.Errorf("hostKey(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestRelayCapsParkedMacsPerIP(t *testing.T) {
+	addr := startTestServerWithConfig(t, Config{MaxConns: 16, MaxConnsPerIP: 16, MaxParkedPerIP: 2})
+	parkMacs(t, addr, 2)
+	time.Sleep(100 * time.Millisecond)
+	mac, err := dialRelay(addr)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer mac.Close()
+	join := FormatJoinLine(JoinLine{Room: strings.Repeat("Z", 43), Role: RoleMac})
+	if _, err := mac.Write([]byte(join)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_ = mac.SetReadDeadline(time.Now().Add(2 * time.Second))
+	line, err := bufio.NewReader(mac).ReadString('\n')
+	if err != nil || strings.TrimSpace(line) != "ERROR busy" {
+		t.Fatalf("third parked mac: %q %v", line, err)
+	}
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/netip"
 	"sync"
 	"time"
 )
@@ -17,6 +18,9 @@ type Config struct {
 	StateFile     string
 	MaxConns      int
 	MaxConnsPerIP int
+	// MaxParkedPerIP caps unpaired parked macs per client prefix (a full IPv4
+	// address or an IPv6 /64). Zero means the default.
+	MaxParkedPerIP int
 	// TLS terminates the outer client↔relay TLS (protocol v2 §1.1). Required.
 	TLS *tls.Config
 }
@@ -28,6 +32,61 @@ const joinTimeout = 5 * time.Second
 // maxPendingRejects bounds the goroutines answering rejected connections with
 // a TLS `ERROR busy`; past it, rejected connections are closed silently.
 const maxPendingRejects = 32
+
+// defaultMaxParkedPerIP bounds macs parked without a phone per client prefix.
+// A real Mac may wait for its phone for hours, so this is a count cap rather
+// than an idle timeout.
+const defaultMaxParkedPerIP = 4
+
+// ipLimiter tracks per-prefix connection and parked-mac counts.
+type ipLimiter struct {
+	mu     sync.Mutex
+	conns  map[string]int
+	parked map[string]int
+}
+
+func newIPLimiter() *ipLimiter {
+	return &ipLimiter{conns: map[string]int{}, parked: map[string]int{}}
+}
+
+func (l *ipLimiter) acquire(m map[string]int, key string, limit int) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if m[key] >= limit {
+		return false
+	}
+	m[key]++
+	return true
+}
+
+func (l *ipLimiter) release(m map[string]int, key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if m[key]--; m[key] <= 0 {
+		delete(m, key)
+	}
+}
+
+// onceFunc returns f wrapped so it runs at most once.
+func onceFunc(f func()) func() {
+	var once sync.Once
+	return func() { once.Do(f) }
+}
+
+// hostKey is the key connection limits are counted under: the full address
+// for IPv4 (including IPv4-mapped IPv6), the /64 prefix for IPv6, so one
+// host can't dodge the cap by rotating through its addresses.
+func hostKey(host string) string {
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return host
+	}
+	addr = addr.WithZone("").Unmap()
+	if addr.Is6() {
+		return netip.PrefixFrom(addr, 64).Masked().String()
+	}
+	return addr.String()
+}
 
 func serve(ctx context.Context, ln net.Listener, registry *Registry, cfg Config) error {
 	if cfg.TLS == nil {
@@ -43,8 +102,11 @@ func serve(ctx context.Context, ln net.Listener, registry *Registry, cfg Config)
 	}
 	sem := make(chan struct{}, maxConns)
 	rejects := make(chan struct{}, maxPendingRejects)
-	var perIPMu sync.Mutex
-	perIP := map[string]int{}
+	maxParked := cfg.MaxParkedPerIP
+	if maxParked <= 0 {
+		maxParked = defaultMaxParkedPerIP
+	}
+	limits := newIPLimiter()
 	var wg sync.WaitGroup
 	var backoff time.Duration
 	for {
@@ -78,34 +140,27 @@ func serve(ctx context.Context, ln net.Listener, registry *Registry, cfg Config)
 		}
 		// Reject rather than block Accept when full, so a flood of idle
 		// connections from one host can't starve everyone else.
-		host := remoteHost(conn)
-		perIPMu.Lock()
-		if perIP[host] >= maxPerIP {
-			perIPMu.Unlock()
+		host := hostKey(remoteHost(conn))
+		if !limits.acquire(limits.conns, host, maxPerIP) {
 			rejectBusy(&wg, rejects, conn, cfg.TLS)
 			continue
 		}
 		select {
 		case sem <- struct{}{}:
 		default:
-			perIPMu.Unlock()
+			limits.release(limits.conns, host)
 			rejectBusy(&wg, rejects, conn, cfg.TLS)
 			continue
 		}
-		perIP[host]++
-		perIPMu.Unlock()
+		release := onceFunc(func() {
+			limits.release(limits.conns, host)
+			<-sem
+		})
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			defer func() {
-				perIPMu.Lock()
-				if perIP[host]--; perIP[host] <= 0 {
-					delete(perIP, host)
-				}
-				perIPMu.Unlock()
-				<-sem
-			}()
-			handleConn(ctx, registry, conn, cfg.TLS)
+			defer release()
+			handleConn(ctx, registry, conn, cfg.TLS, limits, host, maxParked)
 		}()
 	}
 	wg.Wait()
@@ -145,8 +200,9 @@ func rejectBusy(wg *sync.WaitGroup, rejects chan struct{}, raw net.Conn, cfg *tl
 	}()
 }
 
-func handleConn(ctx context.Context, registry *Registry, raw net.Conn, cfg *tls.Config) {
-	conn := &relayConn{Conn: tls.Server(raw, cfg), raw: raw}
+func handleConn(ctx context.Context, registry *Registry, raw net.Conn, cfg *tls.Config, limits *ipLimiter, host string, maxParked int) {
+	tlsConn := tls.Server(raw, cfg)
+	conn := &relayConn{Conn: tlsConn, raw: raw}
 	handedOff := false
 	defer func() {
 		if !handedOff {
@@ -155,7 +211,7 @@ func handleConn(ctx context.Context, registry *Registry, raw net.Conn, cfg *tls.
 	}()
 	// One deadline covers the handshake, the join line and the reply to a bad one.
 	_ = raw.SetDeadline(time.Now().Add(joinTimeout))
-	if err := conn.HandshakeContext(ctx); err != nil {
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		return
 	}
 	line, err := readJoinLine(conn)
@@ -175,6 +231,12 @@ func handleConn(ctx context.Context, registry *Registry, raw net.Conn, cfg *tls.
 	_ = raw.SetDeadline(time.Time{})
 	switch join.Role {
 	case RoleMac:
+		if !limits.acquire(limits.parked, host, maxParked) {
+			_, _ = conn.Write([]byte(FormatError("busy")))
+			return
+		}
+		releaseParked := onceFunc(func() { limits.release(limits.parked, host) })
+		defer releaseParked()
 		parked := registry.ParkMac(join.Room, conn)
 		if parked == nil {
 			_, _ = conn.Write([]byte(FormatError("busy")))
@@ -182,7 +244,7 @@ func handleConn(ctx context.Context, registry *Registry, raw net.Conn, cfg *tls.
 		}
 		defer registry.UnparkMac(join.Room, parked)
 		handedOff = true // pipeMac owns and closes the conn
-		registry.pipeMac(ctx, join.Room, conn, parked)
+		registry.pipeMac(ctx, join.Room, conn, parked, releaseParked)
 	case RolePhone:
 		_, ok := registry.PairPhone(join.Room, join.FCMToken, conn)
 		if !ok {
@@ -232,7 +294,7 @@ func closeOnCancel(ctx context.Context, done <-chan struct{}, c Conn) {
 	}()
 }
 
-func (r *Registry) pipeMac(ctx context.Context, room string, mac net.Conn, parked *ParkedMac) {
+func (r *Registry) pipeMac(ctx context.Context, room string, mac net.Conn, parked *ParkedMac, onPaired func()) {
 	var phone Conn
 	done := make(chan struct{})
 	closeOnCancel(ctx, done, mac)
@@ -301,6 +363,9 @@ func (r *Registry) pipeMac(ctx context.Context, room string, mac net.Conn, parke
 				return
 			}
 			phone = candidate
+			if onPaired != nil {
+				onPaired()
+			}
 			closeOnCancel(ctx, done, candidate)
 			if _, err := writeWithDeadline(mac, []byte(ResponsePaired)); err != nil {
 				return
