@@ -188,6 +188,18 @@ private struct NotificationOptions: View {
                 OptionRow("Sending from the phone", detail: notifications.notificationsRelayEnabled ? "On" : "Off. Turn it on in the phone app.")
                 OptionFootnote("Phone notifications appear as Mac banners. Reply, use their actions, or dismiss them on either side.")
             }
+            OptionGroup("Verification codes") {
+                Toggle(isOn: Binding(
+                    get: { notifications.copyCodesAutomatically },
+                    set: { notifications.setCopyCodesAutomatically($0) }
+                )) {
+                    Text("Copy codes automatically")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                OptionFootnote("Banners with a one-time code get a Copy Code button. Copied codes stay off your phone and are cleared from the clipboard after a minute.")
+            }
             OptionGroup("Desktop app duplicates") {
                 Toggle(isOn: Binding(
                     get: { notifications.dedupEnabled },

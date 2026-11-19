@@ -15,6 +15,8 @@ final class NotificationCoordinator {
     private var packageByKey: [String: String] = [:]
     private var packageByRequestID: [String: String] = [:]
 
+    var autoCopyCodes: ((String) -> Void)?
+
     private(set) var installedApps: [DSAppInfo] = []
 
     init(
@@ -151,7 +153,10 @@ final class NotificationCoordinator {
         if !record.iconPng.isEmpty {
             cacheIconData(package: record.packageName, data: record.iconPng)
         }
-        bridge.handlePosted(record)
+        let pending = bridge.handlePosted(record)
+        if !pending.silent, let code = pending.verificationCode {
+            autoCopyCodes?(code)
+        }
         requestIconIfNeeded(package: record.packageName)
     }
 

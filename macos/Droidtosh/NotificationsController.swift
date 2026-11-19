@@ -10,6 +10,7 @@ final class NotificationsController: ObservableObject {
     @Published private(set) var installedApps: [DSAppInfo] = []
     @Published private(set) var dedupEnabled = true
     @Published private(set) var dedupDisabledPackages: Set<String> = []
+    @Published private(set) var copyCodesAutomatically = false
     @Published private(set) var notificationsRelayEnabled = true
     @Published private(set) var notificationsAuthorized: Bool?
     /// The phone's labels for its apps, from the app list and from notification records.
@@ -17,11 +18,15 @@ final class NotificationsController: ObservableObject {
 
     private let presenter: NotificationPresenter
     private let send: (DSEnvelope) -> Void
+    private let codeCopier = CodeCopier()
     private var coordinator: NotificationCoordinator?
 
     init(presenter: NotificationPresenter, send: @escaping (DSEnvelope) -> Void) {
         self.presenter = presenter
         self.send = send
+        presenter.onCopyCode = { [weak self] code in
+            Task { @MainActor in self?.codeCopier.copy(code) }
+        }
     }
 
     var voipApps: [DSAppInfo] {
@@ -42,6 +47,11 @@ final class NotificationsController: ObservableObject {
             muteList: MuteListStore()
         )
         coordinator.attach(send: send)
+        copyCodesAutomatically = defaults.bool(forKey: "copy-codes-automatically")
+        coordinator.autoCopyCodes = { [weak self] code in
+            guard let self, self.copyCodesAutomatically else { return }
+            self.codeCopier.copy(code)
+        }
         self.coordinator = coordinator
         mutedPackages = coordinator.mutedPackages
     }
@@ -121,6 +131,11 @@ final class NotificationsController: ObservableObject {
         presenter.refreshAuthorizationStatus { [weak self] allowed in
             Task { @MainActor in self?.notificationsAuthorized = allowed }
         }
+    }
+
+    func setCopyCodesAutomatically(_ enabled: Bool) {
+        copyCodesAutomatically = enabled
+        UserDefaults.standard.set(enabled, forKey: "copy-codes-automatically")
     }
 
     func setDedupEnabled(_ enabled: Bool) {

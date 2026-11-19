@@ -5,6 +5,7 @@ import DroidsyncKit
 final class NotificationPresenter: NSObject, NotificationPresenting, UNUserNotificationCenterDelegate {
     var onResponse: ((_ key: String, _ identifier: String, _ replyText: String?, _ isDismiss: Bool) -> Void)?
     var attachmentProvider: ((String) -> URL?)?
+    var onCopyCode: ((String) -> Void)?
     var onAuthorizationCompleted: (() -> Void)?
 
     private let center = UNUserNotificationCenter.current()
@@ -58,6 +59,9 @@ final class NotificationPresenter: NSObject, NotificationPresenting, UNUserNotif
         content.categoryIdentifier = notification.categoryIdentifier
         content.interruptionLevel = notification.silent ? .passive : .active
         content.userInfo = ["key": notification.identifier]
+        if let code = notification.verificationCode {
+            content.userInfo["code"] = code
+        }
         if let url = attachmentProvider?(notification.packageName) {
             let copy = FileManager.default.temporaryDirectory
                 .appendingPathComponent("droidsync-attach-\(UUID().uuidString).png")
@@ -161,6 +165,10 @@ final class NotificationPresenter: NSObject, NotificationPresenting, UNUserNotif
             ?? response.notification.request.identifier
         if response.actionIdentifier == UNNotificationDismissActionIdentifier {
             onResponse?(key, "", nil, true)
+        } else if response.actionIdentifier == NotificationBridge.copyCodeIdentifier {
+            if let code = response.notification.request.content.userInfo["code"] as? String {
+                onCopyCode?(code)
+            }
         } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
             // Tapping the banner does nothing on the phone.
         } else {
