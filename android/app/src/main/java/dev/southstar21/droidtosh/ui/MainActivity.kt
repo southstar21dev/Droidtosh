@@ -34,7 +34,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             DroidtoshTheme {
                 val isPaired by state.isPaired.collectAsStateWithLifecycle()
-                val phase = if (isPaired) Phase.Main else Phase.Onboarding
+                val setupDone by state.setupDone.collectAsStateWithLifecycle()
+                // A fresh pairing stays in the guided setup for its permissions step.
+                val phase = if (isPaired && setupDone) Phase.Main else Phase.Onboarding
                 val slowEffects = MaterialTheme.motionScheme.slowEffectsSpec<Float>()
                 val slowSpatial = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
                 val fastEffects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
