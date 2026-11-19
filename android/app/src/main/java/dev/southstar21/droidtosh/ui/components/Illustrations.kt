@@ -57,7 +57,7 @@ private fun bob(distance: Float, periodMs: Int, label: String): Float {
     return value
 }
 
-/** Welcome art: the Droid Mac on a slowly turning cream cookie, with orbiting shapes. */
+/** Welcome art: the Droid Mac on a slowly turning paper cookie, with orbiting shapes. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DevicesIllustration(modifier: Modifier = Modifier, size: Dp = 240.dp) {
@@ -69,12 +69,12 @@ fun DevicesIllustration(modifier: Modifier = Modifier, size: Dp = 240.dp) {
                 .size(size * 0.82f)
                 .rotate(angle)
                 .clip(MaterialShapes.Cookie12Sided.toShape())
-                .background(Brand.Cream),
+                .background(Brand.Paper),
         )
         Icon(
             painter = painterResource(R.drawable.ic_brand_mark),
             contentDescription = null,
-            tint = Brand.DarkRoast,
+            tint = Brand.Ink,
             modifier = Modifier
                 .size(size * 0.5f)
                 .offset(y = float.dp),
@@ -138,7 +138,7 @@ fun ScanIllustration(modifier: Modifier = Modifier, size: Dp = 220.dp) {
             Icon(
                 DroidIcons.QrCode,
                 contentDescription = null,
-                tint = Brand.DarkRoast, // a QR code reads dark on light in either theme
+                tint = Brand.Ink, // a QR code reads dark on light in either theme
                 modifier = Modifier.size(size * 0.36f),
             )
             Box(

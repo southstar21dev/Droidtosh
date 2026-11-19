@@ -61,20 +61,20 @@ import dev.southstar21.droidtosh.R
 import dev.southstar21.droidtosh.ui.theme.Brand
 import dev.southstar21.droidtosh.ui.theme.LocalExtraShapes
 
-/** The app mark, as on the launcher icon: the dark roast Droid Mac on a cream rounded square. */
+/** The app mark in black and white: the ink Droid Mac on a paper rounded square. */
 @Composable
 fun BrandMark(size: Dp = 40.dp, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(size * 0.3f))
-            .background(Brand.Cream),
+            .background(Brand.Paper),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             painter = painterResource(R.drawable.ic_brand_mark),
             contentDescription = null,
-            tint = Brand.DarkRoast,
+            tint = Brand.Ink,
             modifier = Modifier.size(size * 0.8f),
         )
     }
