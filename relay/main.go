@@ -131,6 +131,12 @@ func main() {
 			}
 		} else if !os.IsNotExist(err) {
 			log.Printf("state load failed: %v", err)
+			// Keep the bad file: the shutdown save would otherwise replace it.
+			if dest, qerr := quarantineState(stateFile, time.Now()); qerr != nil {
+				log.Printf("state quarantine failed: %v", qerr)
+			} else {
+				log.Printf("moved unreadable state file to %s", dest)
+			}
 		}
 	}
 
