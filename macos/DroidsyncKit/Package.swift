@@ -85,5 +85,11 @@ let package = Package(
             path: "Tests/DroidsyncCallsTests",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        .testTarget(
+            name: "DroidsyncKitTests",
+            dependencies: ["DroidsyncKit"],
+            path: "Tests/DroidsyncKitTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
     ]
 )
