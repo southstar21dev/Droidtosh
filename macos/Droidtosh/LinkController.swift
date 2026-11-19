@@ -73,6 +73,10 @@ final class LinkController {
     func sendToPhone(text: String) {
         if let url = LinkPolicy.singleWebURL(in: text), sendLink(url) { return }
         if !clipboard.enabled {
+            if !connection.phoneConnected {
+                notify(title: "Can't send to your phone", body: "Your phone isn't connected.", identifier: "link.notice")
+                return
+            }
             notify(title: "Clipboard sync is off", body: "Turn it on in Droidtosh to send text to your phone.", identifier: "link.notice")
         } else if !clipboard.sendText(text) {
             notify(title: "Couldn't send the text", body: "It is empty or too large.", identifier: "link.notice")
@@ -85,13 +89,14 @@ final class LinkController {
         files.send(urls: urls)
     }
 
-    /// Sends `url` as a link; false when the connected phone is too old for links.
+    /// Sends `url` as a link; false when no phone is connected or it did not negotiate `open_url`.
+    /// A link is never held for a later session.
     @discardableResult
     func sendLink(_ url: String) -> Bool {
         guard LinkPolicy.validate(url, allowTel: false) != nil else { return false }
-        if connection.phoneConnected, !connection.negotiatedCapabilities.contains(ProtocolV2.Capability.openUrl) {
-            return false
-        }
+        guard connection.phoneConnected,
+              connection.negotiatedCapabilities.contains(ProtocolV2.Capability.openUrl)
+        else { return false }
         var message = DSOpenUrl()
         message.url = url
         connection.send(protocolEnvelope(.openURL(message)))
