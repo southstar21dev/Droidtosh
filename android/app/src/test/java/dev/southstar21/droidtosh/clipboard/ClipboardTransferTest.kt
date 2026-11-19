@@ -8,6 +8,12 @@ import org.junit.Test
 
 class ClipboardTransferTest {
     @Test
+    fun sensitiveFlagBlocksSending() {
+        assertTrue(ClipboardPolicy.isSensitive { it == "android.content.extra.IS_SENSITIVE" })
+        assertFalse(ClipboardPolicy.isSensitive { false })
+    }
+
+    @Test
     fun chunkerSplitsWithOffsets() {
         val data = ByteArray(ClipboardTransfer.CHUNK_SIZE * 2 + 10)
         val chunks = ClipboardChunker.chunks(data)
