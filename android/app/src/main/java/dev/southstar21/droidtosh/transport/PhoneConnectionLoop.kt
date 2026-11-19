@@ -313,7 +313,7 @@ class PhoneConnectionLoop(
         val token = host.fcmToken()
         TransportLog.d(
             TAG,
-            "attempt=$attempt room=${credentials.room.take(8)} token=${if (token.isNullOrEmpty()) "none" else "present"}",
+            "attempt=$attempt token=${if (token.isNullOrEmpty()) "none" else "present"}",
         )
         val joinLine = RelayJoinLine.format(credentials.room, PHONE_ROLE, token)
         return connector.connect(
