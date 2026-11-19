@@ -68,37 +68,70 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Sync")
                 .font(.headline)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12, alignment: .top)], spacing: 12) {
-                SyncCard(
-                    title: "Notifications",
-                    detail: notificationsDetail,
-                    icon: .symbol("bell"),
-                    isOn: nil,
-                    open: { selectSection(.notifications) }
-                )
-                SyncCard(
-                    title: "Calls",
-                    detail: callsDetail,
-                    icon: model.calls.activeCall?.phase == .ringing ? .tether(.ringing) : .symbol("phone"),
-                    isOn: nil,
-                    open: { selectSection(.calls) }
-                )
-                SyncCard(
-                    title: "Clipboard",
-                    detail: model.clipboard.enabled ? "Text and images, both ways" : "Off. Copies stay on each device.",
-                    icon: model.clipboard.enabled ? .tether(.mirroring) : .symbol("doc.on.clipboard"),
-                    isOn: Binding(get: { model.clipboard.enabled }, set: { model.clipboard.enabled = $0 }),
-                    open: nil
-                )
-                SyncCard(
-                    title: "Receive files",
-                    detail: model.files.receivingEnabled ? "Saved to \(model.files.downloadsDirectory.lastPathComponent)" : "Off. The phone can't send files.",
-                    icon: .symbol("tray.and.arrow.down"),
-                    isOn: Binding(get: { model.files.receivingEnabled }, set: { model.files.receivingEnabled = $0 }),
-                    open: { selectSection(.files) }
-                )
+            // Four cards in one row when they fit, else two by two, so no card is left alone on a
+            // row and a wide window has no empty column.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    notificationsCard.frame(minWidth: 170, idealWidth: 170)
+                    callsCard.frame(minWidth: 170, idealWidth: 170)
+                    clipboardCard.frame(minWidth: 170, idealWidth: 170)
+                    receiveFilesCard.frame(minWidth: 170, idealWidth: 170)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+                    GridRow {
+                        notificationsCard
+                        callsCard
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    GridRow {
+                        clipboardCard
+                        receiveFilesCard
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
+    }
+
+    private var notificationsCard: SyncCard {
+        SyncCard(
+            title: "Notifications",
+            detail: notificationsDetail,
+            icon: .symbol("bell"),
+            isOn: nil,
+            open: { selectSection(.notifications) }
+        )
+    }
+
+    private var callsCard: SyncCard {
+        SyncCard(
+            title: "Calls",
+            detail: callsDetail,
+            icon: model.calls.activeCall?.phase == .ringing ? .tether(.ringing) : .symbol("phone"),
+            isOn: nil,
+            open: { selectSection(.calls) }
+        )
+    }
+
+    private var clipboardCard: SyncCard {
+        SyncCard(
+            title: "Clipboard",
+            detail: model.clipboard.enabled ? "Text and images, both ways" : "Off. Copies stay on each device.",
+            icon: model.clipboard.enabled ? .tether(.mirroring) : .symbol("doc.on.clipboard"),
+            isOn: Binding(get: { model.clipboard.enabled }, set: { model.clipboard.enabled = $0 }),
+            open: nil
+        )
+    }
+
+    private var receiveFilesCard: SyncCard {
+        SyncCard(
+            title: "Receive files",
+            detail: model.files.receivingEnabled ? "Saved to \(model.files.downloadsDirectory.lastPathComponent)" : "Off. The phone can't send files.",
+            icon: .symbol("tray.and.arrow.down"),
+            isOn: Binding(get: { model.files.receivingEnabled }, set: { model.files.receivingEnabled = $0 }),
+            open: { selectSection(.files) }
+        )
     }
 
     private var notificationsDetail: String {
@@ -210,7 +243,6 @@ private struct PhoneCard: View {
                 .help(model.files.phoneSupportsFiles ? "Choose files or folders to send" : "Connect your phone to send files")
             }
         }
-        
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Brand.hero))
@@ -259,7 +291,6 @@ private struct SetupCard: View {
             Button("Set Up…") { showPairing() }
                 .buttonStyle(InkButtonStyle())
         }
-        
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Brand.hero))
@@ -309,7 +340,7 @@ private struct SyncCard: View {
                     .padding(12)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(CardBackground(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .hoverLift()
@@ -362,6 +393,7 @@ private struct RecentCallsCard: View {
     @Environment(\.selectSection) private var selectSection
 
     var body: some View {
+        // The trailing spacer lets the card stretch to the taller card beside it.
         Card {
             HStack {
                 Text("Recent calls").font(.headline)
@@ -370,19 +402,22 @@ private struct RecentCallsCard: View {
                     .buttonStyle(.inkLink)
                     .font(.callout)
             }
-            let entries = Array(model.callLog.entries.prefix(5))
-            if entries.isEmpty {
-                Text("Your phone's recent calls appear here once it connects.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                        if index > 0 { Divider() }
-                        row(entry)
+            VStack(alignment: .leading, spacing: 0) {
+                let entries = Array(model.callLog.entries.prefix(5))
+                if entries.isEmpty {
+                    Text("Your phone's recent calls appear here once it connects.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                            if index > 0 { Divider() }
+                            row(entry)
+                        }
                     }
                 }
+                Spacer(minLength: 0)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -411,7 +446,6 @@ private struct RecentCallsCard: View {
                     .buttonStyle(OutlineButtonStyle(compact: true))
             }
         }
-        
         .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
     }
@@ -429,6 +463,7 @@ private struct RecentTransfersCard: View {
     }
 
     var body: some View {
+        // The trailing spacer lets the card stretch to the taller card beside it.
         Card {
             HStack {
                 Text("Transfers").font(.headline)
@@ -437,17 +472,20 @@ private struct RecentTransfersCard: View {
                     .buttonStyle(.inkLink)
                     .font(.callout)
             }
-            if recent.isEmpty {
-                Text(model.files.phoneSupportsFiles ? "No transfers yet. Drop files here to send them to your phone." : "No transfers yet.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(recent) { transfer in
-                        FileTransferRow(transfer: transfer, files: model.files, compact: true)
+            VStack(alignment: .leading, spacing: 0) {
+                if recent.isEmpty {
+                    Text(model.files.phoneSupportsFiles ? "No transfers yet. Drop files here to send them to your phone." : "No transfers yet.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(recent) { transfer in
+                            FileTransferRow(transfer: transfer, files: model.files, compact: true)
+                        }
                     }
                 }
+                Spacer(minLength: 0)
             }
         }
         .overlay {
@@ -457,6 +495,6 @@ private struct RecentTransfersCard: View {
             }
         }
         .sendFilesOnDrop(files: model.files, isTargeted: $dropTargeted)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
