@@ -229,6 +229,7 @@ enum LocalStatus {
 /// Three cards for the connection mode, the chosen one lifted.
 struct ConnectionModePicker: View {
     @Binding var mode: ConnectionMode
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private struct Option: Identifiable {
         let id: ConnectionMode
@@ -256,7 +257,7 @@ struct ConnectionModePicker: View {
     private func card(_ option: Option) -> some View {
         let selected = mode == option.id
         return Button {
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { mode = option.id }
+            withAnimation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.78)) { mode = option.id }
         } label: {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -287,7 +288,7 @@ struct ConnectionModePicker: View {
                     .strokeBorder(selected ? Brand.ink : Color.primary.opacity(0.15), lineWidth: selected ? 2 : 1)
             )
             .shadow(color: .black.opacity(selected ? 0.12 : 0), radius: selected ? 10 : 0, y: selected ? 4 : 0)
-            .scaleEffect(selected ? 1.0 : 0.985)
+            .scaleEffect(selected || reduceMotion ? 1.0 : 0.985)
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)

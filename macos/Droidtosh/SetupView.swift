@@ -11,6 +11,7 @@ struct SetupView: View {
     /// Closes the sheet; nil in the standalone window, which dismisses itself.
     var onDone: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var step: Step
     @State private var copied = false
 
@@ -50,7 +51,7 @@ struct SetupView: View {
             .padding(28)
             .frame(maxWidth: .infinity, minHeight: 360, alignment: .topLeading)
             .id(step)
-            .transition(.asymmetric(insertion: .opacity.combined(with: .offset(x: 18)), removal: .opacity))
+            .transition(.asymmetric(insertion: reduceMotion ? .opacity : .opacity.combined(with: .offset(x: 18)), removal: .opacity))
             Divider()
             footer
                 .padding(.horizontal, 20)
@@ -58,7 +59,7 @@ struct SetupView: View {
         }
         .frame(width: 720)
         .background(Brand.surface)
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: step)
+        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.85), value: step)
     }
 
     private func close() {

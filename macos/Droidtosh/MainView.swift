@@ -38,6 +38,7 @@ struct MainView: View {
     @State private var selection: MainSection?
     @State private var showsPairing = false
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(model: AppModel, initialSection: MainSection = .home) {
         self.model = model
@@ -95,7 +96,7 @@ struct MainView: View {
                 .id(selection)
                 .transition(.opacity)
         }
-        .animation(.easeOut(duration: 0.18), value: selection)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: selection)
         .environment(\.selectSection, { selection = $0 })
         .environment(\.showPairing, { showsPairing = true })
         .sheet(isPresented: $showsPairing) {

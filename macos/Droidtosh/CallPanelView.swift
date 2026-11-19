@@ -160,8 +160,8 @@ private struct CallButton: View {
                     .background {
                         if pulses && !reduceMotion { PulseRing() }
                     }
-                    .scaleEffect(hovering ? 1.05 : 1)
-                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: hovering)
+                    .scaleEffect(hovering && !reduceMotion ? 1.05 : 1)
+                    .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.6), value: hovering)
                 Text(title)
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
