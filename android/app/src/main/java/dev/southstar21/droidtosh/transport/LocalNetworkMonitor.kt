@@ -35,7 +35,10 @@ class LocalNetworkMonitor(
         @Suppress("DEPRECATION")
         tracker.reset(
             connectivity.allNetworks.filter { network ->
-                connectivity.getNetworkCapabilities(network)?.let(::isLocal) == true
+                // A VPN reports its underlying transports but never matches the request (NOT_VPN),
+                // so it would get no onLost and keep the answer stuck at true.
+                connectivity.getNetworkCapabilities(network)
+                    ?.let { isLocal(it) && !it.hasTransport(NetworkCapabilities.TRANSPORT_VPN) } == true
             },
         )
         val created = object : ConnectivityManager.NetworkCallback() {
