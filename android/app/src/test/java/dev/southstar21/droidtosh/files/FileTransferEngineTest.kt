@@ -2,6 +2,7 @@ package dev.southstar21.droidtosh.files
 
 import dev.southstar21.droidtosh.protocol.v1.Envelope
 import dev.southstar21.droidtosh.protocol.v1.Envelope.PayloadCase
+import dev.southstar21.droidtosh.protocol.v1.FileAccept
 import dev.southstar21.droidtosh.protocol.v1.FileChunk
 import dev.southstar21.droidtosh.protocol.v1.FileOffer
 import dev.southstar21.droidtosh.transport.newEnvelope
@@ -691,6 +692,22 @@ class FileTransferEngineTest {
         val reply = link.toPhone.single()
         assertTrue(reply.fileComplete.ok)
         assertEquals("a", reply.fileComplete.savedAs)
+    }
+
+    @Test
+    fun aNegativeResumeOffsetStartsFromZero() {
+        val link = Link()
+        link.connect()
+        val id = link.phone.enqueue(MemorySource("a.bin", bytes(2 * chunk)))
+        assertTrue(link.phone.pump())
+        link.toMac.clear()
+        link.phone.onEnvelope(newEnvelope {
+            setFileAccept(FileAccept.newBuilder().setTransferId(id).setResumeOffset(-5))
+        })
+        assertTrue(link.phone.pump())
+        val first = link.toMac.single()
+        assertEquals(PayloadCase.FILE_CHUNK, first.payloadCase)
+        assertEquals(0L, first.fileChunk.offset)
     }
 
     private fun chunkEnvelope(id: String, offset: Long, data: ByteArray) = newEnvelope {

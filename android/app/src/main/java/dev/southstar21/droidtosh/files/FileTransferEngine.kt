@@ -269,7 +269,8 @@ class FileTransferEngine(
         val length = minOf(chunkSize.toLong(), size - transfer.position, windowBytes - (transfer.position - transfer.received)).toInt()
         val data = try {
             read(transfer, length)
-        } catch (error: IOException) {
+        } catch (error: Exception) {
+            // Not only IOException: one bad message or source must not crash the process.
             fail(transfer, "read_failed", notifyPeer = true)
             return true
         }
@@ -340,7 +341,7 @@ class FileTransferEngine(
             return
         }
         // The digest covers exactly what was read so far, so never resume past it.
-        val offset = minOf(accept.resumeOffset, transfer.hashedUpTo, transfer.source.size)
+        val offset = minOf(accept.resumeOffset, transfer.hashedUpTo, transfer.source.size).coerceAtLeast(0)
         if (offset > 0 && !transfer.resumed) {
             transfer.resumed = true
             listener.onResumed(info(transfer, TransferStatus.ACTIVE))
