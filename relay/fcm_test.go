@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestBuildMacOnlineMessage(t *testing.T) {
@@ -97,4 +102,50 @@ func TestMacOnlinePostsToProjectEndpoint(t *testing.T) {
 	if gotBody["message"] == nil {
 		t.Fatalf("missing message body: %v", gotBody)
 	}
+}
+
+func TestNewFCMNotifierTimesOutOnStalledTokenEndpoint(t *testing.T) {
+	stall := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-stall
+	}))
+	defer server.Close()
+	defer close(stall)
+	old := fcmHTTPTimeout
+	fcmHTTPTimeout = 200 * time.Millisecond
+	defer func() { fcmHTTPTimeout = old }()
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("key: %v", err)
+	}
+	pemKey := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: mustPKCS8(t, key)})
+	sa, _ := json.Marshal(map[string]string{
+		"type":           "service_account",
+		"project_id":     "proj",
+		"private_key_id": "kid",
+		"private_key":    string(pemKey),
+		"client_email":   "sa@proj.iam.gserviceaccount.com",
+		"token_uri":      server.URL,
+	})
+	notifier, err := NewFCMNotifier(FCMConfig{ServiceAccountJSON: sa})
+	if err != nil || notifier == nil {
+		t.Fatalf("notifier: %v %v", notifier, err)
+	}
+	start := time.Now()
+	if err := notifier.MacOnline(context.Background(), "tok"); err == nil {
+		t.Fatalf("expected an error from the stalled token endpoint")
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("push hung for %v", elapsed)
+	}
+}
+
+func mustPKCS8(t *testing.T, key *rsa.PrivateKey) []byte {
+	t.Helper()
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatalf("pkcs8: %v", err)
+	}
+	return der
 }
