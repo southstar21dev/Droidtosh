@@ -73,6 +73,19 @@ func onceFunc(f func()) func() {
 	return func() { once.Do(f) }
 }
 
+// releasingConn runs release the first time it is closed, so a slot is held
+// for as long as the socket lives, wherever it ends up being closed.
+type releasingConn struct {
+	net.Conn
+	release func()
+}
+
+func (c *releasingConn) Close() error {
+	err := c.Conn.Close()
+	c.release()
+	return err
+}
+
 // hostKey is the key connection limits are counted under: the full address
 // for IPv4 (including IPv4-mapped IPv6), the /64 prefix for IPv6, so one
 // host can't dodge the cap by rotating through its addresses.
@@ -152,6 +165,8 @@ func serve(ctx context.Context, ln net.Listener, registry *Registry, cfg Config)
 			rejectBusy(&wg, rejects, conn, cfg.TLS)
 			continue
 		}
+		// The slot is held until the connection is closed, which for a paired
+		// phone is when the mac's pipe closes it, not when handleConn returns.
 		release := onceFunc(func() {
 			limits.release(limits.conns, host)
 			<-sem
@@ -159,8 +174,7 @@ func serve(ctx context.Context, ln net.Listener, registry *Registry, cfg Config)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			defer release()
-			handleConn(ctx, registry, conn, cfg.TLS, limits, host, maxParked)
+			handleConn(ctx, registry, conn, cfg.TLS, limits, host, maxParked, release)
 		}()
 	}
 	wg.Wait()
@@ -200,9 +214,9 @@ func rejectBusy(wg *sync.WaitGroup, rejects chan struct{}, raw net.Conn, cfg *tl
 	}()
 }
 
-func handleConn(ctx context.Context, registry *Registry, raw net.Conn, cfg *tls.Config, limits *ipLimiter, host string, maxParked int) {
+func handleConn(ctx context.Context, registry *Registry, raw net.Conn, cfg *tls.Config, limits *ipLimiter, host string, maxParked int, release func()) {
 	tlsConn := tls.Server(raw, cfg)
-	conn := &relayConn{Conn: tlsConn, raw: raw}
+	conn := &releasingConn{Conn: &relayConn{Conn: tlsConn, raw: raw}, release: release}
 	handedOff := false
 	defer func() {
 		if !handedOff {

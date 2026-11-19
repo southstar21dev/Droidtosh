@@ -657,3 +657,48 @@ func TestRelayCapsParkedMacsPerIP(t *testing.T) {
 		t.Fatalf("third parked mac: %q %v", line, err)
 	}
 }
+
+func TestRelayPairedPhoneKeepsItsSlotUntilClosed(t *testing.T) {
+	addr := startTestServerWithConfig(t, Config{MaxConns: 16, MaxConnsPerIP: 2})
+	mac, err := dialRelay(addr)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer mac.Close()
+	if _, err := mac.Write([]byte(FormatJoinLine(JoinLine{Room: room, Role: RoleMac}))); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var phone net.Conn
+	for i := 0; i < 100; i++ {
+		p, resp := joinAndRead(t, addr, FormatJoinLine(JoinLine{Room: room, Role: RolePhone}))
+		if resp == "PAIRED" {
+			phone = p
+			break
+		}
+		p.Close()
+		time.Sleep(20 * time.Millisecond)
+	}
+	if phone == nil {
+		t.Fatalf("phone never paired")
+	}
+	// mac + paired phone fill the per-IP cap of 2.
+	readBusyWithin(t, addr)
+	phone.Close()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		c, err := dialRelay(addr)
+		if err == nil {
+			_ = c.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+			_, _ = c.Write([]byte("garbage\n"))
+			line, _ := bufio.NewReader(c).ReadString('\n')
+			c.Close()
+			if strings.TrimSpace(line) != "ERROR busy" {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("slot not released after the phone closed")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
