@@ -55,7 +55,7 @@ phone ── TCP ── mac (listening on the LAN)
 
 - **No outer TLS and no join line.** The phone opens TCP and starts the inner TLS at once. Everything from the inner TLS up (pinning to `fp`, §3 auth, §4 reliable delivery, §5 resume, features) is identical to the relay path.
 - **Mac listener:** TCP on all interfaces, port `7444` by default (configurable in the Mac settings).
-  - It accepts connections only from loopback, private and link-local addresses: `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `100.64.0.0/10`, `::1`, `fc00::/7`, `fe80::/10` (IPv4-mapped IPv6 is checked as IPv4). Anything else is closed at once.
+  - It accepts connections only from loopback, private, link-local and carrier-grade NAT addresses (the last is what Tailscale uses, so local mode works over a tailnet): `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `100.64.0.0/10`, `::1`, `fc00::/7`, `fe80::/10` (IPv4-mapped IPv6 is checked as IPv4). Anything else is closed at once. This is only a first filter: the inner TLS pin and the §3 authentication still decide who gets in.
   - At most 4 connections may be unauthenticated at a time; further ones are closed. TLS and authentication must finish within 10 s.
 - **Bonjour:** the Mac advertises `_droidtosh._tcp` with the Mac's name as the instance name and the TXT record `v=2`, `fp=<first 16 hex characters of the Mac certificate fingerprint>`. The TXT record holds no secrets (the certificate is shown to anyone who connects anyway). The phone keeps only services whose `fp` is a prefix of its paired `fp`.
 - **Phone candidates:** Bonjour resolutions first, then `lhost:lport` from the pairing URI. Each candidate gets a 3 s connect timeout.

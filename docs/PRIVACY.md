@@ -21,7 +21,8 @@ each other directly over your local network, or through a relay you run yourself
 - **Pinned relay.** The relay's self-signed certificate is pinned by its fingerprint, which travels
   in the pairing QR code, so the phone only talks to your relay.
 - **Local network only from local addresses.** In local network mode the Mac accepts connections
-  only from private and link-local addresses.
+  only from loopback, private and link-local addresses, plus the carrier-grade NAT range
+  `100.64.0.0/10` that Tailscale uses. The pairing key still authenticates every connection.
 - **Secrets stay on the device.** The Mac keeps its TLS key, pairing key and relay room token in
   `~/Library/Application Support/Droidtosh/Secrets`, readable only by your user. The phone keeps
   its pairing encrypted with an Android Keystore key.

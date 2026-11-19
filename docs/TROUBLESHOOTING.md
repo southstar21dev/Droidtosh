@@ -32,6 +32,17 @@ or clear the fingerprint in the Mac's Settings › Connection and pair the phone
 - Some routers block Bonjour; the phone then falls back to the address in the pairing code, which
   goes stale if the Mac's IP address changes. Pair again, or use the relay with local fallback.
 
+## Use local mode away from home with Tailscale
+
+The Mac accepts local connections from Tailscale addresses (`100.64.0.0/10`) as well as from your
+home network, and the pairing key still authenticates every connection. To use it:
+
+1. Install Tailscale on the Mac and the phone and sign in to the same tailnet.
+2. With both devices connected to Tailscale, pair the phone again so the code carries an address
+   the phone can reach.
+3. Bonjour does not work across Tailscale, so the phone uses the address from the pairing code. If
+   the Mac's address changes, pair again, or use the relay instead.
+
 ## The phone disconnects when the screen is off
 
 Allow Droidtosh to run in the background: Settings › Connection & pairing › Battery optimization on
