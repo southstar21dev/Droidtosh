@@ -10,6 +10,11 @@ final class CallsController: ObservableObject {
     @Published private(set) var dedupCallsEnabled = true
     @Published private(set) var dedupCallsDisabledPackages: Set<String> = []
 
+    static let lastDialAccountKey = "dial-last-account"
+
+    /// The SIM the user dialled from last, if any.
+    var lastDialAccount: String? { UserDefaults.standard.string(forKey: Self.lastDialAccountKey) }
+
     /// Fires whenever the coordinator's active call changes, including to nil.
     var onActiveCallChanged: ((CallSnapshot?) -> Void)?
     /// Fires when a call action request is sent, so its result can be attributed to the app.
@@ -84,6 +89,9 @@ final class CallsController: ObservableObject {
         request.number = number
         request.phoneAccountID = phoneAccountId ?? ""
         request.requestID = UUID().uuidString
+        if let phoneAccountId, !phoneAccountId.isEmpty {
+            UserDefaults.standard.set(phoneAccountId, forKey: Self.lastDialAccountKey)
+        }
         send(protocolEnvelope(.dialRequest(request)))
     }
 

@@ -113,6 +113,7 @@ class ConnectionService : Service() {
         dev.southstar21.droidtosh.files.FileTransfers.start(applicationContext, scope)
         dev.southstar21.droidtosh.device.PhoneStatus.start(applicationContext, scope)
         dev.southstar21.droidtosh.device.FindPhone.start(applicationContext, scope)
+        dev.southstar21.droidtosh.link.Links.start(applicationContext, scope)
         if (stateJob?.isActive != true) {
             stateJob = scope.launch { state.collect { diagnostics.onState(diagnosticsLabel(it)) } }
         }
@@ -138,6 +139,7 @@ class ConnectionService : Service() {
         dev.southstar21.droidtosh.files.FileTransfers.stop()
         dev.southstar21.droidtosh.device.PhoneStatus.stop()
         dev.southstar21.droidtosh.device.FindPhone.stop()
+        dev.southstar21.droidtosh.link.Links.stop()
         scope.cancel()
         // The loop is blocked in a socket read that coroutine cancellation can't interrupt.
         activeClient?.let(::closeInBackground)

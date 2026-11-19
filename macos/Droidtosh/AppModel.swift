@@ -16,6 +16,7 @@ final class AppModel: ObservableObject {
     let clipboard: ClipboardController
     let files: FilesController
     let device: DeviceController
+    let link: LinkController
     let updates = UpdatesController()
     /// Not re-published through this object: it refreshes every second while visible, and
     /// `DiagnosticsView` observes it directly.
@@ -41,6 +42,7 @@ final class AppModel: ObservableObject {
         clipboard = ClipboardController(connection: connection, presenter: presenter)
         files = FilesController(connection: connection, presenter: presenter)
         device = DeviceController(connection: connection, presenter: presenter)
+        link = LinkController(connection: connection, clipboard: clipboard, files: files, calls: calls)
         controllerChanges = [
             connection.objectWillChange,
             pairing.objectWillChange,
@@ -105,6 +107,7 @@ final class AppModel: ObservableObject {
 
     func start() {
         notificationPresenter.start()
+        link.installNotificationDelegate(forwardingTo: notificationPresenter)
         notificationPresenter.onAuthorizationCompleted = { [weak self] in
             self?.notifications.refreshNotificationStatus()
         }
@@ -152,7 +155,7 @@ final class AppModel: ObservableObject {
             case .clipboard: clipboard.handle(envelope)
             case .files: files.handle(envelope)
             case .device: device.handle(envelope)
-            case .link: break
+            case .link: link.handle(envelope)
             }
         }
     }

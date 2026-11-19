@@ -116,6 +116,19 @@ final class ClipboardController: ObservableObject {
         systemPasteboard.writeImage(png: data)
     }
 
+    /// "Send to Phone" for text: sends it as clipboard text now. False when clipboard sync is off or
+    /// the text is too large, so the caller can say so.
+    @discardableResult
+    func sendText(_ text: String) -> Bool {
+        guard enabled, !text.isEmpty, text.utf8.count <= ClipboardTransfer.maxTextBytes else { return false }
+        var message = DSClipboardText()
+        message.text = text
+        message.copiedAtMs = Self.nowMs()
+        connection.send(protocolEnvelope(.clipboardText(message)))
+        DebugLog.log("clipboard: sent text from service bytes=\(text.utf8.count)")
+        return true
+    }
+
     private func handleClipboardEvent(_ event: ClipboardMonitor.Event) {
         switch event {
         case .text(let text):

@@ -34,6 +34,28 @@ targets:
         NSLocalNetworkUsageDescription: Droidtosh lets your phone connect to this Mac directly over the local network.
         NSBonjourServices:
           - _droidtosh._tcp
+        # Droidtosh can be chosen to open tel: links (it asks, then places the call on the phone).
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.southstar21.droidtosh.tel
+            CFBundleTypeRole: Viewer
+            CFBundleURLSchemes:
+              - tel
+        # "Send to Phone" in the Services menu: selected text or a link, and files in Finder.
+        NSServices:
+          - NSMenuItem:
+              default: Send to Phone
+            NSMessage: sendToPhone
+            NSPortName: Droidtosh
+            NSSendTypes:
+              - public.utf8-plain-text
+              - NSStringPboardType
+              - public.url
+          - NSMenuItem:
+              default: Send File to Phone
+            NSMessage: sendFileToPhone
+            NSPortName: Droidtosh
+            NSSendFileTypes:
+              - public.item
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.southstar21.droidtosh.mac

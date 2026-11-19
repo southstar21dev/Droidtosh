@@ -36,7 +36,13 @@
 
     <!-- Files -->
     <string name="share_clipboard_off">Clipboard sync is off. Turn it on in Droidtosh to send.</string>
-    <string name="share_clipboard_label">Copy to Mac clipboard</string>
+    <string name="share_clipboard_label">Send to Mac</string>
+    <string name="share_link_sent">Link sent to your Mac</string>
+    <string name="share_link_failed">Couldn\'t send the link. Is your Mac connected?</string>
+    <string name="links_channel">Links from your Mac</string>
+    <string name="links_open_from_mac">Open link from Mac: %1$s</string>
+    <string name="links_call_from_mac">Call from Mac: %1$s</string>
+    <string name="links_call_body">Tap to open the dialer with this number</string>
     <string name="share_file_label">Send file to Mac</string>
     <string name="files_title">Files</string>
     <string name="files_receive">Receive files from Mac</string>
