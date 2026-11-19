@@ -10,6 +10,7 @@ each other directly over your local network, or through a relay you run yourself
 | **Your phone and your Mac** | Everything you sync: notifications, calls, clipboard, files, phone status | — |
 | **Your relay** | That a phone and a Mac in the same room are connected, when, and how many bytes they exchange; the phone's push token if you set up push | The content of anything you sync, which is end-to-end encrypted between your devices |
 | **Firebase (optional)** | A wake-up message, `{"type": "mac_online"}`, sent to your phone's push token | Any content; nothing else is sent through it |
+| **Your UnifiedPush distributor (optional)** | The same wake-up, `{"type": "mac_online"}`, posted by your relay to the endpoint the distributor gave your phone, and which relay sent it | Any content; the endpoint URL is a secret the relay holds, as with a push token |
 | **GitHub** | That an app checked for updates or downloaded one (an ordinary request to its release API) | Anything about your devices or your data |
 
 ## How it's protected

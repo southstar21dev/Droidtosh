@@ -17,7 +17,7 @@ Every connection to the relay is TLS (protocol v2, see
 apps pin by fingerprint, so the room ID and the phone's FCM token in the join
 line are no longer visible on the network path. Plain TCP is not accepted.
 
-- Join line, sent inside TLS: `DROIDSYNC/2 <room> mac|phone [fcm-token]\n`
+- Join line, sent inside TLS: `DROIDSYNC/2 <room> mac|phone [push-token]\n`
   (max 512 bytes). A join line for any other protocol version gets `ERROR upgrade`.
 - Responses: exactly one line, `PAIRED\n`, `WAIT\n`, or `ERROR <reason>\n`
 - Default port: `7443` (TLS over TCP)
@@ -25,9 +25,18 @@ line are no longer visible on the network path. Plain TCP is not accepted.
 - Max concurrent connections: `512` total, `16` per source IP; further
   connections get `ERROR busy` immediately
 
-When a Mac parks in a room that has a registered FCM token, the relay sends a
+When a Mac parks in a room that has a registered push token, the relay sends a
 data-only `mac_online` push so the phone can wake and reconnect. The push never
-contains notification or call content.
+contains notification or call content. The token is either an FCM token or,
+for phones without Google services, a UnifiedPush endpoint sent as
+`up:<https url>` (see `protocol/PROTOCOL-v2.md` 1.2.1).
+
+UnifiedPush needs no setup on the relay. It POSTs exactly
+`{"type":"mac_online"}` to the endpoint the phone registered, over `https`
+only, with a 15 s timeout, never following redirects and refusing loopback,
+private and link-local addresses. Endpoints are capability URLs, so the log
+shows only a short hash. A 404 or 410 drops the endpoint. Set
+`UNIFIEDPUSH_DISABLED=1` to turn it off.
 
 ## Configuration
 
@@ -36,6 +45,7 @@ contains notification or call content.
 | `PORT`               | no       | Listen port, default `7443`.                                                   |
 | `FCM_SERVICE_ACCOUNT`| no       | Firebase service-account JSON (the whole file contents). Enables `mac_online` pushes. |
 | `FCM_PROJECT_ID`     | no       | Firebase project ID; falls back to `project_id` from the service-account JSON. |
+| `UNIFIEDPUSH_DISABLED`| no      | Any value stops the relay from POSTing to UnifiedPush endpoints.              |
 | `STATE_FILE`         | no       | Path to persist room → FCM token state (e.g. `/data/state.json`).              |
 | `MAX_CONNS_PER_IP`   | no       | Concurrent connections allowed from one source IP, default `16`.               |
 | `CERT_FILE`          | no       | TLS certificate (PEM), default `/data/relay-cert.pem`. Generated on first start. |
@@ -178,6 +188,6 @@ contains only public project configuration.
 
 - FCM payloads contain only `{"type": "mac_online"}`; notification, call,
   clipboard and file content stays end-to-end encrypted between the devices.
-- FCM tokens are persisted only when `STATE_FILE` is set.
+- FCM tokens and UnifiedPush endpoints are persisted only when `STATE_FILE` is set.
 - The relay is stateless otherwise; restart it at any time and both devices
   reconnect.

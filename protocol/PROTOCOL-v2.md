@@ -28,9 +28,19 @@ phone ── TCP ── [outer TLS: client ↔ relay] ── relay ── [outer
 - **Phone:** always strict; it uses the `rfp` value from the pairing URI.
 
 ### 1.2 Join line (inside outer TLS)
-`DROIDSYNC/2 <room> mac|phone [fcm-token]\n`
+`DROIDSYNC/2 <room> mac|phone [push-token]\n`
+
+The optional push token is phone-only and tells the relay how to wake the phone (§1.2.1).
 
 Max 512 bytes, 5 s deadline. The relay answers with exactly one line: `PAIRED`, `WAIT` or `ERROR <reason>`. The room is 43 characters of base64url (`[A-Za-z0-9_-]`). A join line for any other protocol version (`DROIDSYNC/<n>`) gets `ERROR upgrade`.
+
+#### 1.2.1 Push token
+The token field holds one of two things, told apart by a prefix:
+
+- **FCM token** (no prefix): up to 256 bytes with no spaces.
+- **UnifiedPush endpoint**: `up:<endpoint>`, where the endpoint is an absolute `https` URL with a host, no userinfo and no fragment, no whitespace, at most 397 bytes (the whole field is at most 400, which keeps the join line under 512). A bad token field gets `ERROR` like any malformed join line. A phone whose endpoint does not fit sends no token (it still joins, it just gets no wake-up).
+
+When a Mac parks, the relay delivers the same content-free `{"type":"mac_online"}`: as an FCM data message to an FCM token, or as an HTTP `POST` of exactly that JSON body to a UnifiedPush endpoint. For endpoints the relay uses `https` only, a 15 s timeout, no redirects and a block on loopback, private and link-local addresses, and rate-limits per room like FCM. An endpoint answering 404 or 410 is dropped. Relays and phones that predate UnifiedPush never see the prefix unless a new phone talks to an old relay, which would treat the field as an FCM token that never delivers: harmless.
 
 ### 1.3 Pipe
 After `PAIRED`, the relay pipes the decrypted outer-TLS byte streams between the two clients. Those bytes are the inner TLS, so the relay still never sees plaintext. The inner TLS is pinned to the Mac's certificate, and frames are length-prefixed (4-byte big-endian length, max 1 MiB).
