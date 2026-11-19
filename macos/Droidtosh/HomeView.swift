@@ -15,7 +15,7 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 16) {
                 Group {
                     if needsSetup {
                         SetupCard(model: model)
@@ -27,19 +27,20 @@ struct HomeView: View {
                 syncSection
                     .entrance(0.07)
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 16) {
+                    HStack(alignment: .top, spacing: 12) {
                         RecentCallsCard(model: model)
                         RecentTransfersCard(model: model)
                     }
-                    VStack(spacing: 16) {
+                    .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 12) {
                         RecentCallsCard(model: model)
                         RecentTransfersCard(model: model)
                     }
                 }
                 .entrance(0.14)
             }
-            .padding(24)
-            .frame(maxWidth: 940)
+            .padding(20)
+            .frame(maxWidth: 1100)
             .frame(maxWidth: .infinity)
         }
         .navigationTitle("Home")
@@ -64,10 +65,10 @@ struct HomeView: View {
     // MARK: Sync
 
     private var syncSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Sync")
                 .font(.headline)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12, alignment: .top)], spacing: 12) {
                 SyncCard(
                     title: "Notifications",
                     detail: notificationsDetail,
@@ -129,10 +130,10 @@ private struct PhoneCard: View {
 
     var body: some View {
         let status = DroidtoshStatus(statusText: model.connection.statusText)
-        HStack(alignment: .center, spacing: 18) {
-            TetherView(state: model.device.findCanStop ? .echo : status.tether, size: 46)
+        HStack(alignment: .center, spacing: 16) {
+            TetherView(state: model.device.findCanStop ? .echo : status.tether, size: 42)
                 .foregroundStyle(Brand.onInk)
-                .frame(width: 66, height: 66)
+                .frame(width: 60, height: 60)
                 .background(RoundedRectangle(cornerRadius: 17, style: .continuous).fill(Brand.ink))
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
@@ -209,7 +210,8 @@ private struct PhoneCard: View {
                 .help(model.files.phoneSupportsFiles ? "Choose files or folders to send" : "Connect your phone to send files")
             }
         }
-        .padding(20)
+        
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Brand.hero))
         .animation(.easeOut(duration: 0.2), value: model.device.findCanStop)
@@ -234,10 +236,10 @@ private struct SetupCard: View {
     @Environment(\.showPairing) private var showPairing
 
     var body: some View {
-        HStack(alignment: .center, spacing: 18) {
-            TetherView(state: .seeking, size: 46)
+        HStack(alignment: .center, spacing: 16) {
+            TetherView(state: .seeking, size: 42)
                 .foregroundStyle(Brand.onInk)
-                .frame(width: 66, height: 66)
+                .frame(width: 60, height: 60)
                 .background(RoundedRectangle(cornerRadius: 17, style: .continuous).fill(Brand.ink))
             VStack(alignment: .leading, spacing: 8) {
                 Text("Set up Droidtosh")
@@ -257,7 +259,8 @@ private struct SetupCard: View {
             Button("Set Up…") { showPairing() }
                 .buttonStyle(InkButtonStyle())
         }
-        .padding(20)
+        
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Brand.hero))
     }
@@ -303,17 +306,17 @@ private struct SyncCard: View {
                     .labelsHidden()
                     .controlSize(.small)
                     .frame(height: 30)
-                    .padding(14)
+                    .padding(12)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(CardBackground(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .hoverLift()
     }
 
     private var cardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 iconView
                     .frame(width: 30, height: 30)
@@ -335,8 +338,8 @@ private struct SyncCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
@@ -367,12 +370,12 @@ private struct RecentCallsCard: View {
                     .buttonStyle(.inkLink)
                     .font(.callout)
             }
-            let entries = Array(model.callLog.entries.prefix(3))
+            let entries = Array(model.callLog.entries.prefix(5))
             if entries.isEmpty {
                 Text("Your phone's recent calls appear here once it connects.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
@@ -382,7 +385,7 @@ private struct RecentCallsCard: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private func row(_ entry: DSCallLogEntry) -> some View {
@@ -408,7 +411,8 @@ private struct RecentCallsCard: View {
                     .buttonStyle(OutlineButtonStyle(compact: true))
             }
         }
-        .padding(.vertical, 7)
+        
+        .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
     }
 }
@@ -421,7 +425,7 @@ private struct RecentTransfersCard: View {
     private var recent: [FileTransferSnapshot] {
         let active = model.files.activeTransfers
         let finished = model.files.transfers.filter { $0.phase.isFinished }
-        return Array((active + finished).prefix(3))
+        return Array((active + finished).prefix(5))
     }
 
     var body: some View {
@@ -437,7 +441,7 @@ private struct RecentTransfersCard: View {
                 Text(model.files.phoneSupportsFiles ? "No transfers yet. Drop files here to send them to your phone." : "No transfers yet.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
             } else {
                 VStack(spacing: 10) {
                     ForEach(recent) { transfer in
