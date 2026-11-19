@@ -15,6 +15,9 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -395,39 +398,51 @@ fun MainScaffold(
 /** A page slides over the shell and follows the predictive-back gesture as it goes. */
 @Composable
 private fun PageOverlay(visible: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    var backProgress by remember { mutableFloatStateOf(0f) }
-    var swipeEdge by remember { mutableStateOf(BackEventCompat.EDGE_LEFT) }
+    val backProgress = remember { Animatable(0f) }
+    // The edge of the gesture in flight; null for the back key and 3-button navigation.
+    var swipeEdge by remember { mutableStateOf<Int?>(null) }
     PredictiveBackHandler(enabled = visible) { events: Flow<BackEventCompat> ->
         try {
             events.collect { event ->
-                backProgress = event.progress
                 swipeEdge = event.swipeEdge
+                backProgress.snapTo(event.progress)
             }
+            // Committed: keep the dragged pose and let the exit carry on from it, toward the same side.
             onDismiss()
-            backProgress = 0f
         } catch (cancelled: CancellationException) {
-            backProgress = 0f
+            backProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+            swipeEdge = null
             throw cancelled
         }
     }
-    LaunchedEffect(visible) { if (visible) backProgress = 0f }
+    LaunchedEffect(visible) {
+        if (visible) {
+            backProgress.snapTo(0f)
+            swipeEdge = null
+        }
+    }
     val density = LocalDensity.current
+    val maxShift = with(density) { 24.dp.toPx() }
+    val shape = MaterialTheme.shapes.extraLarge
     AnimatedVisibility(
         visible = visible,
         enter = slideInHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) { it / 4 } + fadeIn(),
-        exit = slideOutHorizontally(MaterialTheme.motionScheme.fastSpatialSpec()) { it / 4 } + fadeOut(),
+        exit = slideOutHorizontally(MaterialTheme.motionScheme.fastSpatialSpec()) { BackMotion.exitOffset(swipeEdge, it / 4) } + fadeOut(),
     ) {
-        val shift = with(density) { 24.dp.toPx() } * backProgress * if (swipeEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
         Surface(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    val scale = 1f - 0.08f * backProgress
+                    val progress = backProgress.value
+                    val scale = BackMotion.scale(progress)
                     scaleX = scale
                     scaleY = scale
-                    translationX = shift
-                }
-                .clip(MaterialTheme.shapes.extraLarge.takeIf { backProgress > 0f } ?: androidx.compose.ui.graphics.RectangleShape),
+                    translationX = BackMotion.translationX(swipeEdge, progress, maxShift)
+                    if (progress > 0f) {
+                        this.shape = shape
+                        clip = true
+                    }
+                },
             color = MaterialTheme.colorScheme.surface,
         ) { content() }
     }
