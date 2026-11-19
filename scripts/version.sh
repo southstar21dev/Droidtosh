@@ -24,14 +24,18 @@ else
   local_build=1
 fi
 
-pattern='^([0-9]+)\.([0-9]+)\.([0-9]+)(-(alpha|beta|rc)\.([0-9]+))?$'
+# No leading zeros (the apps' SemVer parsers reject them), and at most 4 digits per field so the
+# arithmetic below cannot wrap; the range check then gives the precise limit.
+num='(0|[1-9][0-9]{0,3})'
+pattern="^${num}\\.${num}\\.${num}(-(alpha|beta|rc)\\.${num})?\$"
+
 if [[ ! "$version" =~ $pattern ]]; then
   echo "version.sh: \"$version\" is not X.Y.Z or X.Y.Z-(alpha|beta|rc).N" >&2
   exit 1
 fi
-major=$((10#${BASH_REMATCH[1]}))
-minor=$((10#${BASH_REMATCH[2]}))
-patch=$((10#${BASH_REMATCH[3]}))
+major=$((BASH_REMATCH[1]))
+minor=$((BASH_REMATCH[2]))
+patch=$((BASH_REMATCH[3]))
 stage="${BASH_REMATCH[5]}"
 number="${BASH_REMATCH[6]}"
 
@@ -41,11 +45,11 @@ if [ "$major" -gt 213 ] || [ "$minor" -gt 99 ] || [ "$patch" -gt 99 ]; then
 fi
 case "$stage" in
   "") rank=999 ;;
-  alpha) rank=$((10#$number)) ;;
-  beta) rank=$((300 + 10#$number)) ;;
-  rc) rank=$((600 + 10#$number)) ;;
+  alpha) rank=$((number)) ;;
+  beta) rank=$((300 + number)) ;;
+  rc) rank=$((600 + number)) ;;
 esac
-if [ -n "$stage" ] && { [ "$((10#$number))" -lt 1 ] || [ "$((10#$number))" -gt 299 ]; }; then
+if [ -n "$stage" ] && { [ "$((number))" -lt 1 ] || [ "$((number))" -gt 299 ]; }; then
   echo "version.sh: the pre-release number in $version must be 1–299" >&2
   exit 1
 fi
