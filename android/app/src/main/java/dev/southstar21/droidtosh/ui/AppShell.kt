@@ -26,8 +26,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.ShortNavigationBarItemDefaults
+import androidx.compose.material3.WideNavigationRailItemDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -125,6 +128,8 @@ fun MainShell(
         transfers = transfers,
         connectionMode = pairingMode?.mode,
         relayAvailable = pairingMode?.relayAvailable ?: true,
+        relayAddress = pairingMode?.relayAddress,
+        relayFingerprint = pairingMode?.relayFingerprint,
         versionName = BuildConfig.VERSION_NAME,
         update = update,
         betaUpdates = betaUpdates,
@@ -133,11 +138,11 @@ fun MainShell(
     val actions = rememberAppActions(state)
 
     var destination by rememberSaveable { mutableStateOf(Destination.Home) }
-    var showDiagnostics by rememberSaveable { mutableStateOf(false) }
+    var page by rememberSaveable { mutableStateOf<Page?>(null) }
     LaunchedEffect(requestedDestination) {
         if (requestedDestination != null) {
             destination = requestedDestination
-            showDiagnostics = false
+            page = null
             onDestinationHandled()
         }
     }
@@ -147,11 +152,11 @@ fun MainShell(
         actions = actions,
         destination = destination,
         onDestinationChange = { destination = it },
-        showDiagnostics = showDiagnostics,
-        onShowDiagnosticsChange = { showDiagnostics = it },
+        page = page,
+        onPageChange = { page = it },
         diagnostics = {
             val snapshot by state.diagnostics.collectAsStateWithLifecycle()
-            DiagnosticsScreen(snapshot = snapshot, actions = actions, onBack = { showDiagnostics = false })
+            DiagnosticsScreen(snapshot = snapshot, actions = actions, onBack = { page = Page.Connection })
         },
     )
 }
@@ -215,9 +220,14 @@ private fun rememberAppActions(state: AppState): AppActions {
     }
 }
 
+
 private val WideLayoutMinWidth = 600.dp
 
-/** Stateless shell: adaptive navigation (bottom bar or rail) and the Diagnostics detail page. */
+/**
+ * Stateless shell: adaptive navigation (bottom bar or rail) over four tabs, and the pages that
+ * open over them (Connection from the Mac card, Settings from the gear, Diagnostics from
+ * Connection).
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MainScaffold(
@@ -225,11 +235,11 @@ fun MainScaffold(
     actions: AppActions,
     destination: Destination,
     onDestinationChange: (Destination) -> Unit,
-    showDiagnostics: Boolean,
-    onShowDiagnosticsChange: (Boolean) -> Unit,
+    page: Page?,
+    onPageChange: (Page?) -> Unit,
     diagnostics: @Composable () -> Unit,
 ) {
-    BackHandler(enabled = destination != Destination.Home && !showDiagnostics) {
+    BackHandler(enabled = destination != Destination.Home && page == null) {
         onDestinationChange(Destination.Home)
     }
     val activeCount = ui.activeTransfers.size
@@ -257,18 +267,14 @@ fun MainScaffold(
                         ui = ui,
                         actions = actions,
                         onOpenTransfers = { onDestinationChange(Destination.Transfers) },
-                        onOpenSettings = { onDestinationChange(Destination.Settings) },
+                        onOpenConnection = { onPageChange(Page.Connection) },
+                        onOpenSettings = { onPageChange(Page.Settings) },
                         modifier = screenModifier,
                         contentPadding = padding,
                     )
                     Destination.Transfers -> TransfersScreen(ui, actions, screenModifier, padding)
-                    Destination.Settings -> SettingsScreen(
-                        ui = ui,
-                        actions = actions,
-                        onOpenDiagnostics = { onShowDiagnosticsChange(true) },
-                        modifier = screenModifier,
-                        contentPadding = padding,
-                    )
+                    Destination.Notifications -> NotificationsScreen(ui, actions, screenModifier, padding)
+                    Destination.Calls -> CallsScreen(ui, actions, screenModifier, padding)
                 }
             }
         }
@@ -276,7 +282,6 @@ fun MainScaffold(
         if (wide) {
             Row(Modifier.fillMaxSize()) {
                 WideNavigationRail(
-                    // The page header already carries the brand mark; keep the rail to navigation.
                     arrangement = Arrangement.Center,
                 ) {
                     Destination.entries.forEach { item ->
@@ -286,6 +291,11 @@ fun MainScaffold(
                             icon = { NavIcon(item, activeCount) },
                             label = { Text(destinationLabel(item)) },
                             railExpanded = false,
+                            colors = WideNavigationRailItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            ),
                         )
                     }
                 }
@@ -294,13 +304,18 @@ fun MainScaffold(
         } else {
             Scaffold(
                 bottomBar = {
-                    ShortNavigationBar {
+                    ShortNavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                         Destination.entries.forEach { item ->
                             ShortNavigationBarItem(
                                 selected = destination == item,
                                 onClick = { onDestinationChange(item) },
                                 icon = { NavIcon(item, activeCount) },
                                 label = { Text(destinationLabel(item)) },
+                                colors = ShortNavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                    selectedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                ),
                             )
                         }
                     }
@@ -309,12 +324,36 @@ fun MainScaffold(
         }
     }
 
-    DiagnosticsOverlay(visible = showDiagnostics, onDismiss = { onShowDiagnosticsChange(false) }, content = diagnostics)
+    // The last page shown stays on screen while the overlay animates out.
+    var shownPage by remember { mutableStateOf(page) }
+    if (page != null) shownPage = page
+    PageOverlay(
+        visible = page != null,
+        onDismiss = { onPageChange(if (page == Page.Diagnostics) Page.Connection else null) },
+    ) {
+        AnimatedContent(
+            targetState = shownPage,
+            transitionSpec = { (fadeIn(effects) + scaleIn(spatial, initialScale = 0.97f)).togetherWith(fadeOut(fastEffects)) },
+            label = "page",
+        ) { current ->
+            when (current) {
+                Page.Connection -> ConnectionScreen(
+                    ui = ui,
+                    actions = actions,
+                    onBack = { onPageChange(null) },
+                    onOpenDiagnostics = { onPageChange(Page.Diagnostics) },
+                )
+                Page.Settings -> SettingsScreen(ui = ui, actions = actions, onBack = { onPageChange(null) })
+                Page.Diagnostics -> diagnostics()
+                null -> Unit
+            }
+        }
+    }
 }
 
-/** Diagnostics slides over the shell and follows the predictive-back gesture as it goes. */
+/** A page slides over the shell and follows the predictive-back gesture as it goes. */
 @Composable
-private fun DiagnosticsOverlay(visible: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+private fun PageOverlay(visible: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
     var backProgress by remember { mutableFloatStateOf(0f) }
     var swipeEdge by remember { mutableStateOf(BackEventCompat.EDGE_LEFT) }
     PredictiveBackHandler(enabled = visible) { events: Flow<BackEventCompat> ->
@@ -324,6 +363,7 @@ private fun DiagnosticsOverlay(visible: Boolean, onDismiss: () -> Unit, content:
                 swipeEdge = event.swipeEdge
             }
             onDismiss()
+            backProgress = 0f
         } catch (cancelled: CancellationException) {
             backProgress = 0f
             throw cancelled
@@ -357,7 +397,8 @@ private fun NavIcon(destination: Destination, activeTransfers: Int) {
     val icon: ImageVector = when (destination) {
         Destination.Home -> Icons.Default.Home
         Destination.Transfers -> DroidIcons.Transfers
-        Destination.Settings -> Icons.Default.Settings
+        Destination.Notifications -> Icons.Default.Notifications
+        Destination.Calls -> Icons.Default.Call
     }
     if (destination == Destination.Transfers && activeTransfers > 0) {
         BadgedBox(badge = { Badge { Text(activeTransfers.toString()) } }) {
@@ -371,6 +412,7 @@ private fun NavIcon(destination: Destination, activeTransfers: Int) {
 @Composable
 private fun destinationLabel(destination: Destination): String = when (destination) {
     Destination.Home -> stringResource(R.string.nav_home)
-    Destination.Transfers -> stringResource(R.string.nav_transfers)
-    Destination.Settings -> stringResource(R.string.nav_settings)
+    Destination.Transfers -> stringResource(R.string.nav_files)
+    Destination.Notifications -> stringResource(R.string.nav_notifications)
+    Destination.Calls -> stringResource(R.string.nav_calls)
 }

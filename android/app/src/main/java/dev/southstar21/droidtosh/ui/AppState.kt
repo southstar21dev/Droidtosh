@@ -56,8 +56,24 @@ data class PermissionStatus(
         get() = notifications && phone && callLog && outgoingCalls && contacts && notificationAccess
 }
 
-/** The pairing's connection mode, and whether it has a relay to choose at all. */
-data class PairingMode(val mode: ConnectionMode, val relayAvailable: Boolean)
+/** The pairing's connection mode, whether it has a relay to choose at all, and which relay. */
+data class PairingMode(
+    val mode: ConnectionMode,
+    val relayAvailable: Boolean,
+    val relayAddress: String? = null,
+    val relayFingerprint: String? = null,
+)
+
+private fun PairingCredentials.toPairingMode() = PairingMode(
+    mode = mode,
+    relayAvailable = hasRelay,
+    relayAddress = if (host != null && port != null) "$host:$port" else null,
+    relayFingerprint = relayFingerprint?.let(::shortFingerprint),
+)
+
+/** "AB12 CD34 EF56 7890": the start of a SHA-256 fingerprint, enough to compare by eye. */
+internal fun shortFingerprint(fingerprint: String): String =
+    fingerprint.filter { it.isLetterOrDigit() }.uppercase().take(16).chunked(4).joinToString(" ")
 
 /** What Home shows under the Mac's name: the relay host and when the current state began. */
 data class ConnectionDetails(val relay: String? = null, val stateSinceMs: Long? = null)
@@ -78,6 +94,10 @@ class AppState(application: Application) : AndroidViewModel(application) {
     private val batteryOptimizationIgnoredState = MutableStateFlow(readBatteryOptimizationIgnored())
     private val overlayAllowedState = MutableStateFlow(OverlayPermission.granted(application))
     private val pairingModeState = MutableStateFlow(readPairingMode())
+    private val setupPreferences = application.getSharedPreferences("droidtosh_setup", Context.MODE_PRIVATE)
+
+    // Whoever was paired before the guided setup existed has been through it already.
+    private val setupDoneState = MutableStateFlow(setupPreferences.getBoolean(SETUP_DONE, paired.value))
 
     init {
         LegacyCompanionCleanup.run(application)
@@ -87,6 +107,15 @@ class AppState(application: Application) : AndroidViewModel(application) {
     }
 
     val isPaired: StateFlow<Boolean> = paired
+
+    /** False from a fresh scan until the setup's permissions step is finished or skipped. */
+    val setupDone: StateFlow<Boolean> = setupDoneState.asStateFlow()
+
+    /** Ends the guided setup (its permissions step's Continue or Skip). */
+    fun finishSetup() {
+        setupDoneState.value = true
+        setupPreferences.edit().putBoolean(SETUP_DONE, true).apply()
+    }
 
     /** True when a pairing from an older app version was discarded and the user must scan again. */
     val repairNeeded: StateFlow<Boolean> = repairNeededState.asStateFlow()
@@ -196,7 +225,10 @@ class AppState(application: Application) : AndroidViewModel(application) {
             localPort = payload.localPort,
         )
         credentialStore.save(credentials)
-        pairingModeState.value = PairingMode(credentials.mode, credentials.hasRelay)
+        pairingModeState.value = credentials.toPairingMode()
+        // A fresh pairing goes on to the setup's permissions step.
+        setupDoneState.value = false
+        setupPreferences.edit().putBoolean(SETUP_DONE, false).apply()
         repairNeededState.value = false
         paired.value = true
         ConnectionService.start(getApplication())
@@ -241,7 +273,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     }
 
     private fun readPairingMode(): PairingMode? =
-        runCatching { credentialStore.load() }.getOrNull()?.let { PairingMode(it.mode, it.hasRelay) }
+        runCatching { credentialStore.load() }.getOrNull()?.toPairingMode()
 
     private fun readPermissions(): PermissionStatus {
         val context = getApplication<Application>()
@@ -260,6 +292,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     private companion object {
         const val DETAILS_REFRESH_MS = 1_000L
+        const val SETUP_DONE = "setup_done"
     }
 
     private fun Context.isGranted(permission: String): Boolean =

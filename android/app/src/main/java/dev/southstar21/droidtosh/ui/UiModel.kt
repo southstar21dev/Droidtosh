@@ -28,6 +28,10 @@ data class DroidUiState(
     val connectionMode: ConnectionMode? = null,
     /** Whether the pairing includes a relay, so the relay modes can be chosen. */
     val relayAvailable: Boolean = true,
+    /** The relay from the pairing ("relay.example.com:443"); null when the pairing has none. */
+    val relayAddress: String? = null,
+    /** The pinned relay certificate's fingerprint, shortened for display; null without a relay. */
+    val relayFingerprint: String? = null,
     val versionName: String = "",
     /** The over-the-air updater (docs/RELEASING.md). */
     val update: UpdateState = UpdateState.Idle,
@@ -52,6 +56,11 @@ data class DroidUiState(
             UpdateState.Idle, UpdateState.Checking, UpdateState.UpToDate -> null
         }
 
+    /** The one thing Home asks about: the most important problem, else an update on offer. */
+    val attention: Attention?
+        get() = issues.firstOrNull()?.let { Attention.Problem(it) }
+            ?: (update as? UpdateState.Available)?.let { Attention.Update(it.version) }
+
     /** Things that stop a feature from working, most important first. */
     val issues: List<Issue>
         get() = buildList {
@@ -70,6 +79,12 @@ data class DroidUiState(
             if (!permissions.contacts) add(Issue.Contacts)
             if (!overlayAllowed) add(Issue.Overlay)
         }
+}
+
+/** What Home's single attention line is about. */
+sealed interface Attention {
+    data class Problem(val issue: Issue) : Attention
+    data class Update(val version: String) : Attention
 }
 
 enum class Issue { NotificationAccess, PostNotifications, Phone, BatteryOptimization, FullScreenIntent, CallLog, OutgoingCalls, Contacts, Overlay }
@@ -101,5 +116,8 @@ class AppActions(
     val shareDiagnosticsLogs: () -> Unit = {},
 )
 
-/** The bottom-bar destinations. */
-enum class Destination { Home, Transfers, Settings }
+/** The bottom-bar tabs. [Transfers] is the Files tab (its name is kept for notification intents). */
+enum class Destination { Home, Transfers, Notifications, Calls }
+
+/** Pages that open over the tabs: the connection (from the Mac card), Settings, and Diagnostics. */
+enum class Page { Connection, Settings, Diagnostics }
