@@ -35,6 +35,7 @@
     <string name="clipboard_note">Mac to phone syncs automatically. To send from the phone, use Share → Copy to Mac clipboard, the notification action, or open Droidtosh.</string>
 
     <!-- Files -->
+    <string name="share_clipboard_off">Clipboard sync is off. Turn it on in Droidtosh to send.</string>
     <string name="share_clipboard_label">Copy to Mac clipboard</string>
     <string name="share_file_label">Send file to Mac</string>
     <string name="files_title">Files</string>

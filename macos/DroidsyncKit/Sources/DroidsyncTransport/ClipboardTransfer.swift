@@ -1,11 +1,24 @@
 import CryptoKit
 import Foundation
+import DroidsyncProtocol
 
 public enum ClipboardTransfer {
     public static let chunkSize = 256 * 1024
     public static let maxBlobSize = 32 * 1024 * 1024
     public static let maxTextBytes = 512 * 1024
     public static let allowedMimeTypes: Set<String> = ["image/png", "image/jpeg"]
+
+    /// Whether an inbound payload may reach the Mac pasteboard. Phone clipboard content is
+    /// dropped while clipboard sync is off, so a peer cannot overwrite the pasteboard; other
+    /// payloads (such as the phone status) are not clipboard content and always pass.
+    public static func accepts(_ payload: DSEnvelope.OneOf_Payload?, enabled: Bool) -> Bool {
+        switch payload {
+        case .clipboardText?, .clipboardBlobStart?, .clipboardBlobChunk?, .clipboardBlobEnd?:
+            return enabled
+        default:
+            return true
+        }
+    }
 }
 
 public enum ClipboardChunker {

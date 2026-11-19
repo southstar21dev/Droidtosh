@@ -53,6 +53,10 @@ final class ClipboardController: ObservableObject {
     }
 
     func handle(_ envelope: DSEnvelope) {
+        guard ClipboardTransfer.accepts(envelope.payload, enabled: enabled) else {
+            DebugLog.log("clipboard: dropped inbound clipboard payload, sync is off")
+            return
+        }
         switch envelope.payload {
         case .clipboardText(let message)?:
             DebugLog.log("clipboard: applying text bytes=\(message.text.utf8.count)")

@@ -1,8 +1,24 @@
 import Foundation
 import XCTest
+import DroidsyncProtocol
 @testable import DroidsyncTransport
 
 final class ClipboardTransferTests: XCTestCase {
+    func testDisabledClipboardIgnoresInboundClipboardPayloads() {
+        let payloads: [DSEnvelope.OneOf_Payload] = [
+            .clipboardText(DSClipboardText()),
+            .clipboardBlobStart(DSClipboardBlobStart()),
+            .clipboardBlobChunk(DSClipboardBlobChunk()),
+            .clipboardBlobEnd(DSClipboardBlobEnd()),
+        ]
+        for payload in payloads {
+            XCTAssertFalse(ClipboardTransfer.accepts(payload, enabled: false))
+            XCTAssertTrue(ClipboardTransfer.accepts(payload, enabled: true))
+        }
+        XCTAssertTrue(ClipboardTransfer.accepts(.phoneStatus(DSPhoneStatus()), enabled: false))
+        XCTAssertTrue(ClipboardTransfer.accepts(nil, enabled: false))
+    }
+
     func testChunkerSplitsWithOffsets() {
         let data = Data(repeating: 7, count: ClipboardTransfer.chunkSize * 2 + 10)
         let chunks = ClipboardChunker.chunks(for: data)

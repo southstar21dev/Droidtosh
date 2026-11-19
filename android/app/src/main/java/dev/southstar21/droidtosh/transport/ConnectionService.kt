@@ -98,9 +98,7 @@ class ConnectionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (clipboardManager == null) {
             clipboardManager = ClipboardSyncManager(applicationContext) {
-                applicationContext
-                    .getSharedPreferences("droidsync_clipboard", MODE_PRIVATE)
-                    .getBoolean("enabled", true)
+                dev.southstar21.droidtosh.clipboard.ClipboardPreference.isEnabled(applicationContext)
             }.also { it.start() }
         }
         // connectedDevice's runtime prerequisite is met by the CHANGE_NETWORK_STATE manifest permission.
