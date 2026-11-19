@@ -270,6 +270,7 @@
     <string name="calls_subtitle">Answer, decline and place calls from your Mac</string>
     <string name="calls_ready">Calls ring on your Mac too</string>
     <string name="calls_ready_body">Cellular and app calls, like WhatsApp</string>
+    <string name="calls_ready_cellular_body">Cellular calls; allow notification access for app calls like WhatsApp</string>
     <string name="calls_not_ready">Calls stay on this phone</string>
     <string name="calls_not_ready_body">Allow phone access to see, answer and place calls from the Mac</string>
     <string name="calls_app_calls_header">App calls</string>

@@ -104,7 +104,13 @@ fun CallsScreen(
         val ready = ui.permissions.phone
         FeatureStatusCard(
             title = stringResource(if (ready) R.string.calls_ready else R.string.calls_not_ready),
-            body = stringResource(if (ready) R.string.calls_ready_body else R.string.calls_not_ready_body),
+            body = stringResource(
+                when {
+                    !ready -> R.string.calls_not_ready_body
+                    ui.permissions.notificationAccess -> R.string.calls_ready_body
+                    else -> R.string.calls_ready_cellular_body
+                },
+            ),
         ) {
             if (ready) {
                 ShapeTether(state = TetherState.Ringing, polygon = MaterialShapes.SoftBurst, size = 64.dp, tetherSize = 40.dp)
@@ -144,6 +150,14 @@ fun CallsScreen(
         ListGroup(
             title = stringResource(R.string.calls_app_calls_header),
             content = {
+                item { shape ->
+                    PermissionGroupRow(
+                        shape, Icons.Default.Notifications,
+                        stringResource(R.string.permission_notification_access_title),
+                        stringResource(R.string.permission_notification_access_description),
+                        ui.permissions.notificationAccess, granted, allow, actions.openNotificationAccess,
+                    )
+                }
                 item { shape ->
                     PermissionGroupRow(
                         shape, Icons.Default.Call,
