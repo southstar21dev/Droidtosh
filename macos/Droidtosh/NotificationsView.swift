@@ -188,6 +188,10 @@ private struct NotificationOptions: View {
                 OptionRow("Sending from the phone", detail: notifications.notificationsRelayEnabled ? "On" : "Off. Turn it on in the phone app.")
                 OptionFootnote("Phone notifications appear as Mac banners. Reply, use their actions, or dismiss them on either side.")
             }
+            OptionGroup("Pause") {
+                PausePhoneNotificationsControl(notifications: notifications)
+                OptionFootnote("While paused, phone notifications skip banners and sounds on this Mac and wait quietly in Notification Center. Nothing is lost or dismissed.")
+            }
             OptionGroup("Verification codes") {
                 Toggle(isOn: Binding(
                     get: { notifications.copyCodesAutomatically },
@@ -329,5 +333,37 @@ struct AppMonogram: View {
             .frame(width: size, height: size)
             .background(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous).fill(color))
             .accessibilityHidden(true)
+    }
+}
+
+/// The pause menu, or the paused status with a Resume button.
+struct PausePhoneNotificationsControl: View {
+    @ObservedObject var notifications: NotificationsController
+
+    var body: some View {
+        if let status = notifications.pauseStatusText() {
+            OptionRow(status) {
+                Button("Resume") { notifications.resume() }
+                    .buttonStyle(OutlineButtonStyle(compact: true))
+            }
+        } else {
+            OptionRow("Pause phone notifications") {
+                PausePhoneNotificationsMenu(notifications: notifications)
+            }
+        }
+    }
+}
+
+struct PausePhoneNotificationsMenu: View {
+    @ObservedObject var notifications: NotificationsController
+
+    var body: some View {
+        Menu("Pause") {
+            ForEach(NotificationPause.allCases, id: \.self) { duration in
+                Button(duration.title) { notifications.pause(duration) }
+            }
+        }
+        .menuIndicator(.visible)
+        .fixedSize()
     }
 }

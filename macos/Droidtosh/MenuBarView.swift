@@ -32,6 +32,7 @@ struct MenuBarView: View {
                     .padding(.horizontal, 4)
             }
             syncToggles
+            pauseRow
             if !recentTransfers.isEmpty || model.files.phoneSupportsFiles {
                 transfers
             }
@@ -140,6 +141,31 @@ struct MenuBarView: View {
         .padding(.horizontal, PopoverMetrics.padding)
         .padding(.vertical, 4)
         .popoverSection()
+    }
+
+    private var pauseRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: model.notifications.isPaused ? "bell.slash" : "bell")
+                .frame(width: 22)
+                .foregroundStyle(.secondary)
+            Text(model.notifications.pauseStatusText() ?? "Phone notifications")
+                .font(.callout)
+                .lineLimit(1)
+            Spacer()
+            if model.notifications.isPaused {
+                Button("Resume") { model.notifications.resume() }
+                    .buttonStyle(.borderless)
+                    .font(.callout.weight(.medium))
+            } else {
+                PausePhoneNotificationsMenu(notifications: model.notifications)
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, PopoverMetrics.padding)
+        .padding(.vertical, 8)
+        .popoverSection()
+        .animation(.easeOut(duration: 0.2), value: model.notifications.pausedUntil)
     }
 
     private func syncRow(_ title: String, symbol: String, isOn: Binding<Bool>) -> some View {

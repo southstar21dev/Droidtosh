@@ -6,6 +6,9 @@ final class NotificationPresenter: NSObject, NotificationPresenting, UNUserNotif
     var onResponse: ((_ key: String, _ identifier: String, _ replyText: String?, _ isDismiss: Bool) -> Void)?
     var attachmentProvider: ((String) -> URL?)?
     var onCopyCode: ((String) -> Void)?
+    /// While set to a future date, phone notifications arrive quietly in Notification Center
+    /// (no banner or sound) instead of as banners.
+    var pausedUntil: Date?
     var onAuthorizationCompleted: (() -> Void)?
 
     private let center = UNUserNotificationCenter.current()
@@ -57,7 +60,8 @@ final class NotificationPresenter: NSObject, NotificationPresenting, UNUserNotif
         content.body = notification.body
         content.subtitle = notification.subtitle
         content.categoryIdentifier = notification.categoryIdentifier
-        content.interruptionLevel = notification.silent ? .passive : .active
+        let paused = pausedUntil.map { $0 > Date() } ?? false
+        content.interruptionLevel = (notification.silent || paused) ? .passive : .active
         content.userInfo = ["key": notification.identifier]
         if let code = notification.verificationCode {
             content.userInfo["code"] = code
