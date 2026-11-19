@@ -18,6 +18,10 @@ final class LinkController {
     private let center = UNUserNotificationCenter.current()
     private var pending: [(id: String, url: URL)] = []
     private var delegate: LinkNotificationDelegate?
+    private let launchedAt = Date()
+    private var hasHadPhone = false
+    private var pendingDial: PendingDial?
+    private var pendingDialTask: Task<Void, Never>?
 
     init(connection: ConnectionController, clipboard: ClipboardController, files: FilesController, calls: CallsController) {
         self.connection = connection
@@ -99,6 +103,39 @@ final class LinkController {
     /// A `tel:` link opened with Droidtosh: asks first (a web page must not start a call by
     /// itself), on the SIM used last, then uses the usual dial request.
     func handleTel(_ url: URL) {
+        // A link that launched the app arrives before the phone has had time to connect: hold the
+        // latest one and run it on authentication. A link clicked while the app has been running
+        // and the phone is away still gets the notice at once.
+        let now = Date()
+        if !connection.phoneConnected,
+           PendingDial.shouldWait(now: now, launchedAt: launchedAt, hasHadPhone: hasHadPhone) {
+            let dial = PendingDial(link: url.absoluteString, deadline: now.addingTimeInterval(PendingDial.grace))
+            pendingDial = dial
+            pendingDialTask?.cancel()
+            pendingDialTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(PendingDial.grace * 1_000_000_000))
+                guard !Task.isCancelled, let self, self.pendingDial == dial else { return }
+                self.pendingDial = nil
+                self.dialOrNotify(url)
+            }
+            return
+        }
+        dialOrNotify(url)
+    }
+
+    /// The phone has authenticated: runs a dial that was waiting for it.
+    func phoneAuthenticated() {
+        hasHadPhone = true
+        pendingDialTask?.cancel()
+        pendingDialTask = nil
+        guard let dial = pendingDial else { return }
+        pendingDial = nil
+        if let link = dial.usable(now: Date()), let url = URL(string: link) {
+            dialOrNotify(url)
+        }
+    }
+
+    private func dialOrNotify(_ url: URL) {
         guard let text = DialAccountPicker.telLink(from: url.absoluteString),
               case .tel(_, let number)? = LinkPolicy.validate(text, allowTel: true)
         else {

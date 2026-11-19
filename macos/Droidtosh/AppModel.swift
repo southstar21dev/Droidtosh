@@ -184,6 +184,7 @@ final class AppModel: ObservableObject {
         pairing.handleAuthenticated(psk: psk)
         connection.markPhoneAuthenticated()
         notifications.phoneAuthenticated()
+        link.phoneAuthenticated()
         connection.sendServerInfo()
         calls.reset()
         files.phoneConnected(capabilities: connection.negotiatedCapabilities)
