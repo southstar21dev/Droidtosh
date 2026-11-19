@@ -56,6 +56,8 @@ final class NotificationsController: ObservableObject {
         }
         coordinator.autoCopyCodes = { [weak self] code in
             guard let self, self.copyCodesAutomatically else { return }
+            // Paused means quiet: the Copy Code action on the banner still works on click.
+            if let until = self.pausedUntil, until > Date() { return }
             self.codeCopier.copy(code)
         }
         self.coordinator = coordinator
