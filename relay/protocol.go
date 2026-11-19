@@ -11,6 +11,10 @@ import (
 const (
 	protocolPrefix = "DROIDSYNC/2"
 	maxJoinLine    = 512
+	// maxFCMToken caps a plain FCM token; maxTokenField caps the whole token
+	// field, which may instead be "up:<endpoint>" (see unifiedpush.go).
+	maxFCMToken   = 256
+	maxTokenField = 400
 )
 
 // ErrUnsupportedVersion marks a join line for a protocol version this relay
@@ -55,7 +59,14 @@ func ParseJoinLine(raw string) (JoinLine, error) {
 	token := ""
 	if len(fields) == 4 {
 		token = fields[3]
-		if token == "" || len(token) > 256 || strings.IndexFunc(token, unicode.IsSpace) >= 0 {
+		if token == "" || len(token) > maxTokenField || strings.IndexFunc(token, unicode.IsSpace) >= 0 {
+			return JoinLine{}, fmt.Errorf("malformed fcm token")
+		}
+		if IsUnifiedPushToken(token) {
+			if _, err := ValidateUnifiedPushEndpoint(UnifiedPushEndpoint(token)); err != nil {
+				return JoinLine{}, fmt.Errorf("malformed unifiedpush endpoint")
+			}
+		} else if len(token) > maxFCMToken {
 			return JoinLine{}, fmt.Errorf("malformed fcm token")
 		}
 		if role != RolePhone {

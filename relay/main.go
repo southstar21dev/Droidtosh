@@ -100,24 +100,35 @@ func main() {
 		log.Fatalf("fcm setup failed: %v", err)
 	}
 	if notifier == nil {
-		log.Printf("FCM not configured: mac_online pushes disabled")
+		log.Printf("FCM not configured: FCM pushes disabled")
 	}
+	var upNotifier FCMNotifier
+	if os.Getenv("UNIFIEDPUSH_DISABLED") == "" {
+		upNotifier = NewUnifiedPushNotifier()
+	} else {
+		log.Printf("UnifiedPush disabled")
+	}
+	pusher := routedNotifier{fcm: notifier, up: upNotifier}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	var registry *Registry
 	registry = NewRegistry(func(room, token string) {
-		if notifier == nil {
+		if notifier == nil && upNotifier == nil {
 			return
 		}
 		// Push off the join path so a slow FCM call never delays PAIRED.
 		go func() {
 			pushCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
-			if err := notifier.MacOnline(pushCtx, token); err != nil {
+			if err := pusher.MacOnline(pushCtx, token); err != nil {
 				// The room ID is the relay's only access secret; log a prefix.
-				log.Printf("fcm push failed room=%s…: %v", room[:min(8, len(room))], err)
+				kind, id := "fcm", ""
+				if IsUnifiedPushToken(token) {
+					kind, id = "unifiedpush", " endpoint="+endpointID(token)
+				}
+				log.Printf("%s push failed room=%s…%s: %v", kind, room[:min(8, len(room))], id, err)
 				if errors.Is(err, ErrTokenInvalid) {
 					registry.ClearToken(room, token)
 				}
