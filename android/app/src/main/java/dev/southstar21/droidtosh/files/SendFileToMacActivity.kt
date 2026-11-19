@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.southstar21.droidtosh.sharing.ShareTarget
 import dev.southstar21.droidtosh.ui.Destination
 import dev.southstar21.droidtosh.ui.MainActivity
 import dev.southstar21.droidtosh.ui.ShareResult
@@ -103,6 +104,7 @@ class SendFileToMacActivity : ComponentActivity() {
         val queued = if (offer.uris.isEmpty()) 0 else FileTransfers.send(applicationContext, offer.uris)
         val result = ShareResult(queued = queued, total = offer.total, names = if (queued == 0) emptyList() else offer.names)
         sent = result
+        if (queued > 0) ShareTarget.reportUsed(this, intent)
         return result
     }
 

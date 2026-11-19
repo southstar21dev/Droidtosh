@@ -25,6 +25,7 @@ import dev.southstar21.droidtosh.files.TransferInfo
 import dev.southstar21.droidtosh.launch.OverlayPermission
 import dev.southstar21.droidtosh.BuildConfig
 import dev.southstar21.droidtosh.push.PushTokenStore
+import dev.southstar21.droidtosh.sharing.ShareTarget
 import dev.southstar21.droidtosh.transport.RelayTokenRefusals
 import dev.southstar21.droidtosh.push.UnifiedPushController
 import dev.southstar21.droidtosh.push.WakeProvider
@@ -284,6 +285,9 @@ class AppState(application: Application) : AndroidViewModel(application) {
             localPort = payload.localPort,
         )
         credentialStore.save(credentials)
+        // A new pairing starts nameless until its first session; "Mac" stands in meanwhile.
+        ShareTarget.remove(getApplication())
+        ShareTarget.sync(getApplication(), credentials.fingerprint)
         pairingModeState.value = credentials.toPairingMode()
         // A fresh pairing goes on to the setup's permissions step.
         setupDoneState.value = false
@@ -327,6 +331,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     fun unpair() {
         ConnectionService.stop(getApplication())
         credentialStore.clear()
+        ShareTarget.remove(getApplication())
         pairingModeState.value = null
         paired.value = false
     }

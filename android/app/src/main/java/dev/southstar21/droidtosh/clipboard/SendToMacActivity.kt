@@ -6,14 +6,24 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import dev.southstar21.droidtosh.R
+import dev.southstar21.droidtosh.files.SendFileToMacActivity
 import dev.southstar21.droidtosh.files.ShareUriFilter
 import dev.southstar21.droidtosh.link.LinkPolicy
 import dev.southstar21.droidtosh.link.Links
+import dev.southstar21.droidtosh.sharing.ShareTarget
 
 class SendToMacActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (intent?.action == Intent.ACTION_SEND) handleSend(intent)
+        when (intent?.action) {
+            Intent.ACTION_SEND -> {
+                handleSend(intent)
+                ShareTarget.reportUsed(this, intent)
+            }
+            // Direct Share matches by type only, so several images arrive here; the file flow owns them.
+            Intent.ACTION_SEND_MULTIPLE ->
+                startActivity(Intent(intent).setClass(this, SendFileToMacActivity::class.java))
+        }
         finish()
     }
 

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Direct Share: the paired Mac as a target in the share sheet. The shortcut itself is published at
+     runtime (sharing/ShareTarget.kt); these entries say which shares it accepts and where they go.
+     The first matching entry wins, so images and text land in "Send to Mac" and anything else in
+     "Send file to Mac". -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <share-target android:targetClass="dev.southstar21.droidtosh.clipboard.SendToMacActivity">
+        <data android:mimeType="text/plain" />
+        <data android:mimeType="image/*" />
+        <category android:name="dev.southstar21.droidtosh.category.SEND_TO_MAC" />
+    </share-target>
+    <share-target android:targetClass="dev.southstar21.droidtosh.files.SendFileToMacActivity">
+        <data android:mimeType="*/*" />
+        <category android:name="dev.southstar21.droidtosh.category.SEND_TO_MAC" />
+    </share-target>
+</shortcuts>
