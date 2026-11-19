@@ -49,7 +49,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.southstar21.droidtosh.R
+import androidx.compose.material3.LinearWavyProgressIndicator
 import dev.southstar21.droidtosh.ui.components.ShapeIcon
+import dev.southstar21.droidtosh.ui.components.ShapeTether
+import dev.southstar21.droidtosh.ui.components.TetherState
 import dev.southstar21.droidtosh.ui.theme.DroidIcons
 
 /** What the "Send file to Mac" share target managed to queue. */
@@ -123,13 +126,14 @@ fun ShareSheet(
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
                             )
                         } else {
-                            ShapeIcon(
-                                icon = DroidIcons.Upload,
-                                polygon = MaterialShapes.Cookie9Sided,
+                            // Files on their way: the Tether streams toward the Mac on a soft burst.
+                            ShapeTether(
+                                state = TetherState.Streaming(toPhone = false),
+                                polygon = MaterialShapes.SoftBurst,
                                 size = 64.dp,
-                                iconSize = 30.dp,
+                                tetherSize = 40.dp,
                                 spin = animateIn,
-                                spinPeriodMs = 6_000,
+                                spinPeriodMs = 12_000,
                             )
                         }
                         Spacer(Modifier.width(16.dp))
@@ -139,6 +143,14 @@ fun ShareSheet(
                                 style = MaterialTheme.typography.titleLarge,
                             )
                             Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (!failed) {
+                        Spacer(Modifier.size(16.dp))
+                        if (animateIn) {
+                            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        } else {
+                            LinearWavyProgressIndicator(progress = { 0.4f }, modifier = Modifier.fillMaxWidth())
                         }
                     }
                     if (result.names.isNotEmpty()) {
