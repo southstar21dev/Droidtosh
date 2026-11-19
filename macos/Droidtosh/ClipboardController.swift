@@ -132,7 +132,7 @@ final class ClipboardController: ObservableObject {
             DebugLog.log("clipboard: deferred image bytes=\(data.count) metered=true")
             presenter.postLocal(
                 title: "Image not sent",
-                body: "Phone is on cellular — send to phone?",
+                body: "Phone is on cellular. Send to phone?",
                 identifier: "clipboard.sendImage",
                 categoryIdentifier: "clipboard.sendImage"
             )

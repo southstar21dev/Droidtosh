@@ -298,7 +298,7 @@ final class FilesController: ObservableObject {
         switch (snapshot.direction, snapshot.phase) {
         case (.incoming, .completed):
             title = "File received"
-            body = "\(snapshot.savedName ?? snapshot.name) — saved to Downloads"
+            body = "\(snapshot.savedName ?? snapshot.name) was saved to Downloads"
         case (.outgoing, .completed):
             title = "Sent to phone"
             body = snapshot.savedName.map { "Saved as \($0)" } ?? snapshot.name

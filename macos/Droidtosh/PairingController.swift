@@ -169,7 +169,7 @@ final class PairingController: ObservableObject {
     }
 
     func retryRoomTokenLoad() {
-        onStatus?("Can't read the pairing secrets — retrying")
+        onStatus?("Can’t read the pairing secrets, retrying")
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             guard let self else { return }

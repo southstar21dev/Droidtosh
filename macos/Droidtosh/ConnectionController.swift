@@ -232,7 +232,7 @@ final class ConnectionController: ObservableObject {
                 }
             } else if !relayFingerprintIsUsable {
                 guard connectionMode == .both else {
-                    statusText = "Relay fingerprint is invalid — paste the 64-character value from the relay log"
+                    statusText = "Relay fingerprint is invalid. Paste the 64-character value from the relay log"
                     return nil
                 }
             } else {
@@ -407,17 +407,17 @@ final class ConnectionController: ObservableObject {
         case .failed(let message):
             DebugLog.log("relay: state failed \(message)")
             if activeConfig?.relay == nil {
-                statusText = "Local network unavailable — retrying"
+                statusText = "Local network unavailable, retrying"
             } else if localListening {
-                statusText = "Waiting for phone on the local network — relay is down"
+                statusText = "Waiting for phone on the local network, relay is down"
             } else {
-                statusText = "Relay unreachable — retrying"
+                statusText = "Relay unreachable, retrying"
             }
         case .relayCertificateMismatch(let observed):
             DebugLog.log("relay: certificate mismatch, relay presented \(observed)")
-            statusText = "Relay certificate changed — check the fingerprint in Settings"
+            statusText = "Relay certificate changed. Check the fingerprint on the Connection page"
         case .relayRequiresUpgrade:
-            statusText = "Relay needs a newer Droidtosh — update the app"
+            statusText = "Relay needs a newer Droidtosh. Update the app"
         }
     }
 }
