@@ -152,6 +152,9 @@ jobs:
         with:
           name: android
           path: dist/
+      - name: Remove the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.p12"
 
   mac:
     needs: plan
@@ -183,6 +186,7 @@ jobs:
           security set-keychain-settings -lut 3600 "$keychain"
           security unlock-keychain -p "$keychain_password" "$keychain"
           security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/signing.p12"
           security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" >/dev/null
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
@@ -216,6 +220,11 @@ jobs:
         with:
           name: mac
           path: dist/
+      - name: Remove the signing keychain and certificate
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/signing.p12"
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
 
   publish:
     needs: [plan, android, mac]
