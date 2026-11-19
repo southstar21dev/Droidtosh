@@ -107,7 +107,8 @@ by the relay.
    checking every minute. Use a distributor with shorter endpoints.
 5. If the **Wake-ups** row says your relay needs updating for UnifiedPush, your self-hosted relay
    is older than UnifiedPush support. The phone connects without wake-ups (checking every minute)
-   until you update the relay.
+   until you update the relay. After the update it tries wake-ups with the relay again within a day,
+   or at once when you update the app.
 6. Allow the distributor to run in the background (battery settings), or its wake-ups arrive late.
 
 ## Verification codes show as "Sensitive notification content hidden"

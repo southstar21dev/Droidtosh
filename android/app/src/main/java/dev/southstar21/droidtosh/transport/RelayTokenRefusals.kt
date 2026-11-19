@@ -6,9 +6,14 @@ import java.security.MessageDigest
  * Remembers which relays refused the join line's push token (protocol/PROTOCOL-v2.md section 1.2.1):
  * a relay from before UnifiedPush caps the token field at 256 bytes and answers a longer
  * `up:<endpoint>` with `ERROR bad-join`. Such a relay is joined without the token until the app
- * version or the token changes, so a new phone still connects to an old relay.
+ * version or the token changes, or a day has passed (the relay may have been updated meanwhile),
+ * so a new phone still connects to an old relay.
  */
-class RelayTokenRefusals(private val store: Store, private val appVersion: String) {
+class RelayTokenRefusals(
+    private val store: Store,
+    private val appVersion: String,
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
     /** Where the marks live; the app backs it with SharedPreferences. */
     interface Store {
         fun get(key: String): String?
@@ -16,12 +21,18 @@ class RelayTokenRefusals(private val store: Store, private val appVersion: Strin
         fun remove(key: String)
     }
 
-    /** True when [relayKey] already refused this very [token] under this app version. */
-    fun refused(relayKey: String, token: String?): Boolean =
-        !token.isNullOrEmpty() && store.get(storeKey(relayKey)) == marker(token)
+    /** True when [relayKey] refused this very [token] under this app version within [RETRY_AFTER_MS]. */
+    fun refused(relayKey: String, token: String?): Boolean {
+        if (token.isNullOrEmpty()) return false
+        val stored = store.get(storeKey(relayKey)) ?: return false
+        val prefix = marker(token) + "|"
+        if (!stored.startsWith(prefix)) return false
+        val at = stored.removePrefix(prefix).toLongOrNull() ?: return false
+        return clock() - at in 0 until RETRY_AFTER_MS
+    }
 
     fun remember(relayKey: String, token: String) {
-        store.put(storeKey(relayKey), marker(token))
+        store.put(storeKey(relayKey), marker(token) + "|" + clock())
     }
 
     fun forget(relayKey: String) {
@@ -41,6 +52,9 @@ class RelayTokenRefusals(private val store: Store, private val appVersion: Strin
     private fun storeKey(relayKey: String) = "relay_refused:$relayKey"
 
     companion object {
+        /** How long a refusal holds before the token is tried again, in case the relay was updated. */
+        const val RETRY_AFTER_MS = 24 * 60 * 60_000L
+
         /** The relay as the user paired it: address and pinned certificate. */
         fun relayKey(host: String?, port: Int?, relayFingerprint: String?): String =
             "$host:$port|$relayFingerprint"

@@ -54,6 +54,18 @@ class RelayTokenRefusalsTest {
     }
 
     @Test
+    fun aRefusalExpiresAfterADaySoAnUpdatedRelayGetsTheTokenAgain() {
+        val store = MapStore()
+        var now = 1_000_000L
+        val refusals = RelayTokenRefusals(store, "1.0", clock = { now })
+        refusals.remember(relay, token)
+        now += RelayTokenRefusals.RETRY_AFTER_MS - 1
+        assertNull(refusals.tokenFor(relay, token))
+        now += 1
+        assertEquals(token, refusals.tokenFor(relay, token))
+    }
+
+    @Test
     fun theTokenItselfIsNotStored() {
         val store = MapStore()
         RelayTokenRefusals(store, "1.0").remember(relay, token)
