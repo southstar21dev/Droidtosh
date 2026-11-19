@@ -711,9 +711,21 @@ public final class FileTransferEngine {
     private func resumeIncoming(_ transfer: inout Incoming) {
         let id = transfer.snapshot.id
         let wasParked = transfer.snapshot.phase == .waitingForReconnect
+        // The partial file must hold exactly the bytes we hashed; otherwise start over.
+        let onDisk = (try? fileManager.attributesOfItem(atPath: transfer.partialURL.path)[.size] as? UInt64) ?? 0
+        let restart = onDisk != transfer.written
+        if restart {
+            onLog?("file: \(id) partial on disk (\(onDisk)) does not match received (\(transfer.written)); restarting")
+            transfer.sink?.close()
+            transfer.sink = nil
+            transfer.written = 0
+            transfer.hasher = SHA256()
+            transfer.snapshot.transferred = 0
+            try? fileManager.removeItem(at: transfer.partialURL)
+        }
         if transfer.sink == nil {
             do {
-                transfer.sink = try makeSink(transfer.partialURL, true)
+                transfer.sink = try makeSink(transfer.partialURL, !restart)
             } catch {
                 discardIncoming(id, phase: .failed("write_failed"))
                 sendReject(id, reason: "invalid")

@@ -252,6 +252,27 @@ final class FileTransferEngineTests: XCTestCase {
         XCTAssertTrue(link.outcomes["b"]!.contains(.resumed))
     }
 
+    func testResumeRestartsWhenThePartialFileIsMissing() throws {
+        let link = try Link()
+        link.connect()
+        let (url, data) = try makeFile(link, size: 300_000)
+        let id = try link.a.enqueue(fileAt: url)
+        link.pump(limit: 6)
+        link.disconnect()
+        let partials = try FileManager.default.contentsOfDirectory(at: link.dir("b", "partial"), includingPropertiesForKeys: nil)
+        XCTAssertEqual(partials.count, 1)
+        try FileManager.default.removeItem(at: partials[0])
+        link.connect()
+        let accepts = link.sent(from: "b").compactMap { payload -> UInt64? in
+            if case .fileAccept(let accept) = payload { return accept.resumeOffset }
+            return nil
+        }
+        XCTAssertEqual(accepts.last, 0, "restarted from zero")
+        let saved = link.dir("b", "Downloads").appendingPathComponent("photo.jpg")
+        XCTAssertEqual(try Data(contentsOf: saved), data)
+        XCTAssertEqual(link.snapshots[id]?.phase, .completed)
+    }
+
     func testDuplicateOfferWhileSendingIsTreatedAsResumeAndIgnoredBySender() throws {
         let link = try Link()
         link.connect()
