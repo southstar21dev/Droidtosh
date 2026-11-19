@@ -1,0 +1,2 @@
+# Generated lockfile for the release tools: collapse it in diffs and leave it out of language stats.
+.github/release-tools/package-lock.json linguist-generated=true
