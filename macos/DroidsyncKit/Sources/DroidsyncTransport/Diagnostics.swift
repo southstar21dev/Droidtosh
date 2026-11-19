@@ -386,7 +386,7 @@ public struct DiagnosticsContext: Equatable, Sendable {
 public enum DiagnosticsRedaction {
     /// The first 8 characters of a fingerprint or token, for recognising it without exposing it.
     public static func short(_ value: String?) -> String {
-        guard let value, !value.isEmpty else { return "—" }
+        guard let value, !value.isEmpty else { return "-" }
         return value.count <= 8 ? value : String(value.prefix(8)) + "…"
     }
 
@@ -410,23 +410,23 @@ public enum DiagnosticsReport {
         let iso = ISO8601DateFormatter()
         func time(_ date: Date) -> String { iso.string(from: date) }
 
-        lines.append("Droidtosh diagnostics — \(time(snapshot.capturedAt))")
-        lines.append("App \(context.appVersion) · macOS \(context.macOSVersion) · up \(duration(snapshot.capturedAt.timeIntervalSince(snapshot.launchedAt)))")
+        lines.append("Droidtosh diagnostics, \(time(snapshot.capturedAt))")
+        lines.append("App \(context.appVersion), macOS \(context.macOSVersion), up \(duration(snapshot.capturedAt.timeIntervalSince(snapshot.launchedAt)))")
         lines.append("")
         lines.append("[Connection]")
         lines.append("State: \(snapshot.state) (since \(time(snapshot.stateSince)))")
-        lines.append("Relay: \(context.relayHost.isEmpty ? "—" : context.relayHost):\(context.relayPort)")
+        lines.append("Relay: \(context.relayHost.isEmpty ? "-" : context.relayHost):\(context.relayPort)")
         lines.append("Relay fingerprint: \(DiagnosticsRedaction.short(context.relayFingerprint))")
         lines.append("Mac fingerprint: \(DiagnosticsRedaction.short(context.macFingerprint))")
         if let version = context.negotiatedVersion {
-            lines.append("Protocol: v\(version) · \(context.capabilities.joined(separator: ", "))")
+            lines.append("Protocol: v\(version) (\(context.capabilities.joined(separator: ", ")))")
         } else {
             lines.append("Protocol: no phone session")
         }
         if let started = snapshot.sessionStartedAt {
             lines.append("Session uptime: \(duration(snapshot.capturedAt.timeIntervalSince(started)))")
         } else {
-            lines.append("Session uptime: —")
+            lines.append("Session uptime: -")
         }
         lines.append("Reconnects since launch: \(snapshot.reconnects)")
         if let error = snapshot.lastError {
@@ -438,7 +438,7 @@ public enum DiagnosticsReport {
         lines.append("[Round trip]")
         if let last = snapshot.rtt.last, let avg = snapshot.rtt.average,
            let min = snapshot.rtt.minimum, let max = snapshot.rtt.maximum {
-            lines.append("Last \(ms(last)) · avg \(ms(avg)) · min \(ms(min)) · max \(ms(max)) (\(snapshot.rtt.sampleCount) samples)")
+            lines.append("Last \(ms(last)), avg \(ms(avg)), min \(ms(min)), max \(ms(max)) (\(snapshot.rtt.sampleCount) samples)")
         } else {
             lines.append("No samples yet")
         }
@@ -451,18 +451,18 @@ public enum DiagnosticsReport {
         lines.append("")
         lines.append("[Reliability]")
         let r = context.reliability
-        lines.append("Outbox: \(context.outboxDepth) · evicted \(r.evicted) · expired \(r.expired) · gaps \(r.gaps) · retransmits \(r.retransmits) · duplicates \(r.duplicates)")
+        lines.append("Outbox: \(context.outboxDepth), evicted \(r.evicted), expired \(r.expired), gaps \(r.gaps), retransmits \(r.retransmits), duplicates \(r.duplicates)")
         lines.append("")
         lines.append("[Clipboard]")
-        lines.append("Image transfers: completed \(snapshot.clipboard.completed) · rejected \(snapshot.clipboard.rejected) · timed out \(snapshot.clipboard.timedOut)")
+        lines.append("Image transfers: completed \(snapshot.clipboard.completed), rejected \(snapshot.clipboard.rejected), timed out \(snapshot.clipboard.timedOut)")
         lines.append("")
         lines.append("[Files]")
-        lines.append("Transfers: sent \(snapshot.files.sent) · received \(snapshot.files.received) · failed \(snapshot.files.failed) · resumed \(snapshot.files.resumed)")
+        lines.append("Transfers: sent \(snapshot.files.sent), received \(snapshot.files.received), failed \(snapshot.files.failed), resumed \(snapshot.files.resumed)")
         lines.append("")
         lines.append("[Phone]")
         let d = snapshot.device
-        lines.append("Status updates: \(d.statusesReceived) · low battery alerts \(d.lowBatteryAlerts)")
-        lines.append("Find my phone: requests \(d.findRequests) · rang \(d.findRings) · failed \(d.findFailures) · no response \(d.findNoResponses)")
+        lines.append("Status updates: \(d.statusesReceived), low battery alerts \(d.lowBatteryAlerts)")
+        lines.append("Find my phone: requests \(d.findRequests), rang \(d.findRings), failed \(d.findFailures), no response \(d.findNoResponses)")
         lines.append("")
         lines.append("[Events]")
         if snapshot.events.isEmpty {
@@ -491,12 +491,12 @@ public enum DiagnosticsReport {
     }
 
     private static func traffic(_ counters: TrafficCounters) -> String {
-        "in \(counters.envelopesIn) (\(bytes(counters.bytesIn))) · out \(counters.envelopesOut) (\(bytes(counters.bytesOut)))"
+        "in \(counters.envelopesIn) (\(bytes(counters.bytesIn))), out \(counters.envelopesOut) (\(bytes(counters.bytesOut)))"
     }
 
     private static func features(_ counters: TrafficCounters) -> String {
         let names = Set(counters.byFeatureIn.keys).union(counters.byFeatureOut.keys).sorted()
-        guard !names.isEmpty else { return "—" }
+        guard !names.isEmpty else { return "-" }
         return names.map { "\($0) \(counters.byFeatureIn[$0] ?? 0)/\(counters.byFeatureOut[$0] ?? 0)" }
             .joined(separator: ", ")
     }

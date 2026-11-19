@@ -32,26 +32,26 @@ data class ReportHeader(val appVersion: String, val androidVersion: String, val 
 /** Plain-text diagnostics report. Built only from a [DiagnosticsSnapshot], which holds no secrets. */
 object DiagnosticsReport {
     fun relayText(endpoint: Endpoint?): String =
-        endpoint?.host?.let { host -> endpoint.port?.let { "$host:$it" } ?: host } ?: "—"
+        endpoint?.host?.let { host -> endpoint.port?.let { "$host:$it" } ?: host } ?: "-"
 
     fun format(snapshot: DiagnosticsSnapshot, header: ReportHeader, redactor: Redactor): String = buildString {
         val now = snapshot.takenAtMs
-        appendLine("Droidtosh diagnostics — ${timestamp(now)}")
-        appendLine("App ${header.appVersion} · Android ${header.androidVersion} · ${header.device}")
+        appendLine("Droidtosh diagnostics, ${timestamp(now)}")
+        appendLine("App ${header.appVersion}, Android ${header.androidVersion}, ${header.device}")
         appendLine()
 
         section("Connection")
         line("State", "${snapshot.state} (for ${duration(now - snapshot.stateSinceMs)})")
         val endpoint = snapshot.endpoint
-        line("Mode", endpoint?.mode ?: "—")
-        line("Session path", snapshot.sessionPath ?: "—")
+        line("Mode", endpoint?.mode ?: "-")
+        line("Session path", snapshot.sessionPath ?: "-")
         line("Relay", relayText(endpoint))
-        line("Relay fingerprint", endpoint?.relayFingerprint?.let { "$it…" } ?: "—")
-        line("Local address", endpoint?.local ?: "—")
-        line("Mac fingerprint", endpoint?.macFingerprint?.let { "$it…" } ?: "—")
-        line("Protocol", snapshot.negotiatedVersion?.let { "v$it" } ?: "—")
-        line("Capabilities", snapshot.capabilities.joinToString(", ").ifEmpty { "—" })
-        line("Session uptime", snapshot.sessionStartedAtMs?.let { duration(now - it) } ?: "—")
+        line("Relay fingerprint", endpoint?.relayFingerprint?.let { "$it…" } ?: "-")
+        line("Local address", endpoint?.local ?: "-")
+        line("Mac fingerprint", endpoint?.macFingerprint?.let { "$it…" } ?: "-")
+        line("Protocol", snapshot.negotiatedVersion?.let { "v$it" } ?: "-")
+        line("Capabilities", snapshot.capabilities.joinToString(", ").ifEmpty { "-" })
+        line("Session uptime", snapshot.sessionStartedAtMs?.let { duration(now - it) } ?: "-")
         line("Reconnects", reconnectsText(snapshot))
         line("Push token", if (snapshot.pushTokenPresent) "present" else "none")
         line("Last push", snapshot.lastPushAtMs?.let { "${duration(now - it)} ago" } ?: "never")
@@ -67,7 +67,7 @@ object DiagnosticsReport {
         if (rtt == null) {
             line("RTT", "no samples")
         } else {
-            line("RTT", "last ${rtt.lastMs} ms · avg ${rtt.avgMs} · min ${rtt.minMs} · max ${rtt.maxMs} (${rtt.samples} samples)")
+            line("RTT", "last ${rtt.lastMs} ms, avg ${rtt.avgMs}, min ${rtt.minMs}, max ${rtt.maxMs} (${rtt.samples} samples)")
         }
         appendLine()
 
@@ -134,19 +134,19 @@ object DiagnosticsReport {
     }
 
     fun batteryOptimizationText(ignored: Boolean?): String = when (ignored) {
-        null -> "—"
+        null -> "-"
         true -> "off (unrestricted)"
         false -> "on (may pause the connection)"
     }
 
     fun overlayText(allowed: Boolean?): String = when (allowed) {
-        null -> "—"
+        null -> "-"
         true -> "allowed (can answer app calls while unlocked)"
         false -> "not allowed (app calls can't be answered while unlocked)"
     }
 
     fun traffic(counts: TrafficCounts): String =
-        "in ${counts.envelopesIn} (${bytes(counts.bytesIn)}) · out ${counts.envelopesOut} (${bytes(counts.bytesOut)})"
+        "in ${counts.envelopesIn} (${bytes(counts.bytesIn)}), out ${counts.envelopesOut} (${bytes(counts.bytesOut)})"
 
     fun bytes(value: Long): String = when {
         value >= 1024L * 1024 -> String.format(Locale.US, "%.1f MB", value / (1024.0 * 1024))
@@ -165,7 +165,7 @@ object DiagnosticsReport {
     }
 
     private fun featureMap(map: Map<*, Long>): String =
-        map.entries.joinToString(", ") { "${it.key.toString().lowercase()} ${it.value}" }.ifEmpty { "—" }
+        map.entries.joinToString(", ") { "${it.key.toString().lowercase()} ${it.value}" }.ifEmpty { "-" }
 
     private fun StringBuilder.section(title: String) = appendLine("[$title]")
 

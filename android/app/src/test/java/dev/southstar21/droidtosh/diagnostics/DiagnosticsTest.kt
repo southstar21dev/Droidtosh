@@ -190,7 +190,7 @@ class DiagnosticsReportTest {
 
     @Test
     fun redactorLeavesOrdinaryTextAlone() {
-        val text = "Disconnected (Mac asleep) · relay.example.com:7443 · v2"
+        val text = "Disconnected (Mac asleep), relay.example.com:7443, v2"
         assertEquals(text, Redactor(listOf("short")).redact(text))
     }
 
@@ -239,7 +239,7 @@ class DiagnosticsReportTest {
     fun reportDescribesBatteryOptimization() {
         assertEquals("off (unrestricted)", DiagnosticsReport.batteryOptimizationText(true))
         assertEquals("on (may pause the connection)", DiagnosticsReport.batteryOptimizationText(false))
-        assertEquals("—", DiagnosticsReport.batteryOptimizationText(null))
+        assertEquals("-", DiagnosticsReport.batteryOptimizationText(null))
         val snapshot = DiagnosticsRecorder(clock = { 1_000L })
             .snapshot(pushTokenPresent = false, dropped = emptyMap(), reliable = null, batteryOptimizationIgnored = true)
         val report = DiagnosticsReport.format(snapshot, ReportHeader("1", "15", "Pixel"), Redactor(emptyList()))
@@ -249,7 +249,7 @@ class DiagnosticsReportTest {
 
     @Test
     fun reportDescribesOverlayPermission() {
-        assertEquals("—", DiagnosticsReport.overlayText(null))
+        assertEquals("-", DiagnosticsReport.overlayText(null))
         val snapshot = DiagnosticsRecorder(clock = { 1_000L })
             .snapshot(pushTokenPresent = false, dropped = emptyMap(), reliable = null, overlayAllowed = false)
         val report = DiagnosticsReport.format(snapshot, ReportHeader("1", "15", "Pixel"), Redactor(emptyList()))
