@@ -18,6 +18,19 @@ class WakeTokenTest {
     }
 
     @Test
+    fun rejectsEndpointsTheRelayWouldRefuse() {
+        // Each of these makes the relay answer the whole join with ERROR bad-join.
+        assertNull(WakeToken.unifiedPush("https://"))
+        assertNull(WakeToken.unifiedPush("https:///path"))
+        assertNull(WakeToken.unifiedPush("https://user@a.example/x"))
+        assertNull(WakeToken.unifiedPush("https://a.example/x#frag"))
+        assertNull(WakeToken.unifiedPush("https://a.example/x\u007f"))
+        assertNull(WakeToken.unifiedPush("https://a.example/%zz"))
+        // Non-ASCII would make the byte count exceed the length checked here.
+        assertNull(WakeToken.unifiedPush("https://a.example/" + "\u00e9".repeat(200)))
+    }
+
+    @Test
     fun dropsAnEndpointTooLongForTheJoinLine() {
         val fits = "https://h.example/" + "a".repeat(WakeToken.MAX_TOKEN_FIELD - 3 - "https://h.example/".length)
         val tooLong = fits + "a"

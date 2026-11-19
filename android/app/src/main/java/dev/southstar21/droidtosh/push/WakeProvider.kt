@@ -1,5 +1,8 @@
 package dev.southstar21.droidtosh.push
 
+import java.net.URI
+import java.net.URISyntaxException
+
 /** How the relay wakes the phone when the Mac comes back (protocol-v2, push tokens). */
 enum class WakeProvider { FCM, UNIFIEDPUSH, NONE }
 
@@ -9,10 +12,21 @@ object WakeToken {
     const val MAX_TOKEN_FIELD = 400
     private const val PREFIX = "up:"
 
-    /** The token field for a UnifiedPush endpoint, or null when it is not https or would not fit. */
+    /**
+     * The token field for a UnifiedPush endpoint, or null when the relay would refuse it. The relay
+     * rejects the whole join line over a bad endpoint (relay/unifiedpush.go), so this is at least as
+     * strict: printable ASCII only (so length is the byte count), an https URL with a host, no
+     * userinfo and no fragment.
+     */
     fun unifiedPush(endpoint: String?): String? {
         val url = endpoint?.trim().orEmpty()
-        if (!url.startsWith("https://") || url.any { it <= ' ' }) return null
+        if (!url.startsWith("https://") || url.any { it <= ' ' || it >= '\u007f' }) return null
+        val uri = try {
+            URI(url)
+        } catch (_: URISyntaxException) {
+            return null
+        }
+        if (uri.host.isNullOrEmpty() || uri.rawUserInfo != null || uri.rawFragment != null) return null
         val field = PREFIX + url
         return field.takeIf { it.length <= MAX_TOKEN_FIELD }
     }
