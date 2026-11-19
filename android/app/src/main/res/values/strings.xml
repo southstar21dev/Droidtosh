@@ -46,6 +46,10 @@
     <string name="files_cancel">Cancel transfer</string>
     <string name="files_share_nothing">Couldn\'t read the shared file</string>
     <string name="files_share_partial">Sending %1$d of %2$d files; the others couldn\'t be read</string>
+    <plurals name="files_share_confirm">
+        <item quantity="one">%d file will go to your Mac</item>
+        <item quantity="other">%d files will go to your Mac</item>
+    </plurals>
     <plurals name="files_share_queued">
         <item quantity="one">Sending %d file to your Mac</item>
         <item quantity="other">Sending %d files to your Mac</item>
@@ -179,6 +183,9 @@
     <string name="share_sheet_title">On its way</string>
     <string name="share_sheet_title_failed">Nothing was sent</string>
     <string name="share_sheet_more">+%1$d more</string>
+    <string name="share_sheet_title_confirm">Send to your Mac?</string>
+    <string name="share_sheet_send">Send</string>
+    <string name="share_sheet_cancel">Cancel</string>
     <string name="share_sheet_done">Done</string>
     <string name="share_sheet_view">View transfers</string>
 

@@ -171,6 +171,17 @@ class ScreenshotTest(private val dark: Boolean) {
     }
 
     @Test
+    fun share_sheet_confirm() = snap("share_sheet_confirm") {
+        ShareSheet(
+            ShareResult(queued = 2, total = 2, names = listOf("IMG_2048.HEIC", "Trip notes.pdf")),
+            onDone = {},
+            onOpenTransfers = {},
+            animateIn = false,
+            onSend = {},
+        )
+    }
+
+    @Test
     fun share_sheet_failed() = snap("share_sheet_failed") {
         ShareSheet(ShareResult(queued = 0, total = 1, names = emptyList()), onDone = {}, onOpenTransfers = {}, animateIn = false)
     }
