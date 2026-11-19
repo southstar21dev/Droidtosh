@@ -27,6 +27,7 @@ object ShareTarget {
     private const val PREFS = "droidtosh_share_target"
     private const val KEY_ID = "id"
     private const val KEY_NAME = "name"
+    private const val KEY_LABEL = "label"
 
     /** Stable for one pairing, without putting the whole fingerprint in the system's shortcut list. */
     fun shortcutId(fingerprint: String): String = "mac-" + fingerprint.take(16)
@@ -44,7 +45,10 @@ object ShareTarget {
         sync(context, fingerprint)
     }
 
-    /** Publishes or removes the shortcut to match the pairing. Safe to call as often as needed. */
+    /**
+     * Publishes or removes the shortcut to match the pairing. Safe to call as often as needed: an
+     * unchanged shortcut (same pairing and label) is not pushed again, so every reconnect stays cheap.
+     */
     fun sync(context: Context, fingerprint: String?) {
         val app = context.applicationContext
         runCatching {
@@ -52,11 +56,12 @@ object ShareTarget {
                 is ShareTargetPlan.Remove -> remove(app)
                 is ShareTargetPlan.Publish -> {
                     val previous = prefs(app).getString(KEY_ID, null)
+                    if (previous == plan.id && prefs(app).getString(KEY_LABEL, null) == plan.label) return@runCatching
                     if (previous != null && previous != plan.id) {
                         ShortcutManagerCompat.removeLongLivedShortcuts(app, listOf(previous))
                     }
                     ShortcutManagerCompat.pushDynamicShortcut(app, build(app, plan))
-                    prefs(app).edit().putString(KEY_ID, plan.id).apply()
+                    prefs(app).edit().putString(KEY_ID, plan.id).putString(KEY_LABEL, plan.label).apply()
                 }
             }
         }
