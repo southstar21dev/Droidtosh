@@ -218,6 +218,8 @@ class CellularCallTracker(
 
     fun stop() {
         runCatching { context.unregisterReceiver(receiver) }
+        // Stopping mid-ring must not leave the ringer muted.
+        restoreRing()
     }
 
     fun currentCallState(): CallState? = currentCallId?.let { id ->
