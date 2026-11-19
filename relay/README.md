@@ -14,7 +14,7 @@ network when the relay can't be reached. See the main [README](../README.md#how-
 
 Every connection to the relay is TLS (protocol v2, see
 `protocol/PROTOCOL-v2.md`). The relay uses a self-signed certificate that the
-apps pin by fingerprint, so the room ID and the phone's FCM token in the join
+apps pin by fingerprint, so the room ID and the phone's push token in the join
 line are no longer visible on the network path. Plain TCP is not accepted.
 
 - Join line, sent inside TLS: `DROIDSYNC/2 <room> mac|phone [push-token]\n`
@@ -46,7 +46,7 @@ shows only a short hash. A 404 or 410 drops the endpoint. Set
 | `FCM_SERVICE_ACCOUNT`| no       | Firebase service-account JSON (the whole file contents). Enables `mac_online` pushes. |
 | `FCM_PROJECT_ID`     | no       | Firebase project ID; falls back to `project_id` from the service-account JSON. |
 | `UNIFIEDPUSH_DISABLED`| no      | Any value stops the relay from POSTing to UnifiedPush endpoints.              |
-| `STATE_FILE`         | no       | Path to persist room → FCM token state (e.g. `/data/state.json`).              |
+| `STATE_FILE`         | no       | Path to persist room → push token state (e.g. `/data/state.json`).             |
 | `MAX_CONNS_PER_IP`   | no       | Concurrent connections allowed from one source IP, default `16`.               |
 | `CERT_FILE`          | no       | TLS certificate (PEM), default `/data/relay-cert.pem`. Generated on first start. |
 | `KEY_FILE`           | no       | TLS private key (PEM, written `0600`), default `/data/relay-key.pem`.          |
@@ -72,7 +72,7 @@ To read it without starting the relay, run `droidtosh-relay -print-fingerprint`
 (or `go run . -print-fingerprint`, or
 `docker compose run --rm relay -print-fingerprint`).
 
-Paste it into the Mac's **Settings › Connection › Relay › Fingerprint**. If you leave that
+Paste it into **Fingerprint** under **Relay** on the Mac's **Connection** page. If you leave that
 field empty, the Mac trusts the certificate it sees on first connect and
 shows its fingerprint so you can compare it with the log line. The Mac puts
 the fingerprint into the pairing QR code, and the phone pins it.
@@ -92,8 +92,8 @@ start rather than silently using a different certificate. When it does
 generate a new certificate, it logs `WARNING: generated a NEW relay
 certificate`; seeing that on every deploy means `/data` isn't persistent.
 
-If `FCM_SERVICE_ACCOUNT` is unset, the relay logs `FCM not configured: mac_online
-pushes disabled` and runs without pushes.
+If `FCM_SERVICE_ACCOUNT` is unset, the relay logs `FCM not configured: FCM pushes
+disabled` and runs without FCM pushes (UnifiedPush wake-ups still work).
 
 With `STATE_FILE` set, state is loaded at startup and written on graceful
 shutdown (SIGINT/SIGTERM). It is not written on every change, so a hard
@@ -101,7 +101,7 @@ kill can lose the most recent token registrations; phones re-register their
 token on their next connect.
 
 The relay holds up to 1024 rooms. A token is kept for 30 days after the room's
-last join. Tokens FCM reports as invalid are dropped. When the table is full,
+last join. Tokens FCM reports as invalid, and UnifiedPush endpoints that answer 404 or 410, are dropped. When the table is full,
 the least recently seen room with no open connection is evicted.
 
 ## Local development
@@ -135,7 +135,7 @@ Point the Mac app's relay address at `127.0.0.1:7443` and pair as usual.
 3. Download `google-services.json` and place it at `android/app/google-services.json`
    (gitignored). Rebuild the Android app.
 4. In Firebase: **Project settings → Service accounts → Generate new private
-   key**. A service-account JSON file downloads. Copy its full contents — this
+   key**. A service-account JSON file downloads. Copy its full contents: this
    is the relay's `FCM_SERVICE_ACCOUNT`.
 5. Set `FCM_PROJECT_ID` only if it differs from the `project_id` inside the
    service-account JSON.
@@ -176,11 +176,11 @@ contains only public project configuration.
 
 ## Pair the Mac
 
-1. In Droidtosh on the Mac, open **Settings › Connection**. Choose **Relay**
-   (or **Relay, local network as fallback**), then enter the relay host and
+1. In Droidtosh on the Mac, open the **Connection** page. Choose **Relay**
+   (or **Relay, Wi-Fi as fallback**), then enter the relay host and
    port (for example `relay.example.com` / `7443`) and, optionally, the relay
    fingerprint.
-2. Choose **Show Pairing Code**.
+2. Choose **Show Pairing Code** (or **Pair Phone…** in the menu bar).
 3. On the phone, open Droidtosh and scan the code. The phone connects to the
    relay, the Mac parks in the same room, and both show connected.
 
