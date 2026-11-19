@@ -294,6 +294,25 @@ class FileTransferEngineTest {
     }
 
     @Test
+    fun resumeRestartsWhenThePartialFileDoesNotMatchWhatWasReceived() {
+        val link = Link()
+        link.connect()
+        val data = bytes(3 * chunk)
+        val offer = newEnvelope {
+            setFileOffer(FileOffer.newBuilder().setTransferId("t1").setName("a.bin").setSize(data.size.toLong()))
+        }
+        link.mac.onEnvelope(offer)
+        link.toPhone.clear()
+        link.mac.onEnvelope(chunkEnvelope("t1", 0, data.copyOfRange(0, chunk)))
+        // The partial is truncated behind the engine's back.
+        File(link.macStore.partials, "t1.part").writeBytes(ByteArray(10))
+        link.toPhone.clear()
+        link.mac.onEnvelope(offer)
+        assertEquals(0L, link.toPhone.removeFirst().fileAccept.resumeOffset)
+        assertEquals(0L, File(link.macStore.partials, "t1.part").length())
+    }
+
+    @Test
     fun checksumMismatchIsReportedAndNothingIsSaved() {
         val link = Link()
         link.connect()

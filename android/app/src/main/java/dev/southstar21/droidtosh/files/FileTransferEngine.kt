@@ -412,6 +412,24 @@ class FileTransferEngine(
         if (id in committing) return
         incoming[id]?.let { existing ->
             if (existing.size == offer.size) {
+                // The partial must hold exactly the bytes we hashed; otherwise start over.
+                if (existing.partial.length() != existing.written) {
+                    runCatching { existing.out?.close() }
+                    existing.written = 0
+                    existing.progressSent = 0
+                    existing.digest.reset()
+                    existing.partial.delete()
+                    try {
+                        existing.partial.parentFile?.mkdirs()
+                        existing.out = FileOutputStream(existing.partial, false)
+                    } catch (error: IOException) {
+                        incoming.remove(id)
+                        send(newEnvelope { setFileReject(FileReject.newBuilder().setTransferId(id).setReason("write_failed")) })
+                        finish(TransferInfo(id, TransferDirection.INCOMING, existing.name, existing.size, 0, TransferStatus.FAILED, "write_failed"))
+                        publish()
+                        return
+                    }
+                }
                 // A re-offer (or a retransmitted offer) of a transfer in progress is a resume request.
                 if (existing.written > 0) listener.onResumed(info(existing, TransferStatus.ACTIVE))
                 send(accept(id, existing.written))
