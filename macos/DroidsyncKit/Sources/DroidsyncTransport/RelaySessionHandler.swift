@@ -49,7 +49,7 @@ final class RelayFrameDecoderHandler: ByteToMessageDecoder {
     }
 }
 
-/// Port of `ServerSession`'s state machine over NIO: challenge-on-TLS-ready, PSK
+/// Session state machine over NIO: challenge-on-TLS-ready, PSK
 /// authentication with version/capability negotiation, protocol-version enforcement,
 /// ping/pong and envelope delivery.
 final class RelaySessionHandler: ChannelInboundHandler {
@@ -140,7 +140,7 @@ final class RelaySessionHandler: ChannelInboundHandler {
         guard envelope.protocolVersion == expectedProtocolVersion else {
             // Stop reading immediately; the close only lands once the error write
             // completes, and coalesced frames behind this one must not be processed
-            // (matches `ServerSession.handle` returning false).
+            // (handling stops after a rejected frame).
             closing = true
             diagnostics?.recordRejectedFrame(
                 .wrongVersion,
