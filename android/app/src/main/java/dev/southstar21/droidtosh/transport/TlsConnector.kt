@@ -80,8 +80,8 @@ open class TlsConnector {
         val socket = Socket()
         try {
             socket.connect(InetSocketAddress(host, port), LOCAL_CONNECT_TIMEOUT_MS)
-            socket.soTimeout = HANDSHAKE_TIMEOUT_MS
-            val ssl = wrapMacTls(socket, host, port, macFingerprint)
+            socket.soTimeout = LOCAL_HANDSHAKE_TIMEOUT_MS
+            val ssl = wrapMacTls(socket, host, port, macFingerprint, LOCAL_HANDSHAKE_TIMEOUT_MS)
             ssl.soTimeout = SESSION_READ_TIMEOUT_MS
             return ssl
         } catch (t: Throwable) {
@@ -104,8 +104,14 @@ open class TlsConnector {
         return socket
     }
 
-    private fun wrapMacTls(outer: Socket, host: String, port: Int, fingerprint: String): SSLSocket {
-        val socket = pinnedSocket(outer, host, port, fingerprint, arrayOf("TLSv1.3"))
+    private fun wrapMacTls(
+        outer: Socket,
+        host: String,
+        port: Int,
+        fingerprint: String,
+        handshakeTimeoutMs: Int = HANDSHAKE_TIMEOUT_MS,
+    ): SSLSocket {
+        val socket = pinnedSocket(outer, host, port, fingerprint, arrayOf("TLSv1.3"), handshakeTimeoutMs)
         try {
             socket.startHandshake()
         } catch (error: Exception) {
@@ -121,11 +127,12 @@ open class TlsConnector {
         port: Int,
         fingerprint: String,
         protocols: Array<String>,
+        handshakeTimeoutMs: Int = HANDSHAKE_TIMEOUT_MS,
     ): SSLSocket {
         val context = SSLContext.getInstance("TLS")
         context.init(null, arrayOf(PinnedTrustManager(fingerprint)), SecureRandom())
         val socket = context.socketFactory.createSocket(under, host, port, true) as SSLSocket
-        socket.soTimeout = HANDSHAKE_TIMEOUT_MS
+        socket.soTimeout = handshakeTimeoutMs
         socket.enabledProtocols = protocols
         return socket
     }
@@ -165,5 +172,9 @@ private const val CONNECT_TIMEOUT_MS = 10_000
 private const val LOCAL_CONNECT_TIMEOUT_MS = 3_000
 private const val JOIN_TIMEOUT_MS = 10_000
 private const val HANDSHAKE_TIMEOUT_MS = 30_000
+
+// Direct LAN path: the Mac enforces 10 s for TLS and auth, and a device that only advertises the
+// service must not stall each attempt.
+private const val LOCAL_HANDSHAKE_TIMEOUT_MS = 5_000
 private const val SESSION_READ_TIMEOUT_MS = 120_000
 private const val MAX_RESPONSE_LINE = 512
