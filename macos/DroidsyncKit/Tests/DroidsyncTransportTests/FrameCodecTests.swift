@@ -31,6 +31,22 @@ final class FrameCodecTests: XCTestCase {
         XCTAssertEqual(frames, [Data([1]), Data([2, 3])])
     }
 
+    func testManyFramesWithPartialTailAcrossAppends() throws {
+        var stream = Data()
+        for index in 0..<2_000 { stream += FrameCodec.encode(Data(repeating: UInt8(index % 251), count: index % 17)) }
+        var decoder = FrameDecoder()
+        var received: [Data] = []
+        // Odd chunk size so frames straddle appends.
+        var cursor = 0
+        while cursor < stream.count {
+            let next = min(cursor + 1_001, stream.count)
+            received += try decoder.append(stream.subdata(in: cursor..<next))
+            cursor = next
+        }
+        XCTAssertEqual(received.count, 2_000)
+        XCTAssertEqual(received[1_999], Data(repeating: UInt8(1_999 % 251), count: 1_999 % 17))
+    }
+
     func testZeroLengthFrame() throws {
         var decoder = FrameDecoder()
         let frames = try decoder.append(Data([0x00, 0x00, 0x00, 0x00]))
