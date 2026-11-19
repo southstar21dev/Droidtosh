@@ -135,9 +135,10 @@ final class LinkController {
         pendingDialTask = nil
         guard let dial = pendingDial else { return }
         pendingDial = nil
-        if let link = dial.usable(now: Date()), let url = URL(string: link) {
-            dialOrNotify(url)
-        }
+        guard let link = dial.usable(now: Date()), let url = URL(string: link) else { return }
+        // On the next main-actor turn: the prompt is modal, and the caller still has the rest of
+        // the session setup to run (server info, call and file state) before anything else.
+        Task { @MainActor [weak self] in self?.dialOrNotify(url) }
     }
 
     private func dialOrNotify(_ url: URL) {
