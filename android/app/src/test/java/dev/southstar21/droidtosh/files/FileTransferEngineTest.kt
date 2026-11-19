@@ -49,9 +49,11 @@ class FileTransferEngineTest {
 
     private class DirStore(val partials: File, val downloads: File, var space: Long = Long.MAX_VALUE) : IncomingFileStore {
         var failCommit = false
+        var duringCommit: () -> Unit = {}
         override fun partialFile(transferId: String) = File(partials, "$transferId.part")
         override fun usableSpace() = space
         override fun commit(partial: File, name: String, mimeType: String): SavedFile {
+            duringCommit()
             if (failCommit) throw java.io.IOException("read-only")
             downloads.mkdirs()
             val finalName = FileNames.unique(name) { File(downloads, it).exists() }
@@ -589,6 +591,19 @@ class FileTransferEngineTest {
         link.run()
         assertEquals("source_changed", link.finished.first { it.id == id && it.direction == TransferDirection.OUTGOING }.error)
         assertEquals(TransferStatus.CANCELLED, link.finished.first { it.direction == TransferDirection.INCOMING }.status)
+    }
+
+    @Test
+    fun commitsAReceivedFileWithoutHoldingTheEngineLock() {
+        val link = Link()
+        var lockHeld: Boolean? = null
+        link.macStore.duringCommit = { lockHeld = Thread.holdsLock(link.mac) }
+        link.connect()
+        link.phone.enqueue(MemorySource("a.bin", bytes(3 * chunk)))
+        link.run()
+        assertEquals(false, lockHeld)
+        assertTrue(link.saved("a.bin").exists())
+        assertEquals(TransferStatus.COMPLETED, link.finished.first { it.direction == TransferDirection.INCOMING }.status)
     }
 
     @Test

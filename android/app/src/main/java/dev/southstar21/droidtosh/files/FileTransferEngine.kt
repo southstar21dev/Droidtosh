@@ -137,6 +137,8 @@ class FileTransferEngine(
     // Outgoing transfers whose file is still being made, by id: their names.
     private val preparing = LinkedHashMap<String, String>()
     private val incoming = LinkedHashMap<String, Incoming>()
+    // Verified transfers whose commit runs outside the lock; their repeats are ignored meanwhile.
+    private val committing = HashSet<String>()
     private val finished = ArrayDeque<TransferInfo>()
     // Replies to re-sent Ends of transfers that already finished, so a retransmission gets the same answer.
     private val completions = LinkedHashMap<String, Envelope>()
@@ -406,6 +408,7 @@ class FileTransferEngine(
             send(it)
             return
         }
+        if (id in committing) return
         incoming[id]?.let { existing ->
             if (existing.size == offer.size) {
                 // A re-offer (or a retransmitted offer) of a transfer in progress is a resume request.
@@ -489,43 +492,58 @@ class FileTransferEngine(
         publish()
     }
 
-    private fun handleEnd(end: FileEnd) {
+    /**
+     * Returns the commit to run once the lock is released: copying into place can take long, so it
+     * must not block other callers (cancel, enqueue) on the engine monitor.
+     */
+    private fun handleEnd(end: FileEnd): (() -> Unit)? {
         val id = end.transferId
-        completions[id]?.let { send(it); return }
+        completions[id]?.let { send(it); return null }
+        if (id in committing) return null
         val transfer = incoming[id]
         if (transfer == null) {
             send(complete(id, ok = false, error = "unknown_transfer"))
-            return
+            return null
         }
         // Bytes are still missing (lost with a dropped session); the sender re-offers on reconnect.
-        if (transfer.written < transfer.size) return
+        if (transfer.written < transfer.size) return null
         incoming.remove(id)
         runCatching { transfer.out?.close() }
         transfer.out = null
         val sha = transfer.digest.digest()
-        val reply: Envelope
         if (!sha.contentEquals(end.sha256.toByteArray())) {
             transfer.partial.delete()
-            reply = complete(id, ok = false, error = "checksum_mismatch")
+            val reply = complete(id, ok = false, error = "checksum_mismatch")
             finish(info(transfer, TransferStatus.FAILED, "checksum_mismatch"))
-        } else {
+            remember(id, reply)
+            send(reply)
+            publish()
+            return null
+        }
+        committing += id
+        publish()
+        return {
             val saved = try {
                 store.commit(transfer.partial, transfer.name, transfer.mimeType)
             } catch (error: Exception) {
                 null
             }
             transfer.partial.delete()
-            if (saved == null) {
-                reply = complete(id, ok = false, error = "write_failed")
-                finish(info(transfer, TransferStatus.FAILED, "write_failed"))
-            } else {
-                reply = complete(id, ok = true, savedAs = saved.displayName)
-                finish(info(transfer, TransferStatus.COMPLETED).copy(saved = saved))
+            synchronized(this) {
+                committing -= id
+                val reply: Envelope
+                if (saved == null) {
+                    reply = complete(id, ok = false, error = "write_failed")
+                    finish(info(transfer, TransferStatus.FAILED, "write_failed"))
+                } else {
+                    reply = complete(id, ok = true, savedAs = saved.displayName)
+                    finish(info(transfer, TransferStatus.COMPLETED).copy(saved = saved))
+                }
+                remember(id, reply)
+                send(reply)
+                publish()
             }
         }
-        remember(id, reply)
-        send(reply)
-        publish()
     }
 
     private fun complete(id: String, ok: Boolean, error: String = "", savedAs: String = "") = newEnvelope {
@@ -565,19 +583,24 @@ class FileTransferEngine(
 
     // Both directions
 
-    @Synchronized
     fun onEnvelope(envelope: Envelope) {
+        val commit = synchronized(this) { dispatch(envelope) }
+        commit?.invoke()
+    }
+
+    private fun dispatch(envelope: Envelope): (() -> Unit)? {
         when (envelope.payloadCase) {
             PayloadCase.FILE_OFFER -> handleOffer(envelope.fileOffer)
             PayloadCase.FILE_ACCEPT -> handleAccept(envelope.fileAccept)
             PayloadCase.FILE_REJECT -> handleReject(envelope.fileReject)
             PayloadCase.FILE_CHUNK -> handleChunk(envelope.fileChunk)
             PayloadCase.FILE_PROGRESS -> handleProgress(envelope.fileProgress)
-            PayloadCase.FILE_END -> handleEnd(envelope.fileEnd)
+            PayloadCase.FILE_END -> return handleEnd(envelope.fileEnd)
             PayloadCase.FILE_COMPLETE -> handleComplete(envelope.fileComplete)
             PayloadCase.FILE_CANCEL -> handleCancel(envelope.fileCancel)
             else -> Unit
         }
+        return null
     }
 
     private fun handleCancel(cancel: FileCancel) {
