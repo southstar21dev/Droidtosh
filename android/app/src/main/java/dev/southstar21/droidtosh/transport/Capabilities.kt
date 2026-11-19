@@ -20,6 +20,14 @@ object Capabilities {
     val SUPPORTED: List<String> =
         listOf(NOTIFICATIONS, CALLS, CALLLOG, CLIPBOARD_TEXT, CLIPBOARD_IMAGE, FILES, PHONE_STATUS, FIND, OPEN_URL, RELIABLE)
 
+    /**
+     * Whether a reliable [envelope] may wait in the outbox while disconnected, before the next
+     * session's capabilities are known. Not a link: an older Mac can't take it, and the sender
+     * should fall back (clipboard text, or a failure message) instead of reporting it sent.
+     */
+    fun holdableWhileDisconnected(envelope: Envelope): Boolean =
+        envelope.payloadCase != PayloadCase.OPEN_URL
+
     /** The capability an outgoing feature envelope needs, or null if it is always allowed. */
     fun requiredFor(envelope: Envelope): String? = when (envelope.payloadCase) {
         PayloadCase.NOTIFICATION_POSTED,

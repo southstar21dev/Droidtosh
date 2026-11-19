@@ -239,6 +239,23 @@ class TransportHubTest {
         assertFalse(TransportHub.send(clipboardText("gone")))
     }
 
+    @Test
+    fun linksAreNotHeldWhileDisconnectedOrSentWithoutTheCapability() {
+        val reliable = ReliableStream(clock = { 0L })
+        val link = newEnvelope { setOpenUrl(dev.southstar21.droidtosh.protocol.v1.OpenUrl.newBuilder().setUrl("https://example.com")) }
+        // An older Mac's session: open_url was not negotiated.
+        TransportHub.attach(client(FakeDuplexStream()), reliable, Capabilities.SUPPORTED.toSet() - Capabilities.OPEN_URL, ready = false)
+        assertFalse(TransportHub.send(link))
+        TransportHub.detach()
+        assertFalse(TransportHub.send(link))
+        assertTrue(TransportHub.send(clipboardText("still held")))
+        val pending = reliable.onPeerResume(
+            dev.southstar21.droidtosh.protocol.v1.Resume.newBuilder().setStreamId("mac").setPeerStreamId(reliable.streamId).build()
+        )
+        assertEquals(listOf(Envelope.PayloadCase.CLIPBOARD_TEXT), pending.map { it.payloadCase })
+        TransportHub.releaseStream(reliable)
+    }
+
     private fun clipboardText(text: String) = newEnvelope {
         setClipboardText(dev.southstar21.droidtosh.protocol.v1.ClipboardText.newBuilder().setText(text))
     }

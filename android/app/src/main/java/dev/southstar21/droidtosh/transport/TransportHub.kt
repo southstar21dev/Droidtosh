@@ -179,6 +179,7 @@ object TransportHub {
     private fun holdWhileDisconnected(envelope: Envelope): Boolean {
         val stream = reliable ?: return false
         if (!ReliableStream.isReliable(envelope)) return false
+        if (!Capabilities.holdableWhileDisconnected(envelope)) return false
         stream.prepareOutgoing(envelope)
         return true
     }

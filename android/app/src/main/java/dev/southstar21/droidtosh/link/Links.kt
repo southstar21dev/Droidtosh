@@ -49,7 +49,10 @@ object Links {
         job = null
     }
 
-    /** Sends [url] to the Mac; false if it isn't a valid link or the Mac can't take links. */
+    /**
+     * Sends [url] to the Mac; false if it isn't a valid link, the phone isn't connected, or the Mac
+     * didn't negotiate `open_url` (links are never held for a later session).
+     */
     fun send(url: String): Boolean {
         val link = LinkPolicy.validate(url, allowTel = false) ?: return false
         return TransportHub.send(newEnvelope { setOpenUrl(OpenUrl.newBuilder().setUrl(link.url)) })
