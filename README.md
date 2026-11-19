@@ -56,7 +56,7 @@
 ## Install
 
 1. Download the APK and the Mac app from [Releases](https://github.com/southstar21dev/Droidtosh/releases).
-2. **Android:** open the APK and allow installing apps when asked. **Mac:** move Droidtosh to `/Applications`; the first time, right-click it and choose **Open**, since it isn't notarized by Apple.
+2. **Android:** open the APK and allow installing apps when asked. **Mac:** move Droidtosh to `/Applications`; it isn't notarized by Apple, so open it once, then go to **System Settings > Privacy & Security** and click **Open Anyway**.
 3. On the Mac, open Droidtosh from the menu bar, choose how the phone connects (see below), and choose **Pair Your Phone**.
 4. On the phone, open Droidtosh and scan the code.
 

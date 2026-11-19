@@ -6,8 +6,9 @@ can share a report without secrets in it.
 
 ## The Mac app won't open the first time
 
-It isn't notarized by Apple. Right-click Droidtosh in `/Applications` and choose **Open**, or allow
-it under System Settings › Privacy & Security.
+It isn't notarized by Apple, and on macOS 15 and later right-clicking and choosing **Open** no longer
+gets past Gatekeeper. Open Droidtosh once from `/Applications` and dismiss the warning, then go to
+System Settings > Privacy & Security, click **Open Anyway** next to Droidtosh and confirm.
 
 ## The phone shows "Pairing expired" or never connects after pairing
 
