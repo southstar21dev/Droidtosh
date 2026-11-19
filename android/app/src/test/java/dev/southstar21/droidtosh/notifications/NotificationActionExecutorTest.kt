@@ -2,6 +2,7 @@ package dev.southstar21.droidtosh.notifications
 
 import android.app.Notification
 import android.app.PendingIntent
+import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
@@ -30,14 +31,16 @@ class NotificationActionExecutorTest {
         }
     }
 
-    private fun notification(): Notification =
+    private fun notification(replyable: Boolean = true): Notification =
         Notification.Builder(context, "chat")
             .setContentTitle("Alice")
             .addAction(
                 Notification.Action.Builder(
                     0, "Reply",
                     PendingIntent.getBroadcast(context, 0, Intent(), PendingIntent.FLAG_IMMUTABLE),
-                ).build()
+                ).apply {
+                    if (replyable) addRemoteInput(RemoteInput.Builder("reply").build())
+                }.build()
             )
             .build()
 
@@ -52,6 +55,20 @@ class NotificationActionExecutorTest {
         assertTrue(outcome.ok)
         assertEquals("Reply", sender.lastTitle)
         assertEquals("hello", sender.lastReply)
+    }
+
+    @Test
+    fun rejectsReplyToActionWithoutRemoteInput() {
+        val sender = RecordingSender()
+        val executor = NotificationActionExecutor(
+            activeNotifications = { listOf(ActiveNotification("k1", notification(replyable = false))) },
+            sender = sender,
+        )
+        val outcome = executor.execute("k1", 0, "hello")
+        assertFalse(outcome.ok)
+        assertEquals("not_replyable", outcome.errorCode)
+        assertEquals(null, sender.lastTitle)
+        assertTrue(executor.execute("k1", 0, null).ok)
     }
 
     @Test
