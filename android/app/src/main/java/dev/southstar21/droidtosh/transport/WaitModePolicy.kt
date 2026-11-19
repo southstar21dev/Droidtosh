@@ -1,13 +1,19 @@
 package dev.southstar21.droidtosh.transport
 
+/**
+ * How long the Mac-asleep wait lasts. [pushAvailable] is asked on every wait, because the wake-up
+ * provider can change while the service runs (a UnifiedPush endpoint arriving, for one).
+ */
 class WaitModePolicy(
-    private val fcmEnabled: Boolean,
+    private val pushAvailable: () -> Boolean,
     /** Overrides both delays; the end-to-end harness uses it to keep the Mac-asleep wait short. */
     private val overrideMs: Long? = null,
 ) {
+    constructor(fcmEnabled: Boolean, overrideMs: Long? = null) : this({ fcmEnabled }, overrideMs)
+
     /** [fcmUsable] is false when no relay is in use (local-only mode), so no `mac_online` push can come. */
     fun nextDelayMs(fcmUsable: Boolean = true): Long =
-        overrideMs ?: if (fcmEnabled && fcmUsable) FCM_SAFETY_NET_MS else NO_FCM_PROBE_MS
+        overrideMs ?: if (fcmUsable && pushAvailable()) FCM_SAFETY_NET_MS else NO_FCM_PROBE_MS
 
     companion object {
         const val FCM_SAFETY_NET_MS = 15 * 60_000L

@@ -199,7 +199,7 @@ class ConnectionService : Service() {
             },
             scope = scope,
             reliableStream = reliableStream,
-            waitPolicy = WaitModePolicy(pushTokens.provider() != WakeProvider.NONE),
+            waitPolicy = WaitModePolicy(pushAvailable = { pushTokens.provider() != WakeProvider.NONE }),
             waitSignal = waitSignal,
         )
         connection = loop
