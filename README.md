@@ -53,7 +53,7 @@
 - **Links and numbers.** Share a link from Android to the Mac, or use **Send to Phone** in the Mac's Services menu for selected text, links and files. Links open only when you tap or click their notification, and Droidtosh can open `tel:` links on the Mac to dial them from the phone.
 - **Phone status.** Battery, network and sound mode in the menu bar, low-battery alerts, and **Find my phone** to ring it at full volume.
 - **Connection health.** Plain-words reasons when the devices are not connected, a Reconnect now button, and a Background checklist on the phone that the Mac warns about when Android or the phone maker may stop the connection.
-- **Wake-ups.** With a relay, the phone reconnects as soon as the Mac is back, through Firebase or, on phones without Google services, [UnifiedPush](docs/TROUBLESHOOTING.md#the-phone-doesnt-wake-when-the-mac-comes-back-no-google-services) (for example ntfy).
+- **Wake-ups.** With a relay, the phone reconnects as soon as the Mac is back, through [UnifiedPush](docs/TROUBLESHOOTING.md#the-phone-doesnt-wake-when-the-mac-comes-back-no-google-services) (for example ntfy), no Google services needed. Builds made with your own Firebase project can use Firebase instead.
 - **Updates.** Both apps update themselves from GitHub releases when you say so, with an opt-in beta channel.
 
 ## Install
