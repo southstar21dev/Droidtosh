@@ -105,9 +105,20 @@ struct MainView: View {
     }
 
     private func sidebarRow(_ section: MainSection) -> some View {
-        Label(section.title, systemImage: section.symbol)
-            .badge(badge(for: section))
+        let selected = selection == section
+        let ink: Color = selected ? Brand.onInk : .primary
+        return Label {
+            Text(section.title).foregroundStyle(ink)
+        } icon: {
+            Image(systemName: section.symbol).foregroundStyle(ink)
+        }
+            .badge(Text(badge(for: section) > 0 ? "\(badge(for: section))" : "").foregroundStyle(selected ? Brand.onInk.opacity(0.7) : Color.secondary))
             .tag(section)
+            .listRowBackground(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(selected ? Brand.ink : Color.clear)
+                    .padding(.horizontal, 10)
+            )
     }
 
     private func badge(for section: MainSection) -> Int {
