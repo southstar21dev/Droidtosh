@@ -42,6 +42,14 @@ class PairingPayloadParserTest {
     }
 
     @Test
+    fun readsAPercentEncodedPlusInTheNameAsAPlus() {
+        // Exactly what the Mac emits for "Tom's Mac+Pro & Co=1 #2 é".
+        val uri = "droidsync://pair?v=2&did=mac-1&name=Tom%27s%20Mac%2BPro%20%26%20Co%3D1%20%232%20%C3%A9" +
+            "&host=192.168.1.20&port=8765&fp=$fp&rfp=$rfp&room=$room&psk=${Base64URL.encode(psk)}&mode=relay"
+        assertEquals("Tom's Mac+Pro & Co=1 #2 é", PairingPayloadParser.parse(uri).deviceName)
+    }
+
+    @Test
     fun normalizesFingerprintsToLowercase() {
         val parsed = PairingPayloadParser.parse(uri(relayFingerprint = "B".repeat(64)))
         assertEquals(rfp, parsed.relayFingerprint)

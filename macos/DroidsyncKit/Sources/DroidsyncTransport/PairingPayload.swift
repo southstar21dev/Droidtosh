@@ -57,30 +57,37 @@ public struct PairingPayload: Equatable {
         var components = URLComponents()
         components.scheme = "droidsync"
         components.host = "pair"
-        var items = [
-            URLQueryItem(name: "v", value: String(Self.version)),
-            URLQueryItem(name: "did", value: deviceID),
-            URLQueryItem(name: "name", value: deviceName),
+        var items: [URLQueryItem] = [
+            Self.item("v", value: String(Self.version)),
+            Self.item("did", value: deviceID),
+            Self.item("name", value: deviceName),
         ]
         if mode.usesRelay, let host, let port {
-            items.append(URLQueryItem(name: "host", value: host))
-            items.append(URLQueryItem(name: "port", value: String(port)))
+            items.append(Self.item("host", value: host))
+            items.append(Self.item("port", value: String(port)))
         }
-        items.append(URLQueryItem(name: "fp", value: fingerprint))
+        items.append(Self.item("fp", value: fingerprint))
         if mode.usesRelay, let relayFingerprint {
-            items.append(URLQueryItem(name: "rfp", value: relayFingerprint))
+            items.append(Self.item("rfp", value: relayFingerprint))
         }
         items += [
-            URLQueryItem(name: "psk", value: Base64URL.encode(psk)),
-            URLQueryItem(name: "room", value: room),
-            URLQueryItem(name: "mode", value: mode.rawValue),
+            Self.item("psk", value: Base64URL.encode(psk)),
+            Self.item("room", value: room),
+            Self.item("mode", value: mode.rawValue),
         ]
         if mode.usesLocal {
-            if let localHost { items.append(URLQueryItem(name: "lhost", value: localHost)) }
-            if let localPort { items.append(URLQueryItem(name: "lport", value: String(localPort))) }
+            if let localHost { items.append(Self.item("lhost", value: localHost)) }
+            if let localPort { items.append(Self.item("lport", value: String(localPort))) }
         }
-        components.queryItems = items
+        components.percentEncodedQueryItems = items
         return components.string ?? ""
+    }
+
+    /// Percent-encodes everything but RFC 3986 unreserved characters, so "+" (read as a space by
+    /// form decoders such as Android's) and "&", "=", "#" in a Mac name survive the round trip.
+    private static func item(_ name: String, value: String) -> URLQueryItem {
+        let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        return URLQueryItem(name: name, value: value.addingPercentEncoding(withAllowedCharacters: unreserved) ?? value)
     }
 
     public static func parse(_ uri: String) throws -> PairingPayload {
