@@ -14,11 +14,14 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.southstar21.droidtosh.R
+import dev.southstar21.droidtosh.transport.ConnectionState
 import dev.southstar21.droidtosh.ui.components.FeatureStatusCard
 import dev.southstar21.droidtosh.ui.components.ListGroup
 import dev.southstar21.droidtosh.ui.components.PermissionGroupRow
@@ -40,10 +43,17 @@ fun NotificationsScreen(
     val allow = stringResource(R.string.fix_allow)
     TabColumn(modifier, contentPadding) {
         TabTitle(stringResource(R.string.nav_notifications), subtitle = stringResource(R.string.notifications_subtitle))
-        val relaying = ui.permissions.notificationAccess
+        val access = ui.permissions.notificationAccess
+        val relaying = access && ui.connection is ConnectionState.Connected
         FeatureStatusCard(
             title = stringResource(if (relaying) R.string.notifications_relaying else R.string.notifications_not_relaying),
-            body = stringResource(if (relaying) R.string.notifications_relaying_body else R.string.notifications_not_relaying_body),
+            body = stringResource(
+                when {
+                    relaying -> R.string.notifications_relaying_body
+                    access -> R.string.notifications_waiting_body
+                    else -> R.string.notifications_not_relaying_body
+                },
+            ),
         ) {
             if (relaying) {
                 ShapeTether(state = TetherState.Mirroring, polygon = MaterialShapes.Clover4Leaf, size = 64.dp, tetherSize = 40.dp)
@@ -80,10 +90,11 @@ fun NotificationsScreen(
                 }
             },
         )
-        ListGroup(
-            title = stringResource(R.string.notifications_muted_header),
-            footer = stringResource(R.string.settings_mute_list_note),
-            content = {},
+        Text(
+            text = stringResource(R.string.settings_mute_list_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
 }

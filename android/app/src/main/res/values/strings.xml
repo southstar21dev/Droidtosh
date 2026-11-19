@@ -265,7 +265,7 @@
     <string name="notifications_not_relaying">Not relaying yet</string>
     <string name="notifications_not_relaying_body">Turn on notification access so Droidtosh can relay them</string>
     <string name="section_access">Access</string>
-    <string name="notifications_muted_header">Muted on your Mac</string>
+    <string name="notifications_waiting_body">They will reach your Mac once it is connected</string>
     <!-- Redesign: Calls tab -->
     <string name="calls_subtitle">Answer, decline and place calls from your Mac</string>
     <string name="calls_ready">Calls ring on your Mac too</string>
