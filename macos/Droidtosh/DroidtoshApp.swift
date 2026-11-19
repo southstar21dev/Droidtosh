@@ -14,8 +14,8 @@ struct DroidtoshApp: App {
         .defaultLaunchBehavior(.suppressed)
         .defaultSize(width: 920, height: 640)
         .windowToolbarStyle(.unified)
-        Window("Pair Phone", id: "pairing") {
-            PairingView(model: appDelegate.model)
+        Window("Set Up Droidtosh", id: "pairing") {
+            SetupView(model: appDelegate.model)
         }
         .defaultLaunchBehavior(.suppressed)
         .windowResizability(.contentSize)

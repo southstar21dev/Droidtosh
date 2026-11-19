@@ -15,46 +15,16 @@ struct FilesView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                dropZone
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 12, trailing: 0))
-                    .listRowSeparator(.hidden)
+        HStack(spacing: 0) {
+            transferList
+                .frame(minWidth: 320, maxWidth: .infinity)
+            Divider()
+            ScrollView {
+                FileOptions(model: model, files: files)
+                    .padding(18)
             }
-            if !files.activeTransfers.isEmpty {
-                Section("In Progress") {
-                    ForEach(files.activeTransfers) { transfer in
-                        FileTransferRow(transfer: transfer, files: files)
-                    }
-                }
-            }
-            if !finished.isEmpty {
-                Section {
-                    ForEach(finished) { transfer in
-                        FileTransferRow(transfer: transfer, files: files)
-                    }
-                } header: {
-                    HStack {
-                        Text("Recent")
-                        Spacer()
-                        Button("Clear") { files.clearFinished() }
-                            .buttonStyle(.link)
-                            .font(.caption)
-                    }
-                }
-            }
-        }
-        .listStyle(.inset)
-        .overlay(alignment: .bottom) {
-            if files.transfers.isEmpty {
-                ContentUnavailableView {
-                    Label("No Transfers Yet", systemImage: "arrow.up.arrow.down.circle")
-                } description: {
-                    Text("Files from your phone are saved to Downloads.")
-                }
-                .frame(maxHeight: 260)
-                .padding(.bottom, 40)
-            }
+            .frame(width: 280)
+            .background(Brand.card.opacity(0.6))
         }
         .navigationTitle("Files")
         .toolbar {
@@ -83,15 +53,66 @@ struct FilesView: View {
         }
     }
 
+    private var transferList: some View {
+        List {
+            Section {
+                dropZone
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 12, trailing: 0))
+                    .listRowSeparator(.hidden)
+            }
+            if !files.activeTransfers.isEmpty {
+                Section("In Progress") {
+                    ForEach(files.activeTransfers) { transfer in
+                        FileTransferRow(transfer: transfer, files: files)
+                    }
+                }
+            }
+            if !finished.isEmpty {
+                Section {
+                    ForEach(finished) { transfer in
+                        FileTransferRow(transfer: transfer, files: files)
+                    }
+                } header: {
+                    HStack {
+                        Text("Recent")
+                        Spacer()
+                        Button("Clear") { files.clearFinished() }
+                            .buttonStyle(.inkLink)
+                            .font(.caption)
+                    }
+                }
+            }
+        }
+        .listStyle(.inset)
+        .overlay(alignment: .bottom) {
+            if files.transfers.isEmpty {
+                ContentUnavailableView {
+                    Label("No Transfers Yet", systemImage: "arrow.up.arrow.down.circle")
+                } description: {
+                    Text("Files from your phone are saved to Downloads.")
+                }
+                .frame(maxHeight: 260)
+                .padding(.bottom, 40)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: files.transfers.map(\.id))
+    }
+
     private var finished: [FileTransferSnapshot] { files.transfers.filter { $0.phase.isFinished } }
 
     private var dropZone: some View {
         VStack(spacing: 10) {
-            Image(systemName: dropTargeted ? "arrow.down.doc.fill" : "square.and.arrow.up.on.square")
-                .font(.system(size: 34, weight: .light))
-                .foregroundStyle(dropTargeted ? Color.accentColor : .secondary)
-                .symbolEffect(.bounce, value: dropTargeted)
-                .accessibilityHidden(true)
+            Group {
+                if dropTargeted {
+                    TetherView(state: .streaming(toPhone: true), size: 40)
+                } else {
+                    Image(systemName: "square.and.arrow.up.on.square")
+                        .font(.system(size: 34, weight: .light))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(height: 40)
+            .accessibilityHidden(true)
             if files.phoneSupportsFiles {
                 Text(dropTargeted ? "Release to send to \(phoneName)" : "Drop files or folders to send them to \(phoneName)")
                     .font(.headline)
@@ -109,13 +130,14 @@ struct FilesView: View {
         .frame(maxWidth: .infinity, minHeight: 170)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(dropTargeted ? Color.accentColor.opacity(0.1) : Color(nsColor: .quaternarySystemFill))
+                .fill(dropTargeted ? Color.primary.opacity(0.08) : Color(nsColor: .quaternarySystemFill))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(style: StrokeStyle(lineWidth: dropTargeted ? 2 : 1.5, dash: [7, 5]))
-                .foregroundStyle(dropTargeted ? Color.accentColor : Color.secondary.opacity(0.45))
+                .foregroundStyle(dropTargeted ? Brand.ink : Color.secondary.opacity(0.45))
         )
+        .scaleEffect(dropTargeted ? 1.01 : 1)
         .animation(.easeOut(duration: 0.15), value: dropTargeted)
         .sendFilesOnDrop(files: files, isTargeted: $dropTargeted)
         .accessibilityElement(children: .contain)
@@ -138,7 +160,7 @@ struct FileTransferRow: View {
 
     var body: some View {
         HStack(spacing: compact ? 8 : 12) {
-            FileIcon(name: transfer.name, direction: transfer.direction, size: compact ? 26 : 34)
+            icon
             VStack(alignment: .leading, spacing: compact ? 2 : 4) {
                 Text(transfer.name)
                     .font(compact ? .callout : .body)
@@ -151,7 +173,8 @@ struct FileTransferRow: View {
                 }
                 Text(statusText)
                     .font(.caption)
-                    .foregroundStyle(statusIsError ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(statusIsError ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                    .fontWeight(statusIsError ? .semibold : .regular)
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
@@ -169,7 +192,7 @@ struct FileTransferRow: View {
                     .accessibilityLabel("Show \(transfer.name) in Finder")
                 } else if transfer.phase == .completed {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.primary)
                         .accessibilityHidden(true)
                 }
             } else {
@@ -197,6 +220,25 @@ struct FileTransferRow: View {
         }
     }
 
+    /// The Tether while a transfer moves (or a folder is zipped), the file's icon otherwise.
+    @ViewBuilder
+    private var icon: some View {
+        let side: CGFloat = compact ? 26 : 34
+        switch transfer.phase {
+        case .transferring, .offered:
+            TetherView(state: .streaming(toPhone: transfer.direction == .outgoing), size: side * 0.8)
+                .frame(width: side, height: side)
+                .background(RoundedRectangle(cornerRadius: side * 0.26, style: .continuous).fill(Brand.tile))
+                .accessibilityLabel(transfer.direction == .outgoing ? "Sending" : "Receiving")
+        case .compressing:
+            TetherView(state: .handshake, size: side * 0.8)
+                .frame(width: side, height: side)
+                .background(RoundedRectangle(cornerRadius: side * 0.26, style: .continuous).fill(Brand.tile))
+        default:
+            FileIcon(name: transfer.name, direction: transfer.direction, size: side)
+        }
+    }
+
     private var sizeText: String {
         ByteCountFormatter.string(fromByteCount: Int64(clamping: transfer.size), countStyle: .file)
     }
@@ -205,17 +247,17 @@ struct FileTransferRow: View {
         let toOrFrom = transfer.direction == .incoming ? "From phone" : "To phone"
         switch transfer.phase {
         case .compressing: return "Compressing…"
-        case .queued: return "\(toOrFrom) · Waiting · \(sizeText)"
-        case .offered: return "Waiting for phone · \(sizeText)"
+        case .queued: return "\(toOrFrom), waiting, \(sizeText)"
+        case .offered: return "Waiting for phone, \(sizeText)"
         case .transferring:
             let done = ByteCountFormatter.string(fromByteCount: Int64(clamping: transfer.transferred), countStyle: .file)
-            return "\(toOrFrom) · \(done) of \(sizeText)"
-        case .waitingForReconnect: return "Paused — resumes when the phone reconnects"
+            return "\(toOrFrom), \(done) of \(sizeText)"
+        case .waitingForReconnect: return "Paused, resumes when the phone reconnects"
         case .completed:
-            if transfer.direction == .incoming { return "Saved to Downloads · \(sizeText)" }
-            return "Sent · \(sizeText)"
-        case .failed(let reason): return "Failed — \(FilesController.describe(reason))"
-        case .cancelled(let reason): return reason == "user" ? "Cancelled" : "Cancelled — \(FilesController.describe(reason))"
+            if transfer.direction == .incoming { return "Saved to Downloads, \(sizeText)" }
+            return "Sent, \(sizeText)"
+        case .failed(let reason): return "Failed: \(FilesController.describe(reason))"
+        case .cancelled(let reason): return reason == "user" ? "Cancelled" : "Cancelled: \(FilesController.describe(reason))"
         }
     }
 
@@ -240,7 +282,7 @@ struct FileIcon: View {
                 Image(systemName: direction == .outgoing ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
                     .font(.system(size: size * 0.38))
                     .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, direction == .outgoing ? Color.accentColor : Color.green)
+                    .foregroundStyle(Brand.onInk, Brand.ink)
                     .offset(x: 3, y: 2)
             }
             .accessibilityLabel(direction == .outgoing ? "Sending" : "Receiving")
@@ -250,6 +292,48 @@ struct FileIcon: View {
         let ext = (name as NSString).pathExtension
         let type = ext.isEmpty ? UTType.data : (UTType(filenameExtension: ext) ?? .data)
         return NSWorkspace.shared.icon(for: type)
+    }
+}
+
+/// Receiving options (moved here from Settings): the switch and where files are saved.
+private struct FileOptions: View {
+    @ObservedObject var model: AppModel
+    @ObservedObject var files: FilesController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            OptionGroup("Receiving") {
+                Toggle(isOn: Binding(
+                    get: { files.receivingEnabled },
+                    set: { files.receivingEnabled = $0 }
+                ).animation(.spring(response: 0.3, dampingFraction: 0.7))) {
+                    Text("Receive files from phone")
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Save to")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Label {
+                            Text(files.downloadsDirectory.lastPathComponent)
+                                .lineLimit(1)
+                        } icon: {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: files.downloadsDirectory.path))
+                                .resizable()
+                                .frame(width: 16, height: 16)
+                        }
+                        .help(files.downloadsDirectory.path(percentEncoded: false))
+                        Spacer(minLength: 4)
+                        Button("Show") { files.showDownloads() }
+                            .buttonStyle(OutlineButtonStyle(compact: true))
+                            .help("Show in Finder")
+                    }
+                }
+            }
+            OptionFootnote("Drop files on the menu bar icon, the popover or this page to send them. Folders go as a zip archive, up to 2 GB each. Interrupted transfers resume.")
+        }
     }
 }
 

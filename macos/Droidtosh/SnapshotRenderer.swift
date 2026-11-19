@@ -49,10 +49,10 @@ enum SnapshotRenderer {
             for section in MainSection.allCases {
                 save("main-\(section.rawValue)", await window(MainView(model: connected, initialSection: section), size: windowSize, title: "Droidtosh", appearance: appearance))
             }
-            save("main-overview-setup", await window(MainView(model: setup, initialSection: .overview), size: windowSize, title: "Droidtosh", appearance: appearance))
+            save("main-home-setup", await window(MainView(model: setup, initialSection: .home), size: windowSize, title: "Droidtosh", appearance: appearance))
             save("main-notifications-empty", await window(MainView(model: unconfigured, initialSection: .notifications), size: NSSize(width: 900, height: 560), title: "Droidtosh", appearance: appearance))
-            save("pairing", await window(PairingView(model: connected, onDone: {}), size: nil, title: "Pair Phone", appearance: appearance))
-            save("pairing-unconfigured", await window(PairingView(model: unconfigured, onDone: {}), size: nil, title: "Pair Phone", appearance: appearance))
+            save("setup-pair", await window(SetupView(model: connected, onDone: {}), size: nil, title: "Set Up Droidtosh", appearance: appearance))
+            save("setup-connection", await window(SetupView(model: unconfigured, onDone: {}), size: nil, title: "Set Up Droidtosh", appearance: appearance))
             for tab in SettingsTab.allCases {
                 save("settings-\(tab.rawValue)", await window(SettingsPane(model: connected, tab: tab), size: nil, title: tab.title, appearance: appearance))
             }
@@ -195,8 +195,8 @@ private struct SnapshotBackdrop<Content: View>: View {
         .background(
             LinearGradient(
                 colors: colorScheme == .dark
-                    ? [Color(hex: 0x2A2320), Color(hex: 0x4A3F33)]
-                    : [Color(hex: 0xF5ECD7), Color(hex: 0xD8C8A4)],
+                    ? [Color(hex: 0x1A1A1A), Color(hex: 0x3A3A3A)]
+                    : [Color(hex: 0xEDEDED), Color(hex: 0xC8C8C8)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
