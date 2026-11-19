@@ -176,15 +176,27 @@ private struct CallButton: View {
 
 /// An ink ring that grows and fades behind the Accept button.
 private struct PulseRing: View {
+    @State private var onScreen = true
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4
-            Circle()
-                .stroke(Brand.ink, lineWidth: 2)
-                .scaleEffect(1 + 0.45 * t)
-                .opacity(0.45 * (1 - t))
+        Group {
+            if onScreen {
+                TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
+                    ring(timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4)
+                }
+            } else {
+                ring(0)
+            }
         }
+        .background(WindowVisibilityReader(onScreen: $onScreen))
         .allowsHitTesting(false)
+    }
+
+    private func ring(_ t: Double) -> some View {
+        Circle()
+            .stroke(Brand.ink, lineWidth: 2)
+            .scaleEffect(1 + 0.45 * t)
+            .opacity(0.45 * (1 - t))
     }
 }
 

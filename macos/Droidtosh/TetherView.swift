@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// What the Tether shows: the link between the phone and this Mac, as two points and what
@@ -55,16 +56,74 @@ struct TetherView: View {
     let state: TetherState
     var size: CGFloat = 28
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var onScreen = true
+
+    /// Calm states hold a still frame, and small marks don't need more than 30 fps.
+    private var isStill: Bool {
+        switch state {
+        case .linked, .resting: return true
+        default: return false
+        }
+    }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion)) { timeline in
-            let time = reduceMotion ? state.stillTime : timeline.date.timeIntervalSinceReferenceDate
-            Canvas { context, canvasSize in
-                TetherRenderer(state: state, time: time, side: min(canvasSize.width, canvasSize.height)).draw(in: &context)
+        Group {
+            if reduceMotion || isStill || !onScreen {
+                canvas(time: state.stillTime)
+            } else {
+                TimelineView(.animation(minimumInterval: size <= 28 ? 1.0 / 30 : 1.0 / 60)) { timeline in
+                    canvas(time: timeline.date.timeIntervalSinceReferenceDate)
+                }
             }
         }
         .frame(width: size, height: size)
+        .background(WindowVisibilityReader(onScreen: $onScreen))
         .accessibilityHidden(true)
+    }
+
+    private func canvas(time: Double) -> some View {
+        Canvas { context, canvasSize in
+            TetherRenderer(state: state, time: time, side: min(canvasSize.width, canvasSize.height)).draw(in: &context)
+        }
+    }
+}
+
+/// Reports whether the hosting window is actually visible (on screen and not occluded), so
+/// animations stop in closed popovers and hidden panels.
+struct WindowVisibilityReader: NSViewRepresentable {
+    @Binding var onScreen: Bool
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        view.onChange = { visible in
+            DispatchQueue.main.async { if onScreen != visible { onScreen = visible } }
+        }
+        return view
+    }
+
+    func updateNSView(_ view: TrackingView, context: Context) {}
+
+    final class TrackingView: NSView {
+        var onChange: ((Bool) -> Void)?
+        private var observers: [NSObjectProtocol] = []
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers = []
+            guard let window else { return }
+            observers.append(NotificationCenter.default.addObserver(
+                forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.report() } })
+            report()
+        }
+
+        private func report() {
+            guard let window else { return }
+            onChange?(window.isVisible && window.occlusionState.contains(.visible))
+        }
+
+        deinit { observers.forEach(NotificationCenter.default.removeObserver) }
     }
 }
 
