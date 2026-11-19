@@ -64,6 +64,7 @@ xcuserdata/
 
 # Relay: local binary, state and certificates (pinned by paired phones; back them up, never commit)
 relay/relay
+relay/droidtosh-relay
 relay/state.json
 relay/data/
 

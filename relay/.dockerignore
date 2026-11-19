@@ -6,3 +6,5 @@ data/
 docker-compose.yml
 Dockerfile
 .dockerignore
+relay
+droidtosh-relay
