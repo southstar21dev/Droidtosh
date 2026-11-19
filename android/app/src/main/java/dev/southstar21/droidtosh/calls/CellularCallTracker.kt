@@ -262,7 +262,8 @@ class CellularCallTracker(
         else CallPhase.CALL_PHASE_ACTIVE
 
     fun handleAction(callId: String, action: CallActionType): Boolean {
-        if (!callId.startsWith(CELLULAR_PREFIX)) return false
+        // A delayed action for an earlier call must not act on the current one.
+        if (!callId.startsWith(CELLULAR_PREFIX) || callId != currentCallId) return false
         val ok = when (action) {
             CallActionType.CALL_ACTION_ACCEPT -> accept()
             CallActionType.CALL_ACTION_DECLINE ->
