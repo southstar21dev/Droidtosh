@@ -319,7 +319,8 @@ class CellularCallTracker(
         runCatching { audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_UNMUTE, 0) }
     }
 
-    fun dial(number: String, phoneAccountId: String?): Boolean {
+    fun dial(requested: String, phoneAccountId: String?): Boolean {
+        val number = DialNumber.clean(requested) ?: return false
         // Don't clobber the fields of a call that is already ringing or in progress.
         if (currentCallId != null || awaitingOutgoing) return placeCall(number, phoneAccountId)
         return runCatching {
@@ -697,4 +698,13 @@ class TelecomCallControl(private val context: Context) : CellularCallControl {
             telecomManager.endCall()
         }.onFailure { android.util.Log.w("DroidsyncCalls", "endCall failed", it) }.getOrDefault(false)
     }
+}
+
+/** Validates numbers the Mac asks the phone to dial: a tel: URI would otherwise run MMI/USSD codes. */
+internal object DialNumber {
+    private val DIALABLE = Regex("^\\+?[0-9]{1,32}$")
+
+    /** The number without spaces, dashes and parentheses, or null unless it is digits with an optional leading +. */
+    fun clean(number: String): String? =
+        number.filterNot { it == ' ' || it == '-' || it == '(' || it == ')' }.takeIf { DIALABLE.matches(it) }
 }
