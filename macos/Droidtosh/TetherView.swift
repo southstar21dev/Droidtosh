@@ -124,13 +124,17 @@ struct WindowVisibilityReader: NSViewRepresentable {
                 NSWindow.didMiniaturizeNotification,
                 NSWindow.didDeminiaturizeNotification,
                 NSWindow.didChangeScreenNotification,
-                NSWindow.willCloseNotification,
             ]
             for name in names {
                 observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.report() }
                 })
             }
+            // The window is still visible while it is about to close, so sampling it then would
+            // report true; a closing window is going away, so say so.
+            observers.append(NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: window, queue: .main
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.onChange?(false) } })
             visibleObservation = window.observe(\.isVisible, options: [.new]) { [weak self] _, _ in
                 DispatchQueue.main.async { MainActor.assumeIsolated { self?.report() } }
             }
