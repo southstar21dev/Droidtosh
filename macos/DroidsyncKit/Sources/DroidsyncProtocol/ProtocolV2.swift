@@ -16,6 +16,7 @@ public enum ProtocolV2 {
         public static let files = "files"
         public static let phoneStatus = "phone.status"
         public static let find = "find"
+        public static let openUrl = "open_url"
     }
 
     /// Everything this Mac build can do; the session uses the intersection with the phone's list.
@@ -29,6 +30,7 @@ public enum ProtocolV2 {
         Capability.files,
         Capability.phoneStatus,
         Capability.find,
+        Capability.openUrl,
     ]
 
     /// Mac → phone payloads sent with a sequence number and kept until acknowledged (§4.3).
@@ -43,6 +45,9 @@ public enum ProtocolV2 {
             return true
         // A ring request must survive a reconnect; the phone drops stale starts (§9).
         case .findPhoneRequest:
+            return true
+        // A link must reach the phone even across a short reconnect; the outbox TTL drops stale ones (§10).
+        case .openURL:
             return true
         default:
             return false
@@ -67,6 +72,8 @@ public enum ProtocolV2 {
             return Capability.files
         case .findPhoneRequest:
             return Capability.find
+        case .openURL:
+            return Capability.openUrl
         default:
             return nil
         }

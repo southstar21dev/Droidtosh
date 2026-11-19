@@ -48,6 +48,17 @@ message DeviceStatus {
   RingerMode ringer_mode = 11;
   bool do_not_disturb = 12;
   uint64 sampled_at_ms = 13;      // phone clock
+  // The phone's background health check found something that can stop the connection while the
+  // phone is idle (PROTOCOL-v2.md section 8.3). False from older phones means "nothing known".
+  bool background_restricted = 14;
+  BackgroundReason background_reason = 15;  // the top problem; UNSPECIFIED when not restricted
+}
+
+// The top problem of the phone's background checklist that can stop the connection while idle.
+enum BackgroundReason {
+  BACKGROUND_REASON_UNSPECIFIED = 0;
+  BACKGROUND_REASON_BATTERY_OPTIMIZED = 1;  // not exempt from battery optimization
+  BACKGROUND_REASON_VENDOR_BATTERY = 2;     // an OEM battery manager is likely to kill the app
 }
 
 enum FindAction {

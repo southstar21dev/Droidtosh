@@ -6,6 +6,7 @@ import "droidsync/v1/calls.proto";
 import "droidsync/v1/clipboard.proto";
 import "droidsync/v1/device.proto";
 import "droidsync/v1/files.proto";
+import "droidsync/v1/link.proto";
 import "droidsync/v1/notifications.proto";
 
 option java_package = "dev.southstar21.droidtosh.protocol.v1";
@@ -67,6 +68,8 @@ message Envelope {
     DeviceStatus device_status = 80;
     FindPhoneRequest find_phone_request = 81;
     FindPhoneState find_phone_state = 82;
+
+    OpenUrl open_url = 90;
 
     CallState call_state = 40;
     CallAction call_action = 41;

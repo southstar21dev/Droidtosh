@@ -1,5 +1,6 @@
 package dev.southstar21.droidtosh.protocol
 
+import dev.southstar21.droidtosh.protocol.v1.BackgroundReason
 import dev.southstar21.droidtosh.protocol.v1.CallDirection
 import dev.southstar21.droidtosh.protocol.v1.CallKind
 import dev.southstar21.droidtosh.protocol.v1.CallPhase
@@ -9,6 +10,8 @@ import dev.southstar21.droidtosh.protocol.v1.FindAction
 import dev.southstar21.droidtosh.protocol.v1.FindEndReason
 import dev.southstar21.droidtosh.protocol.v1.NetworkType
 import dev.southstar21.droidtosh.protocol.v1.RingerMode
+import dev.southstar21.droidtosh.transport.Capabilities
+import dev.southstar21.droidtosh.transport.ReliableStream
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -76,7 +79,7 @@ class FixtureDecodeTest {
 
     @Test
     fun everyFixtureIsProtocolV2() {
-        for (name in listOf("hello", "ping", "notification_record", "call_state", "resume", "device_status")) {
+        for (name in listOf("hello", "ping", "notification_record", "call_state", "resume", "device_status", "open_url")) {
             assertEquals(name, 2, Envelope.parseFrom(load(name)).protocolVersion)
         }
     }
@@ -113,6 +116,8 @@ class FixtureDecodeTest {
         assertEquals("5G", status.cellularGeneration)
         assertEquals("Telekom.de", status.carrier)
         assertFalse(status.airplaneMode)
+        assertTrue(status.backgroundRestricted)
+        assertEquals(BackgroundReason.BACKGROUND_REASON_VENDOR_BATTERY, status.backgroundReason)
         assertEquals(RingerMode.RINGER_MODE_VIBRATE, status.ringerMode)
         assertTrue(status.doNotDisturb)
         assertEquals(1_759_999_999_500L, status.sampledAtMs)
@@ -170,5 +175,18 @@ class FixtureDecodeTest {
         assertFalse(state.ringing)
         assertEquals(FindEndReason.FIND_END_STOPPED_ON_PHONE, state.ended)
         assertArrayEquals(bytes, envelope.toByteArray())
+    }
+
+    @Test
+    fun openUrlFixtureDecodesAndReEncodes() {
+        val bytes = load("open_url")
+        val envelope = Envelope.parseFrom(bytes)
+        assertEquals("fixture-open-url", envelope.messageId)
+        assertTrue(envelope.hasOpenUrl())
+        assertEquals("https://example.com/path?q=1", envelope.openUrl.url)
+        assertArrayEquals(bytes, envelope.toByteArray())
+        assertEquals(Capabilities.OPEN_URL, Capabilities.requiredFor(envelope))
+        assertTrue(ReliableStream.isReliable(envelope))
+        assertTrue(Capabilities.OPEN_URL in Capabilities.SUPPORTED)
     }
 }

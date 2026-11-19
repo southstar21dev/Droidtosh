@@ -152,6 +152,7 @@ final class AppModel: ObservableObject {
             case .clipboard: clipboard.handle(envelope)
             case .files: files.handle(envelope)
             case .device: device.handle(envelope)
+            case .link: break
             }
         }
     }

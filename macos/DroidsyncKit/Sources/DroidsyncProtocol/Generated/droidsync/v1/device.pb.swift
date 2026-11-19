@@ -162,6 +162,49 @@ public nonisolated enum DSRingerMode: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+/// The top problem of the phone's background checklist that can stop the connection while idle.
+public nonisolated enum DSBackgroundReason: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+
+  /// not exempt from battery optimization
+  case batteryOptimized // = 1
+
+  /// an OEM battery manager is likely to kill the app
+  case vendorBattery // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .batteryOptimized
+    case 2: self = .vendorBattery
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .batteryOptimized: return 1
+    case .vendorBattery: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [DSBackgroundReason] = [
+    .unspecified,
+    .batteryOptimized,
+    .vendorBattery,
+  ]
+
+}
+
 public nonisolated enum DSFindAction: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -292,6 +335,13 @@ public nonisolated struct DSDeviceStatus: Sendable {
   /// phone clock
   public var sampledAtMs: UInt64 = 0
 
+  /// The phone's background health check found something that can stop the connection while the
+  /// phone is idle (PROTOCOL-v2.md section 8.3). False from older phones means "nothing known".
+  public var backgroundRestricted: Bool = false
+
+  /// the top problem; UNSPECIFIED when not restricted
+  public var backgroundReason: DSBackgroundReason = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -350,6 +400,10 @@ nonisolated extension DSRingerMode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0RINGER_MODE_UNSPECIFIED\0\u{1}RINGER_MODE_NORMAL\0\u{1}RINGER_MODE_VIBRATE\0\u{1}RINGER_MODE_SILENT\0")
 }
 
+nonisolated extension DSBackgroundReason: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0BACKGROUND_REASON_UNSPECIFIED\0\u{1}BACKGROUND_REASON_BATTERY_OPTIMIZED\0\u{1}BACKGROUND_REASON_VENDOR_BATTERY\0")
+}
+
 nonisolated extension DSFindAction: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0FIND_ACTION_UNSPECIFIED\0\u{1}FIND_ACTION_START\0\u{1}FIND_ACTION_STOP\0")
 }
@@ -360,7 +414,7 @@ nonisolated extension DSFindEndReason: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension DSDeviceStatus: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeviceStatus"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}battery_percent\0\u{1}charging\0\u{3}charge_source\0\u{3}power_save\0\u{3}network_type\0\u{3}wifi_level\0\u{3}cellular_level\0\u{3}cellular_generation\0\u{1}carrier\0\u{3}airplane_mode\0\u{3}ringer_mode\0\u{3}do_not_disturb\0\u{3}sampled_at_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}battery_percent\0\u{1}charging\0\u{3}charge_source\0\u{3}power_save\0\u{3}network_type\0\u{3}wifi_level\0\u{3}cellular_level\0\u{3}cellular_generation\0\u{1}carrier\0\u{3}airplane_mode\0\u{3}ringer_mode\0\u{3}do_not_disturb\0\u{3}sampled_at_ms\0\u{3}background_restricted\0\u{3}background_reason\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -381,6 +435,8 @@ nonisolated extension DSDeviceStatus: SwiftProtobuf.Message, SwiftProtobuf._Mess
       case 11: try { try decoder.decodeSingularEnumField(value: &self.ringerMode) }()
       case 12: try { try decoder.decodeSingularBoolField(value: &self.doNotDisturb) }()
       case 13: try { try decoder.decodeSingularUInt64Field(value: &self.sampledAtMs) }()
+      case 14: try { try decoder.decodeSingularBoolField(value: &self.backgroundRestricted) }()
+      case 15: try { try decoder.decodeSingularEnumField(value: &self.backgroundReason) }()
       default: break
       }
     }
@@ -426,6 +482,12 @@ nonisolated extension DSDeviceStatus: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if self.sampledAtMs != 0 {
       try visitor.visitSingularUInt64Field(value: self.sampledAtMs, fieldNumber: 13)
     }
+    if self.backgroundRestricted != false {
+      try visitor.visitSingularBoolField(value: self.backgroundRestricted, fieldNumber: 14)
+    }
+    if self.backgroundReason != .unspecified {
+      try visitor.visitSingularEnumField(value: self.backgroundReason, fieldNumber: 15)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -443,6 +505,8 @@ nonisolated extension DSDeviceStatus: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if lhs.ringerMode != rhs.ringerMode {return false}
     if lhs.doNotDisturb != rhs.doNotDisturb {return false}
     if lhs.sampledAtMs != rhs.sampledAtMs {return false}
+    if lhs.backgroundRestricted != rhs.backgroundRestricted {return false}
+    if lhs.backgroundReason != rhs.backgroundReason {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

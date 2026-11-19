@@ -104,6 +104,7 @@ Every `Envelope.protocol_version` must equal the negotiated version (2); anythin
 - `files` (section 7)
 - `phone.status` (section 8)
 - `find` (section 9)
+- `open_url` (section 10)
 
 ## 4. Reliable delivery
 Each side keeps a **send stream** identified by `stream_id`. This is a random UUID created when the process starts, or when the Android service starts, and it is never persisted.
@@ -126,8 +127,8 @@ Each side keeps a **send stream** identified by `stream_id`. This is a random UU
 - **`seq > lastProcessed + 1`:** a gap; this can only happen after evictions. Process it, set `lastProcessed = seq`, and count the gap. The inner TLS is ordered, so gaps only come from the sender evicting entries.
 
 ### 4.3 Which payloads are reliable (`seq > 0`)
-- **Phone → Mac:** `action_result`, `clipboard_text`.
-- **Mac → phone:** `notification_action`, `notification_dismiss`, `call_action`, `dial_request`, `mute_list_set`, `open_app_request`, `clipboard_text`.
+- **Phone → Mac:** `action_result`, `clipboard_text`, `open_url`.
+- **Mac → phone:** `notification_action`, `notification_dismiss`, `call_action`, `dial_request`, `mute_list_set`, `open_app_request`, `clipboard_text`, `open_url`.
 
 Everything else is unreliable, because either the snapshot sent on every reconnect restores it or it is latest-wins: notification posted, updated and removed, call state, snapshots, apps list and icons, clipboard blobs, ping and pong, server info, host status, phone status. A clipboard blob transfer interrupted by a disconnect is simply abandoned.
 
@@ -203,6 +204,14 @@ The `phone_status{metered}` message from the clipboard feature is unrelated and 
 - **Stale data:** status older than 10 minutes, or from a session that has ended, is shown greyed with "last seen <time>".
 - **Low battery:** an optional macOS notification (default on) when the phone drops to 20% and again at 10% while not charging. Each threshold fires once per discharge; plugging in resets them.
 
+### 8.3 Background health
+`DeviceStatus` carries two optional fields from the phone's background health check (the "Background" checklist on the Connection page):
+
+- `background_restricted` (`bool`, field 14): true while something can stop the connection when the phone is idle.
+- `background_reason` (`BackgroundReason`, field 15): the top open item, in this order: `BATTERY_OPTIMIZED` (not exempt from battery optimization) then `VENDOR_BATTERY` (an OEM battery manager that is likely to kill the app and that the user has not dealt with yet). `UNSPECIFIED` when not restricted. Missing notification permissions are not part of this flag: they do not stop the connection, and the phone shows them on its own.
+
+Both are plain proto3 fields, so this is backward compatible and needs no new capability: an older phone never sends them (the Mac reads that as "nothing known"), and an older Mac ignores them. A change of `background_restricted` is sent within 1 s like the other flags, and it is part of the heartbeat. The Mac shows "Your phone may disconnect when idle. Fix it on the phone: Droidtosh > Connection > Background" while it is true.
+
 ## 9. Find my phone (`find` capability)
 - **Request:** the Mac sends `FindPhoneRequest{request_id, action}`. It is reliable (§4), so it is retransmitted after a reconnect within the outbox TTL.
 - **Start:** the phone rings for **60 s** at full volume, even when the ringer is silent or vibrate:
@@ -218,3 +227,10 @@ The `phone_status{metered}` message from the clipboard feature is unrelated and 
   - If the feature is disabled in the phone settings, it answers `FAILED` with error `disabled`.
   - If audio can't start, it answers `FAILED` with error `audio_failed`.
 - **Mac UI:** a "Find My Phone" button in the popover and the device page. While the phone rings it becomes "Stop Ringing". The Mac shows "Ringing…", then how it ended. If no `FindPhoneState` arrives within 15 s while connected, it shows "Phone didn't respond". While disconnected, the button says the request will be sent when the phone reconnects.
+
+## 10. Links and phone numbers (`open_url` capability)
+Either side can send `OpenUrl{url}` to the other. It is reliable (§4), so it survives a short reconnect within the outbox TTL; a link that waited longer is dropped, which is deliberate.
+
+- **Validation (receiver, strict):** at most 2048 bytes of UTF-8, no control characters (U+0000 to U+001F, U+007F to U+009F) and no whitespace, a scheme and (for http and https) a host. The Mac accepts only `http` and `https`. The phone accepts `http` and `https`, and also `tel:` (after `tel:` only digits, `+`, `*`, `#`, `-`, `.`, parentheses and spaces). Anything else is dropped silently and counted in diagnostics.
+- **Never opened automatically:** the receiver shows a notification, "Open link from phone: <host>" on the Mac or "Open link from Mac: <host>" on the phone, and opens the link only when the user clicks or taps it. For `tel:` the phone notification says "Call <number> (from Mac)" and the tap opens the dialer with the number filled in, it does not place the call.
+- **Senders:** the phone sends a shared URL from "Send to Mac" (other shared text still goes through the clipboard), and the Mac sends from its "Send to Phone" service. Mac `tel:` links are not sent as `OpenUrl`: they use the existing `DialRequest`.

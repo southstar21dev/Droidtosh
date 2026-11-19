@@ -103,11 +103,13 @@ final class FixtureDecodeTests: XCTestCase {
         XCTAssertEqual(status.ringerMode, .vibrate)
         XCTAssertTrue(status.doNotDisturb)
         XCTAssertEqual(status.sampledAtMs, 1_759_999_999_500)
+        XCTAssertTrue(status.backgroundRestricted)
+        XCTAssertEqual(status.backgroundReason, .vendorBattery)
         XCTAssertEqual(try envelope.serializedData(), data)
     }
 
     func testEveryFixtureIsProtocolV2() throws {
-        for name in ["hello", "ping", "notification_record", "call_state", "resume", "device_status", "file_offer", "file_chunk", "find_phone_request", "find_phone_state"] {
+        for name in ["hello", "ping", "notification_record", "call_state", "resume", "device_status", "file_offer", "file_chunk", "find_phone_request", "find_phone_state", "open_url"] {
             let envelope = try DSEnvelope(serializedBytes: try load(name))
             XCTAssertEqual(envelope.protocolVersion, ProtocolV2.version, name)
         }
@@ -167,5 +169,19 @@ final class FixtureDecodeTests: XCTestCase {
         XCTAssertFalse(state.ringing)
         XCTAssertEqual(state.ended, .findEndStoppedOnPhone)
         XCTAssertEqual(try envelope.serializedData(), data)
+    }
+
+    func testOpenUrlFixture() throws {
+        let data = try load("open_url")
+        let envelope = try DSEnvelope(serializedBytes: data)
+        XCTAssertEqual(envelope.messageID, "fixture-open-url")
+        guard case .openURL(let link)? = envelope.payload else {
+            return XCTFail("expected open_url payload")
+        }
+        XCTAssertEqual(link.url, "https://example.com/path?q=1")
+        XCTAssertEqual(try envelope.serializedData(), data)
+        XCTAssertEqual(ProtocolV2.requiredCapability(for: .openURL(link)), ProtocolV2.Capability.openUrl)
+        XCTAssertTrue(ProtocolV2.isReliableFromMac(.openURL(link)))
+        XCTAssertTrue(ProtocolV2.macCapabilities.contains(ProtocolV2.Capability.openUrl))
     }
 }

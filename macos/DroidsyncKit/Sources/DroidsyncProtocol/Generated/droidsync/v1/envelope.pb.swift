@@ -390,6 +390,14 @@ public nonisolated struct DSEnvelope: @unchecked Sendable {
     set {_uniqueStorage()._payload = .findPhoneState(newValue)}
   }
 
+  public var openURL: DSOpenUrl {
+    get {
+      if case .openURL(let v)? = _storage._payload {return v}
+      return DSOpenUrl()
+    }
+    set {_uniqueStorage()._payload = .openURL(newValue)}
+  }
+
   public var callState: DSCallState {
     get {
       if case .callState(let v)? = _storage._payload {return v}
@@ -474,6 +482,7 @@ public nonisolated struct DSEnvelope: @unchecked Sendable {
     case deviceStatus(DSDeviceStatus)
     case findPhoneRequest(DSFindPhoneRequest)
     case findPhoneState(DSFindPhoneState)
+    case openURL(DSOpenUrl)
     case callState(DSCallState)
     case callAction(DSCallAction)
     case dialRequest(DSDialRequest)
@@ -647,7 +656,7 @@ fileprivate nonisolated let _protobuf_package = "droidsync.v1"
 
 nonisolated extension DSEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Envelope"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}protocol_version\0\u{3}message_id\0\u{3}sent_at_ms\0\u{1}seq\0\u{1}ack\0\u{4}\u{5}auth_challenge\0\u{3}auth_response\0\u{3}auth_ok\0\u{1}hello\0\u{1}ping\0\u{1}pong\0\u{1}error\0\u{1}resume\0\u{3}ack_only\0\u{4}\u{2}notification_posted\0\u{3}notification_updated\0\u{3}notification_removed\0\u{3}notification_action\0\u{3}notification_dismiss\0\u{3}action_result\0\u{3}snapshot_request\0\u{3}snapshot_reply\0\u{3}apps_list_request\0\u{3}apps_list\0\u{3}app_icon\0\u{3}mute_list_set\0\u{4}\u{9}call_state\0\u{3}call_action\0\u{3}dial_request\0\u{3}calllog_request\0\u{3}calllog_page\0\u{3}open_app_request\0\u{3}relay_status\0\u{3}server_info\0\u{3}host_status\0\u{4}\u{2}clipboard_text\0\u{3}clipboard_blob_start\0\u{3}clipboard_blob_chunk\0\u{3}clipboard_blob_end\0\u{3}phone_status\0\u{4}\u{6}file_offer\0\u{3}file_accept\0\u{3}file_reject\0\u{3}file_chunk\0\u{3}file_progress\0\u{3}file_end\0\u{3}file_complete\0\u{3}file_cancel\0\u{4}\u{d}device_status\0\u{3}find_phone_request\0\u{3}find_phone_state\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}protocol_version\0\u{3}message_id\0\u{3}sent_at_ms\0\u{1}seq\0\u{1}ack\0\u{4}\u{5}auth_challenge\0\u{3}auth_response\0\u{3}auth_ok\0\u{1}hello\0\u{1}ping\0\u{1}pong\0\u{1}error\0\u{1}resume\0\u{3}ack_only\0\u{4}\u{2}notification_posted\0\u{3}notification_updated\0\u{3}notification_removed\0\u{3}notification_action\0\u{3}notification_dismiss\0\u{3}action_result\0\u{3}snapshot_request\0\u{3}snapshot_reply\0\u{3}apps_list_request\0\u{3}apps_list\0\u{3}app_icon\0\u{3}mute_list_set\0\u{4}\u{9}call_state\0\u{3}call_action\0\u{3}dial_request\0\u{3}calllog_request\0\u{3}calllog_page\0\u{3}open_app_request\0\u{3}relay_status\0\u{3}server_info\0\u{3}host_status\0\u{4}\u{2}clipboard_text\0\u{3}clipboard_blob_start\0\u{3}clipboard_blob_chunk\0\u{3}clipboard_blob_end\0\u{3}phone_status\0\u{4}\u{6}file_offer\0\u{3}file_accept\0\u{3}file_reject\0\u{3}file_chunk\0\u{3}file_progress\0\u{3}file_end\0\u{3}file_complete\0\u{3}file_cancel\0\u{4}\u{d}device_status\0\u{3}find_phone_request\0\u{3}find_phone_state\0\u{4}\u{8}open_url\0")
 
   fileprivate class _StorageClass {
     var _protocolVersion: UInt32 = 0
@@ -1293,6 +1302,19 @@ nonisolated extension DSEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageI
             _storage._payload = .findPhoneState(v)
           }
         }()
+        case 90: try {
+          var v: DSOpenUrl?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .openURL(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .openURL(v)
+          }
+        }()
         default: break
         }
       }
@@ -1504,6 +1526,10 @@ nonisolated extension DSEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case .findPhoneState?: try {
         guard case .findPhoneState(let v)? = _storage._payload else { preconditionFailure() }
         try visitor.visitSingularMessageField(value: v, fieldNumber: 82)
+      }()
+      case .openURL?: try {
+        guard case .openURL(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 90)
       }()
       case nil: break
       }

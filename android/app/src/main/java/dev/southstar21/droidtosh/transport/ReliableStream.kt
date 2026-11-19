@@ -188,6 +188,7 @@ class ReliableStream(
             PayloadCase.FILE_CANCEL,
             PayloadCase.FIND_PHONE_REQUEST,
             PayloadCase.FIND_PHONE_STATE,
+            PayloadCase.OPEN_URL,
         )
 
         fun isReliable(envelope: Envelope): Boolean = envelope.payloadCase in RELIABLE

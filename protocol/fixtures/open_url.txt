@@ -1,0 +1,6 @@
+protocol_version: 2
+message_id: "fixture-open-url"
+sent_at_ms: 1760000000000
+open_url {
+  url: "https://example.com/path?q=1"
+}

@@ -158,6 +158,7 @@ public final class DiagnosticsRecorder: @unchecked Sendable {
             case .clipboard: return "clipboard"
             case .files: return "files"
             case .device: return "device"
+            case .link: return "link"
             }
         }
         switch ProtocolV2.requiredCapability(for: payload) {
@@ -167,6 +168,7 @@ public final class DiagnosticsRecorder: @unchecked Sendable {
         case ProtocolV2.Capability.clipboardText?, ProtocolV2.Capability.clipboardImage?: return "clipboard"
         case ProtocolV2.Capability.files?: return "files"
         case ProtocolV2.Capability.phoneStatus?, ProtocolV2.Capability.find?: return "device"
+        case ProtocolV2.Capability.openUrl?: return "link"
         default: return "transport"
         }
     }

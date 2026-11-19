@@ -13,11 +13,12 @@ object Capabilities {
     const val FILES = "files"
     const val PHONE_STATUS = "phone.status"
     const val FIND = "find"
+    const val OPEN_URL = "open_url"
     const val RELIABLE = "reliable"
 
     /** Everything this build supports, advertised in AuthResponse. */
     val SUPPORTED: List<String> =
-        listOf(NOTIFICATIONS, CALLS, CALLLOG, CLIPBOARD_TEXT, CLIPBOARD_IMAGE, FILES, PHONE_STATUS, FIND, RELIABLE)
+        listOf(NOTIFICATIONS, CALLS, CALLLOG, CLIPBOARD_TEXT, CLIPBOARD_IMAGE, FILES, PHONE_STATUS, FIND, OPEN_URL, RELIABLE)
 
     /** The capability an outgoing feature envelope needs, or null if it is always allowed. */
     fun requiredFor(envelope: Envelope): String? = when (envelope.payloadCase) {
@@ -44,6 +45,7 @@ object Capabilities {
         PayloadCase.FILE_CANCEL -> FILES
         PayloadCase.DEVICE_STATUS -> PHONE_STATUS
         PayloadCase.FIND_PHONE_STATE -> FIND
+        PayloadCase.OPEN_URL -> OPEN_URL
         else -> null
     }
 }

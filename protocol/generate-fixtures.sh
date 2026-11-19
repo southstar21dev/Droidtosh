@@ -23,3 +23,4 @@ encode file_offer
 encode file_chunk
 encode find_phone_request
 encode find_phone_state
+encode open_url
