@@ -408,9 +408,29 @@ final class ConnectionController: ObservableObject {
         return false
     }
 
+    /// Bumped when the pairing-expired window ends so views re-read `disconnectCause`.
+    @Published private(set) var causeRevision = 0
+    private var causeExpiryTask: Task<Void, Never>?
+
+    /// The headline derives "Pairing expired" from a time window, so nothing else would redraw
+    /// when it ends: wake once, just after the window closes.
+    private func scheduleCauseExpiry() {
+        causeExpiryTask?.cancel()
+        causeExpiryTask = nil
+        guard let failure = diagnostics.snapshot().events.last(where: { $0.kind == .authFailure }) else { return }
+        let remaining = failure.date.addingTimeInterval(ConnectionCause.pairingExpiredWindow).timeIntervalSinceNow
+        guard remaining > -1 else { return }
+        causeExpiryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64((max(remaining, 0) + 1) * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.causeRevision += 1
+        }
+    }
+
     private func handle(state: RelayTransport.State) {
         relayConnected = state == .connected
         transportState = state
+        scheduleCauseExpiry()
         switch state {
         case .stopped:
             guard relayTransport != nil else { return }
