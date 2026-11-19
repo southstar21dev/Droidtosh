@@ -1,38 +1,35 @@
 import AppKit
 import SwiftUI
 
-// The shared look of Droidtosh's windows, popover and panels: the Roast & Cream brand colours, cards, banners
-// and the Liquid Glass helpers (with material fallbacks before macOS 26).
+// The shared look of Droidtosh's windows, popover and panels: black, white and greys, cards,
+// the attention line, motion helpers and the Liquid Glass helpers (with material fallbacks
+// before macOS 26).
 
 enum Brand {
-    /// Cream #F5ECD7, the app-icon tile behind the logo.
-    static let cream = Color(hex: 0xF5ECD7)
-    /// Dark roast #1F1A17, the logo itself.
-    static let darkRoast = Color(hex: 0x1F1A17)
-    /// Ring cream #E6D8B8, a deeper cream for containers on light.
-    static let ringCream = Color(hex: 0xE6D8B8)
-    /// Tan #A8946A, the quiet accent of the southstar21 family.
-    static let tan = Color(hex: 0xA8946A)
     /// The Droid Mac logo from the app icon, as a template image.
     static let glyph = Image("BrandGlyph")
 
-    // Roast & Cream, as on Android: the hero is the inverse surface (dark roast on light, cream
-    // on dark), and icon tiles are tonal cream–roast containers. Flat colour only, no gradients.
+    // Black and white only: ink on paper in light mode, and the reverse in dark mode. State is
+    // carried by words, weight and the Tether, never by colour.
 
-    /// The window background behind the content, as Android's surface.
-    static let surface = Color(light: 0xFBF7EE, dark: 0x1F1A17)
-    /// Cards and grouped content on `surface`, as Android's surface container.
-    static let card = Color(light: 0xF5ECD7, dark: 0x2A2320)
-    /// The hero surface: dark roast in light mode, cream in dark mode.
-    static let hero = Color(light: 0x1F1A17, dark: 0xF5ECD7)
+    /// The strongest foreground: black on light, white on dark.
+    static let ink = Color(light: 0x000000, dark: 0xFFFFFF)
+    /// Text and symbols on `ink`.
+    static let onInk = Color(light: 0xFFFFFF, dark: 0x000000)
+    /// The window background behind the content.
+    static let surface = Color(light: 0xFFFFFF, dark: 0x161616)
+    /// Cards and grouped content on `surface`.
+    static let card = Color(light: 0xF7F7F7, dark: 0x202020)
+    /// The phone card on Home: a quiet grey panel.
+    static let hero = Color(light: 0xF0F0F0, dark: 0x262626)
     /// Text and symbols on `hero`.
-    static let onHero = Color(light: 0xF5ECD7, dark: 0x1F1A17)
+    static let onHero = Color(light: 0x000000, dark: 0xFFFFFF)
     /// The fill of icon tiles and other tonal containers.
-    static let tile = Color(light: 0xE6D8B8, dark: 0x4A3F33)
+    static let tile = Color(light: 0xE8E8E8, dark: 0x333333)
     /// Symbols on `tile`.
-    static let onTile = Color(light: 0x1F1A17, dark: 0xF5ECD7)
-    /// Warm tones for per-app monograms, from the cream–roast ramp; white text reads on each.
-    static let monograms: [Color] = [0x6E5E44, 0x8A5300, 0x4A3F33, 0x7A4E2D, 0x5E6B4A, 0x8C6A4F, 0x3A3129, 0x96743A].map { Color(hex: $0) }
+    static let onTile = Color(light: 0x000000, dark: 0xFFFFFF)
+    /// Greys for per-app monograms; white text reads on each.
+    static let monograms: [Color] = [0x1A1A1A, 0x333333, 0x4D4D4D, 0x5C5C5C, 0x262626, 0x404040, 0x555555, 0x0D0D0D].map { Color(hex: $0) }
 }
 
 extension Color {
@@ -73,17 +70,126 @@ extension View {
         if #available(macOS 26.0, *) { self.buttonStyle(.glass) } else { self.buttonStyle(.bordered) }
     }
 
-    /// The primary action of a group: tinted glass on macOS 26, bordered prominent before.
-    @ViewBuilder
+    /// The primary action of a group: an ink button.
     func droidtoshProminentButton() -> some View {
-        if #available(macOS 26.0, *) { self.buttonStyle(.glassProminent) } else { self.buttonStyle(.borderedProminent) }
+        buttonStyle(InkButtonStyle())
+    }
+}
+
+/// The primary button: ink fill with paper text, a slight press.
+struct InkButtonStyle: ButtonStyle {
+    var compact = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(compact ? .callout.weight(.semibold) : .body.weight(.semibold))
+            .foregroundStyle(Brand.onInk)
+            .padding(.horizontal, compact ? 12 : 16)
+            .padding(.vertical, compact ? 5 : 8)
+            .background(RoundedRectangle(cornerRadius: compact ? 8 : 10, style: .continuous).fill(Brand.ink))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.35)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+/// A secondary button: outlined, same shape as `InkButtonStyle`.
+struct OutlineButtonStyle: ButtonStyle {
+    var compact = false
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(compact ? .callout.weight(.medium) : .body.weight(.medium))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, compact ? 12 : 16)
+            .padding(.vertical, compact ? 5 : 8)
+            .background(
+                RoundedRectangle(cornerRadius: compact ? 8 : 10, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.1 : hovering ? 0.06 : 0.0))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: compact ? 8 : 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.22), lineWidth: 1)
+            )
+            .opacity(isEnabled ? 1 : 0.35)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+            .onHover { hovering = $0 }
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+/// A text link in ink, underlined on hover, instead of the blue system link.
+struct InkLinkButtonStyle: ButtonStyle {
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .fontWeight(.medium)
+            .foregroundStyle(.primary)
+            .underline(hovering)
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .onHover { hovering = $0 }
+            .contentShape(Rectangle())
+    }
+}
+
+extension ButtonStyle where Self == InkLinkButtonStyle {
+    static var inkLink: InkLinkButtonStyle { InkLinkButtonStyle() }
+}
+
+// MARK: Motion
+
+private struct EntranceModifier: ViewModifier {
+    let delay: Double
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown || reduceMotion ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 10)
+            .onAppear {
+                guard !shown else { return }
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85).delay(delay)) { shown = true }
+            }
+    }
+}
+
+private struct HoverLiftModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .shadow(color: .black.opacity(hovering ? 0.10 : 0), radius: hovering ? 10 : 0, y: hovering ? 3 : 0)
+            .offset(y: hovering && !reduceMotion ? -1 : 0)
+            .animation(.easeOut(duration: 0.18), value: hovering)
+            .onHover { hovering = $0 }
+    }
+}
+
+extension View {
+    /// Rises into place when it first appears; staggered by `delay`.
+    func entrance(_ delay: Double = 0) -> some View {
+        modifier(EntranceModifier(delay: delay))
+    }
+
+    /// A soft shadow and a one-point lift on hover.
+    func hoverLift(cornerRadius: CGFloat = 12) -> some View {
+        modifier(HoverLiftModifier(cornerRadius: cornerRadius))
     }
 }
 
 // MARK: Cards
 
-/// A content card in a window: a quiet cream (or roast) fill like a grouped form section, so
-/// content stays in the content layer and glass is kept for controls.
+/// A content card in a window: a quiet grey fill like a grouped form section, so content stays
+/// in the content layer and glass is kept for controls.
 struct Card<Content: View>: View {
     var padding: CGFloat = 16
     @ViewBuilder var content: Content
@@ -139,39 +245,36 @@ extension CardHeader where Accessory == EmptyView {
     }
 }
 
-/// A label whose icon takes the accent colour, as in System Settings section titles.
+/// A label whose icon is quieter than its title, as in System Settings section titles.
 struct TintedIconLabelStyle: LabelStyle {
-    var tint: Color = .accentColor
-
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 6) {
-            configuration.icon.foregroundStyle(tint)
+            configuration.icon.foregroundStyle(.secondary)
             configuration.title
         }
     }
 }
 
-/// An SF Symbol on a rounded square: roast on a cream tile by default, or white on a status
-/// colour (green, orange, red) when the tile reports a state.
+/// An SF Symbol on a rounded grey square, or on ink when `emphasized`.
 struct IconTile: View {
     let symbol: String
-    var color: Color? = nil
+    var emphasized = false
     var size: CGFloat = 26
 
     var body: some View {
         Image(systemName: symbol)
             .font(.system(size: size * 0.5, weight: .semibold))
-            .foregroundStyle(color == nil ? Brand.onTile : .white)
+            .foregroundStyle(emphasized ? Brand.onInk : Brand.onTile)
             .frame(width: size, height: size)
             .background(
                 RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
-                    .fill(color ?? Brand.tile)
+                    .fill(emphasized ? Brand.ink : Brand.tile)
             )
             .accessibilityHidden(true)
     }
 }
 
-/// The logo as on the app icon (dark roast Droid Mac on cream): the app's "avatar" in headers and onboarding.
+/// The logo on an ink tile: the app's "avatar" in Settings.
 struct BrandBadge: View {
     var size: CGFloat = 32
 
@@ -180,31 +283,22 @@ struct BrandBadge: View {
             .resizable()
             .renderingMode(.template)
             .scaledToFit()
-            .foregroundStyle(Brand.darkRoast)
-            .padding(size * 0.1)
+            .foregroundStyle(Brand.onInk)
+            .padding(size * 0.14)
             .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: size * 0.27, style: .continuous).fill(Brand.cream))
-            .shadow(color: .black.opacity(0.18), radius: size * 0.08, y: size * 0.04)
+            .background(RoundedRectangle(cornerRadius: size * 0.27, style: .continuous).fill(Brand.ink))
             .accessibilityHidden(true)
     }
 }
 
 // MARK: Banners
 
-/// An inline problem or hint with an optional action, used in the popover and the overview.
+/// An inline problem or hint with an optional action.
 struct Banner<Actions: View>: View {
     enum Style {
         case warning
         case info
         case error
-
-        var color: Color {
-            switch self {
-            case .warning: return .orange
-            case .info: return .accentColor
-            case .error: return .red
-            }
-        }
     }
 
     let style: Style
@@ -225,7 +319,6 @@ struct Banner<Actions: View>: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: symbol)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(style.color)
                 .frame(width: 20)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
@@ -247,11 +340,11 @@ struct Banner<Actions: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(style.color.opacity(0.1))
+                .fill(Color.primary.opacity(style == .info ? 0.04 : 0.07))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(style.color.opacity(0.28), lineWidth: 0.5)
+                .strokeBorder(Color.primary.opacity(style == .info ? 0.12 : 0.3), lineWidth: style == .info ? 0.5 : 1)
         )
         .accessibilityElement(children: .combine)
     }
@@ -265,30 +358,132 @@ extension Banner where Actions == EmptyView {
 
 // MARK: Status
 
-/// Coloured dot and label for the connection state.
+/// The Tether and a label for the connection state.
 struct StatusBadge: View {
     let status: DroidtoshStatus
     var onHero = false
 
     var body: some View {
         HStack(spacing: 5) {
-            Circle()
-                .fill(onHero ? Brand.onHero : status.color)
-                .frame(width: 7, height: 7)
-                .overlay {
-                    if status == .connected && !onHero {
-                        Circle().stroke(status.color.opacity(0.35), lineWidth: 3)
-                    }
-                }
+            TetherView(state: status.tether, size: 14)
             Text(status.title)
                 .font(.caption.weight(.semibold))
         }
-        .padding(.horizontal, 8)
+        .padding(.leading, 5)
+        .padding(.trailing, 8)
         .padding(.vertical, 3)
-        .foregroundStyle(onHero ? AnyShapeStyle(Brand.onHero) : AnyShapeStyle(status.color))
-        .background(Capsule().fill(onHero ? Brand.onHero.opacity(0.16) : status.color.opacity(0.14)))
+        .foregroundStyle(.primary)
+        .background(Capsule().fill(onHero ? Brand.surface : Color.primary.opacity(0.07)))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Status: \(status.title)")
+    }
+}
+
+// MARK: Attention line
+
+/// The one thing that needs the user right now, shown as a single line instead of a stack of
+/// banners: in the main window's toolbar and at the bottom of the popover.
+struct AttentionItem: Identifiable {
+    enum Action {
+        case setup
+        case installUpdate
+        case openNotificationSettings
+        case none
+    }
+
+    let id: String
+    let symbol: String
+    let title: String
+    let detail: String?
+    let actionTitle: String?
+    let action: Action
+
+    /// Most important first; the attention line shows the first.
+    @MainActor
+    static func items(for model: AppModel) -> [AttentionItem] {
+        var items: [AttentionItem] = []
+        if !model.connectionConfigured {
+            items.append(AttentionItem(id: "connection", symbol: "network.slash", title: "Choose how your phone connects", detail: "Set a relay address, or choose Local network, to pair.", actionTitle: "Set Up", action: .setup))
+        } else if !model.pairing.isPaired && !model.connection.phoneConnected {
+            items.append(AttentionItem(id: "pair", symbol: "qrcode", title: "Pair your phone", detail: "Scan the pairing code with Droidtosh on Android.", actionTitle: "Show Code", action: .setup))
+        }
+        if case .available(let offer) = model.updates.state {
+            items.append(AttentionItem(id: "update", symbol: "arrow.down.circle", title: "Droidtosh \(offer.version) is ready", detail: "Install it and relaunch.", actionTitle: "Install", action: .installUpdate))
+        }
+        if model.notifications.notificationsAuthorized == false {
+            items.append(AttentionItem(id: "blocked", symbol: "bell.slash", title: "Notifications are blocked", detail: "Allow them for Droidtosh in System Settings.", actionTitle: "Open Settings", action: .openNotificationSettings))
+        }
+        if !model.notifications.notificationsRelayEnabled {
+            items.append(AttentionItem(id: "relay-off", symbol: "exclamationmark.triangle", title: "Notification relay is off", detail: "Turn it on in the Droidtosh app on your phone.", actionTitle: nil, action: .none))
+        }
+        return items
+    }
+
+    @MainActor
+    func perform(model: AppModel, setup: () -> Void) {
+        switch action {
+        case .setup: setup()
+        case .installUpdate: model.updates.install()
+        case .openNotificationSettings: SystemSettings.openNotifications()
+        case .none: break
+        }
+    }
+}
+
+/// A capsule with the most important attention item; more items show as a count with a menu.
+struct AttentionLine: View {
+    let items: [AttentionItem]
+    let perform: (AttentionItem) -> Void
+
+    var body: some View {
+        if let first = items.first {
+            HStack(spacing: 6) {
+                Button {
+                    perform(first)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: first.symbol)
+                            .font(.caption.weight(.semibold))
+                        Text(first.title)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        if let actionTitle = first.actionTitle {
+                            Text(actionTitle)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Brand.onInk)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Brand.ink))
+                        }
+                    }
+                    .padding(.leading, 10)
+                    .padding(.trailing, first.actionTitle == nil ? 10 : 4)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.primary.opacity(0.06)))
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.18), lineWidth: 0.5))
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(first.detail ?? first.title)
+                if items.count > 1 {
+                    Menu {
+                        ForEach(items.dropFirst()) { item in
+                            Button(item.title) { perform(item) }
+                        }
+                    } label: {
+                        Text("+\(items.count - 1)")
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("More things that need attention")
+                }
+            }
+            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            .accessibilityElement(children: .contain)
+        }
     }
 }
 
@@ -313,6 +508,7 @@ struct WindowOpener {
         bringForward()
     }
 
+    /// The guided setup window, which also shows the pairing code.
     func pairing() {
         openWindow(id: "pairing")
         bringForward()

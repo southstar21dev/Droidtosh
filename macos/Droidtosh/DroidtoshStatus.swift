@@ -34,12 +34,11 @@ enum DroidtoshStatus: Equatable {
         }
     }
 
+    /// Black and white: connected and offline read as ink, the in-between states as grey.
     var color: Color {
         switch self {
-        case .connected: return .green
-        case .connecting: return .orange
-        case .offline: return .red
-        case .notPaired: return .secondary
+        case .connected, .offline: return .primary
+        case .connecting, .notPaired: return .secondary
         }
     }
 

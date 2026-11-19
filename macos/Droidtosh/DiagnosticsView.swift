@@ -61,27 +61,28 @@ struct DiagnosticsView: View {
         HStack(spacing: 16) {
             metric("State", value: snapshot.state.capitalized, symbol: "dot.radiowaves.left.and.right", tint: stateTint)
             Divider().frame(height: 34)
-            metric("Round trip", value: snapshot.rtt.last.map(DiagnosticsReport.ms) ?? "—", symbol: "timer", tint: nil)
+            metric("Round trip", value: snapshot.rtt.last.map(DiagnosticsReport.ms) ?? "None", symbol: "timer", tint: nil)
             Divider().frame(height: 34)
             metric("Uptime", value: snapshot.sessionStartedAt.map {
                 DiagnosticsReport.duration(snapshot.capturedAt.timeIntervalSince($0))
-            } ?? "—", symbol: "clock", tint: nil)
+            } ?? "None", symbol: "clock", tint: nil)
             Divider().frame(height: 34)
-            metric("Outbox", value: "\(context.outboxDepth)", symbol: "tray.full", tint: context.outboxDepth > 0 ? .orange : nil)
+            metric("Outbox", value: "\(context.outboxDepth)", symbol: "tray.full", tint: context.outboxDepth > 0 ? .primary : nil)
         }
         .padding(.vertical, 4)
     }
 
-    private var stateTint: Color {
+    /// Black and white: an ink tile when connected or failed, grey while in between.
+    private var stateTint: Color? {
         let state = snapshot.state.lowercased()
-        if state.contains("connected") && !state.contains("dis") { return .green }
-        if snapshot.lastError != nil && state.contains("fail") { return .red }
-        return .orange
+        if state.contains("connected") && !state.contains("dis") { return .primary }
+        if snapshot.lastError != nil && state.contains("fail") { return .primary }
+        return nil
     }
 
     private func metric(_ title: String, value: String, symbol: String, tint: Color?) -> some View {
         HStack(spacing: 8) {
-            IconTile(symbol: symbol, color: tint, size: 28)
+            IconTile(symbol: symbol, emphasized: tint != nil, size: 28)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.caption)
@@ -100,7 +101,7 @@ struct DiagnosticsView: View {
 
     private var connectionSection: some View {
         Section("Connection") {
-            row("State", "\(snapshot.state) · \(ago(snapshot.stateSince))")
+            row("State", "\(snapshot.state), \(ago(snapshot.stateSince))")
             row("Relay", context.relayHost.isEmpty ? "Not configured" : "\(context.relayHost):\(context.relayPort)")
             row("Relay fingerprint", DiagnosticsRedaction.short(context.relayFingerprint), monospaced: true)
             row("Protocol", context.negotiatedVersion.map { "v\($0)" } ?? "No phone session")
@@ -109,10 +110,10 @@ struct DiagnosticsView: View {
             }
             row("Session uptime", snapshot.sessionStartedAt.map {
                 DiagnosticsReport.duration(snapshot.capturedAt.timeIntervalSince($0))
-            } ?? "—")
+            } ?? "None")
             row("Reconnects since launch", "\(snapshot.reconnects)")
             if let error = snapshot.lastError {
-                row("Last error", "\(error.message) · \(ago(error.date))", tint: .orange)
+                row("Last error", "\(error.message), \(ago(error.date))", tint: .primary)
             } else {
                 row("Last error", "None")
             }
@@ -151,13 +152,13 @@ struct DiagnosticsView: View {
             ForEach(features, id: \.self) { feature in
                 row(
                     feature.capitalized,
-                    "\(snapshot.session.byFeatureIn[feature] ?? 0) in · \(snapshot.session.byFeatureOut[feature] ?? 0) out"
+                    "\(snapshot.session.byFeatureIn[feature] ?? 0) in, \(snapshot.session.byFeatureOut[feature] ?? 0) out"
                 )
             }
             row(
                 "Rejected frames",
                 "\(snapshot.rejected.total) (oversize \(snapshot.rejected.oversize), undecodable \(snapshot.rejected.undecodable), version \(snapshot.rejected.wrongVersion))",
-                tint: snapshot.rejected.total > 0 ? .orange : nil
+                tint: snapshot.rejected.total > 0 ? .primary : nil
             )
         }
     }
@@ -166,21 +167,21 @@ struct DiagnosticsView: View {
         Section("Features") {
             row(
                 "Clipboard images",
-                "\(snapshot.clipboard.completed) completed · \(snapshot.clipboard.rejected) rejected · \(snapshot.clipboard.timedOut) timed out"
+                "\(snapshot.clipboard.completed) completed, \(snapshot.clipboard.rejected) rejected, \(snapshot.clipboard.timedOut) timed out"
             )
             row(
                 "File transfers",
-                "\(snapshot.files.sent) sent · \(snapshot.files.received) received · \(snapshot.files.failed) failed · \(snapshot.files.resumed) resumed",
-                tint: snapshot.files.failed > 0 ? .orange : nil
+                "\(snapshot.files.sent) sent, \(snapshot.files.received) received, \(snapshot.files.failed) failed, \(snapshot.files.resumed) resumed",
+                tint: snapshot.files.failed > 0 ? .primary : nil
             )
             row(
                 "Phone status",
-                "\(snapshot.device.statusesReceived) updates · \(snapshot.device.lowBatteryAlerts) low battery alerts"
+                "\(snapshot.device.statusesReceived) updates, \(snapshot.device.lowBatteryAlerts) low battery alerts"
             )
             row(
                 "Find my phone",
-                "\(snapshot.device.findRequests) requests · \(snapshot.device.findRings) rang · \(snapshot.device.findFailures) failed · \(snapshot.device.findNoResponses) no response",
-                tint: snapshot.device.findFailures + snapshot.device.findNoResponses > 0 ? .orange : nil
+                "\(snapshot.device.findRequests) requests, \(snapshot.device.findRings) rang, \(snapshot.device.findFailures) failed, \(snapshot.device.findNoResponses) no response",
+                tint: snapshot.device.findFailures + snapshot.device.findNoResponses > 0 ? .primary : nil
             )
         }
     }
@@ -201,8 +202,8 @@ struct DiagnosticsView: View {
                             .font(.caption.weight(.semibold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
-                            .foregroundStyle(event.kind == .state ? Color.secondary : Color.orange)
-                            .background(Capsule().fill((event.kind == .state ? Color.secondary : Color.orange).opacity(0.14)))
+                            .foregroundStyle(event.kind == .state ? Color.secondary : Color.primary)
+                            .background(Capsule().fill((event.kind == .state ? Color.secondary : Color.primary).opacity(0.14)))
                             .frame(width: 84, alignment: .leading)
                         Text(event.message)
                             .font(.callout)
@@ -228,7 +229,7 @@ struct DiagnosticsView: View {
     }
 
     private func traffic(_ counters: TrafficCounters) -> String {
-        "\(counters.envelopesIn) in (\(DiagnosticsReport.bytes(counters.bytesIn))) · \(counters.envelopesOut) out (\(DiagnosticsReport.bytes(counters.bytesOut)))"
+        "\(counters.envelopesIn) in (\(DiagnosticsReport.bytes(counters.bytesIn))), \(counters.envelopesOut) out (\(DiagnosticsReport.bytes(counters.bytesOut)))"
     }
 
     private func ago(_ date: Date) -> String {
