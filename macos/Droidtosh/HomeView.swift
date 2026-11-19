@@ -279,18 +279,36 @@ private struct SyncCard: View {
     let open: (() -> Void)?
 
     var body: some View {
+        ZStack(alignment: .topTrailing) {
+            if let open {
+                Button(action: open) { cardContent }
+                    .buttonStyle(.plain)
+            } else {
+                cardContent
+            }
+            if let isOn {
+                Toggle(title, isOn: isOn.animation(.spring(response: 0.3, dampingFraction: 0.7)))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .frame(height: 30)
+                    .padding(14)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .background(CardBackground(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .hoverLift()
+    }
+
+    private var cardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 iconView
                     .frame(width: 30, height: 30)
                     .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Brand.tile))
                 Spacer()
-                if let isOn {
-                    Toggle(title, isOn: isOn.animation(.spring(response: 0.3, dampingFraction: 0.7)))
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-                        .controlSize(.small)
-                } else if open != nil {
+                if open != nil && isOn == nil {
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.tertiary)
@@ -308,12 +326,7 @@ private struct SyncCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
-        .background(CardBackground(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .onTapGesture { open?() }
-        .hoverLift()
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(open != nil && isOn == nil ? .isButton : [])
     }
 
     @ViewBuilder
