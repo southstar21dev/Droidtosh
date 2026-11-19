@@ -157,6 +157,8 @@ data class WakeUiState(
     val options: List<WakeProvider>,
     val selected: WakeProvider,
     val unifiedPushRegistered: Boolean = false,
+    /** The paired relay refused the push token (an older relay), so wake-ups are off until it is updated. */
+    val relayRefusesToken: Boolean = false,
 )
 
 /** The bottom-bar tabs. [Transfers] is the Files tab (its name is kept for notification intents). */

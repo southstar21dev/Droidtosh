@@ -40,6 +40,8 @@ class PhoneConnectionLoop(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Capabilities advertised in the handshake; the e2e harness narrows them to test gating. */
     private val capabilities: List<String> = Capabilities.SUPPORTED,
+    /** Relays that refused the push token; the default forgets on restart (tests). */
+    private val tokenRefusals: RelayTokenRefusals = RelayTokenRefusals(MemoryRefusalStore(), ""),
 ) {
     data class Timing(
         val pingIntervalMs: Long = 45_000L,
@@ -341,19 +343,32 @@ class PhoneConnectionLoop(
     }
 
     private fun dialRelay(credentials: PairingCredentials, attempt: Int): RelayConnectResult {
-        val token = host.fcmToken()
+        val relayHost = checkNotNull(credentials.host)
+        val relayPort = checkNotNull(credentials.port)
+        val relayFingerprint = checkNotNull(credentials.relayFingerprint)
+        val relayKey = RelayTokenRefusals.relayKey(relayHost, relayPort, relayFingerprint)
+        val wanted = host.fcmToken()
+        val token = tokenRefusals.tokenFor(relayKey, wanted)
         TransportLog.d(
             TAG,
-            "attempt=$attempt token=${if (token.isNullOrEmpty()) "none" else "present"}",
+            "attempt=$attempt token=${if (token.isNullOrEmpty()) "none" else "present"}" +
+                if (token == null && !wanted.isNullOrEmpty()) " (relay refused it)" else "",
         )
-        val joinLine = RelayJoinLine.format(credentials.room, PHONE_ROLE, token)
-        return connector.connect(
-            checkNotNull(credentials.host),
-            checkNotNull(credentials.port),
-            joinLine,
-            checkNotNull(credentials.relayFingerprint),
+        fun join(token: String?) = connector.connect(
+            relayHost,
+            relayPort,
+            RelayJoinLine.format(credentials.room, PHONE_ROLE, token),
+            relayFingerprint,
             credentials.fingerprint,
         )
+        val result = join(token)
+        if (token != null && RelayTokenRefusals.shouldRetryWithoutToken(true, result)) {
+            // An older relay caps the token field below a UnifiedPush endpoint; join without it, at once.
+            tokenRefusals.remember(relayKey, token)
+            diagnostics.onInfo("relay refused the wake-up token (bad-join); joining without it, the relay needs updating for UnifiedPush")
+            return join(null)
+        }
+        return result
     }
 
     /** Tries each local candidate in turn (§1.4); throws the last failure when none answers. */
@@ -383,5 +398,16 @@ class PhoneConnectionLoop(
             // Closing a TLS socket writes close_notify, which isn't allowed on the main thread.
             Thread { runCatching { client.close() } }.start()
         }
+    }
+}
+
+private class MemoryRefusalStore : RelayTokenRefusals.Store {
+    private val values = HashMap<String, String>()
+    override fun get(key: String) = values[key]
+    override fun put(key: String, value: String) {
+        values[key] = value
+    }
+    override fun remove(key: String) {
+        values.remove(key)
     }
 }

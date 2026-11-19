@@ -587,7 +587,8 @@ private fun WakeUpGroup(
                         icon = DroidIcons.Shield,
                         title = stringResource(R.string.wake_distributor),
                         supporting = stringResource(
-                            if (wake.unifiedPushRegistered) R.string.wake_distributor_ready
+                            if (wake.relayRefusesToken) R.string.wake_relay_outdated
+                            else if (wake.unifiedPushRegistered) R.string.wake_distributor_ready
                             else R.string.wake_distributor_missing
                         ),
                         onClick = onPickDistributor,

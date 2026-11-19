@@ -105,7 +105,10 @@ by the relay.
    link-local addresses, so a distributor server that only exists on your home network won't work.
 4. If the endpoint is very long (over 397 characters) the phone can't send it and falls back to
    checking every minute. Use a distributor with shorter endpoints.
-5. Allow the distributor to run in the background (battery settings), or its wake-ups arrive late.
+5. If the **Wake-ups** row says your relay needs updating for UnifiedPush, your self-hosted relay
+   is older than UnifiedPush support. The phone connects without wake-ups (checking every minute)
+   until you update the relay.
+6. Allow the distributor to run in the background (battery settings), or its wake-ups arrive late.
 
 ## Verification codes show as "Sensitive notification content hidden"
 

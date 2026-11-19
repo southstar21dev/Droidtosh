@@ -25,6 +25,7 @@ import dev.southstar21.droidtosh.files.TransferInfo
 import dev.southstar21.droidtosh.launch.OverlayPermission
 import dev.southstar21.droidtosh.BuildConfig
 import dev.southstar21.droidtosh.push.PushTokenStore
+import dev.southstar21.droidtosh.transport.RelayTokenRefusals
 import dev.southstar21.droidtosh.push.UnifiedPushController
 import dev.southstar21.droidtosh.push.WakeProvider
 import dev.southstar21.droidtosh.transport.ConnectionMode
@@ -166,7 +167,14 @@ class AppState(application: Application) : AndroidViewModel(application) {
             }
             add(WakeProvider.NONE)
         }
-        return WakeUiState(options, provider, pushStore.unifiedPushEndpoint != null)
+        val refused = runCatching {
+            val credentials = credentialStore.load()
+            credentials != null && pushStore.refusals().refused(
+                RelayTokenRefusals.relayKey(credentials.host, credentials.port, credentials.relayFingerprint),
+                pushStore.joinToken(),
+            )
+        }.getOrDefault(false)
+        return WakeUiState(options, provider, pushStore.unifiedPushEndpoint != null, relayRefusesToken = refused)
     }
 
     /** Re-reads the wake-up state (a distributor may have been installed or registered meanwhile). */

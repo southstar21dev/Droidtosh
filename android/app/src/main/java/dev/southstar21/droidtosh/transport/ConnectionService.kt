@@ -199,8 +199,18 @@ class ConnectionService : Service() {
             },
             scope = scope,
             reliableStream = reliableStream,
-            waitPolicy = WaitModePolicy(pushAvailable = { pushTokens.provider() != WakeProvider.NONE }),
+            waitPolicy = WaitModePolicy(pushAvailable = {
+                // A relay that refused the token never sends a wake-up, so the phone has to poll.
+                pushTokens.provider() != WakeProvider.NONE && !runCatching {
+                    val credentials = credentialStore.load()
+                    credentials != null && pushTokens.refusals(APP_VERSION).refused(
+                        RelayTokenRefusals.relayKey(credentials.host, credentials.port, credentials.relayFingerprint),
+                        pushTokens.joinToken(),
+                    )
+                }.getOrDefault(false)
+            }),
             waitSignal = waitSignal,
+            tokenRefusals = pushTokens.refusals(APP_VERSION),
         )
         connection = loop
         loop.run()

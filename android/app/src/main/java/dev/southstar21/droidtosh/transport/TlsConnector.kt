@@ -17,6 +17,9 @@ sealed class RelayConnectResult {
     data class Failed(val cause: Throwable) : RelayConnectResult()
 }
 
+/** The relay answered the join line with `ERROR <reason>`. */
+class RelayErrorException(val reason: String) : IOException(relayErrorMessage(reason))
+
 /** The relay's TLS certificate didn't match the pinned fingerprint, or the relay doesn't speak TLS. */
 class RelayTlsException(message: String, cause: Throwable) : IOException(message, cause)
 
@@ -56,7 +59,7 @@ open class TlsConnector {
                 }
                 is RelayResponse.Error -> {
                     relay.close()
-                    RelayConnectResult.Failed(IOException(relayErrorMessage(parsed.reason)))
+                    RelayConnectResult.Failed(RelayErrorException(parsed.reason))
                 }
                 RelayResponse.Paired -> {
                     relay.soTimeout = HANDSHAKE_TIMEOUT_MS

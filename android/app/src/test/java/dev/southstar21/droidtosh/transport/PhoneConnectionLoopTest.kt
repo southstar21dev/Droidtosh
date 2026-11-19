@@ -154,6 +154,56 @@ class PhoneConnectionLoopTest {
             clock = { testScheduler.currentTime },
         )
 
+    /** An old relay: any join line that carries a token is refused with bad-join, others WAIT. */
+    private class OldRelayConnector : TlsConnector() {
+        val joinLines = mutableListOf<String>()
+
+        override fun connect(
+            host: String,
+            port: Int,
+            joinLine: String,
+            relayFingerprint: String,
+            macFingerprint: String,
+        ): RelayConnectResult {
+            joinLines += joinLine
+            val hasToken = joinLine.trim().split(' ').size > 3
+            return if (hasToken) RelayConnectResult.Failed(RelayErrorException("bad-join")) else RelayConnectResult.Waiting
+        }
+    }
+
+    @Test
+    fun aBadJoinWithATokenRetriesAtOnceWithoutItAndRemembersTheRelay() = runTest {
+        val connector = OldRelayConnector()
+        val host = object : PhoneConnectionLoop.Host by FakeHost() {
+            override fun fcmToken() = "up:https://push.example/long"
+        }
+        val refusals = RelayTokenRefusals(RelayTokenRefusalsTestStore(), "1.0")
+        val job = launch {
+            PhoneConnectionLoop(
+                host = host,
+                scope = this@runTest,
+                reliableStream = ReliableStream(clock = { testScheduler.currentTime }),
+                waitPolicy = WaitModePolicy(fcmEnabled = true),
+                waitSignal = Channel(Channel.CONFLATED),
+                connector = connector,
+                reconnectPolicy = ReconnectPolicy(jitterFraction = { 0.0 }),
+                clock = { testScheduler.currentTime },
+                tokenRefusals = refusals,
+            ).run()
+        }
+        runCurrent()
+        // Same instant: first with the token, then at once without it.
+        assertEquals(
+            listOf("DROIDSYNC/2 room phone up:https://push.example/long\n", "DROIDSYNC/2 room phone\n"),
+            connector.joinLines,
+        )
+        advanceTimeBy(1_001L)
+        // The next attempt skips the refused token straight away.
+        assertEquals("DROIDSYNC/2 room phone\n", connector.joinLines[2])
+        assertEquals(3, connector.joinLines.size)
+        job.cancel()
+    }
+
     @Test
     fun relayModeNeverDialsTheLocalNetwork() = runTest {
         val connector = RecordingConnector { RelayConnectResult.Waiting }
@@ -244,5 +294,16 @@ class PhoneConnectionLoopTest {
         assertEquals(listOf("relay"), connector.attempts)
         assertEquals(ConnectionState.Disconnected("relay down", DisconnectCause.RelayUnreachable), host.states.last())
         job.cancel()
+    }
+}
+
+private class RelayTokenRefusalsTestStore : RelayTokenRefusals.Store {
+    private val map = HashMap<String, String>()
+    override fun get(key: String) = map[key]
+    override fun put(key: String, value: String) {
+        map[key] = value
+    }
+    override fun remove(key: String) {
+        map.remove(key)
     }
 }

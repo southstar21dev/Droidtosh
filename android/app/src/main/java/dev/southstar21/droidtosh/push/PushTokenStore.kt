@@ -2,8 +2,9 @@ package dev.southstar21.droidtosh.push
 
 import android.content.Context
 import dev.southstar21.droidtosh.BuildConfig
+import dev.southstar21.droidtosh.transport.RelayTokenRefusals
 
-class PushTokenStore(context: Context) {
+class PushTokenStore(context: Context) : RelayTokenRefusals.Store {
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /** The FCM registration token. */
@@ -42,6 +43,19 @@ class PushTokenStore(context: Context) {
         WakeProvider.UNIFIEDPUSH -> WakeToken.unifiedPush(unifiedPushEndpoint)
         WakeProvider.NONE -> null
     }
+
+    override fun get(key: String): String? = preferences.getString(key, null)
+
+    override fun put(key: String, value: String) {
+        preferences.edit().putString(key, value).apply()
+    }
+
+    override fun remove(key: String) {
+        preferences.edit().remove(key).apply()
+    }
+
+    /** Relays that refused the join token, kept per app version (see [RelayTokenRefusals]). */
+    fun refusals(appVersion: String = BuildConfig.VERSION_NAME) = RelayTokenRefusals(this, appVersion)
 
     companion object {
         const val PREFS_NAME = "droidsync_push"
