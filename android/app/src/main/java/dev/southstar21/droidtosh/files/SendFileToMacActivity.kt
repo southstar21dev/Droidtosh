@@ -60,7 +60,8 @@ class SendFileToMacActivity : ComponentActivity() {
                         finish()
                     },
                     onSend = if (result == null && offer != null && offer.uris.isNotEmpty()) {
-                        { result = send(offer) }
+                        // Two taps can land before the recomposition that hides Send; queue once.
+                        { if (result == null && sent == null) result = send(offer) }
                     } else {
                         null
                     },
