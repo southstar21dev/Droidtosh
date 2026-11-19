@@ -56,10 +56,18 @@ data class DroidUiState(
             UpdateState.Idle, UpdateState.Checking, UpdateState.UpToDate -> null
         }
 
-    /** The one thing Home asks about: the most important problem, else an update on offer. */
-    val attention: Attention?
-        get() = issues.firstOrNull()?.let { Attention.Problem(it) }
-            ?: (update as? UpdateState.Available)?.let { Attention.Update(it.version) }
+    /** What Home's attention lines ask about: the most important problem, then any update on offer. */
+    val attentions: List<Attention>
+        get() = buildList {
+            issues.firstOrNull()?.let { add(Attention.Problem(it)) }
+            val offered = when (val state = update) {
+                is UpdateState.Available -> state.version
+                is UpdateState.ReadyToInstall -> state.version
+                is UpdateState.Failed -> state.available?.version
+                else -> null
+            }
+            offered?.let { add(Attention.Update(it)) }
+        }
 
     /** Things that stop a feature from working, most important first. */
     val issues: List<Issue>

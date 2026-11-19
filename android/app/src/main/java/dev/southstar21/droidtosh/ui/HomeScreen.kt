@@ -128,7 +128,7 @@ fun HomeScreen(
             RingingCard(onStop = actions.stopRinging)
         }
 
-        ui.attention?.let { attention -> AttentionFor(attention, actions) }
+        ui.attentions.forEach { attention -> AttentionFor(attention, actions) }
 
         SectionHeader(stringResource(R.string.home_quick_actions))
         ConnectedTiles(
