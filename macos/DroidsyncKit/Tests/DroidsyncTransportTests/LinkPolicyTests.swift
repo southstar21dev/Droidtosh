@@ -37,6 +37,9 @@ final class LinkPolicyTests: XCTestCase {
         XCTAssertNil(link("https://exam\u{200B}ple.com/"))
         XCTAssertNil(link("https://example.com/\u{202E}fdp"))
         XCTAssertNil(link(" https://example.com/"))
+        // Supplementary-plane format (a tag character) and private-use code points, as on the phone.
+        XCTAssertNil(link("https://example.com/\u{E0001}"))
+        XCTAssertNil(link("https://example.com/\u{F0000}"))
     }
 
     func testCapsTheLengthInBytes() {

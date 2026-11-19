@@ -46,6 +46,11 @@ class LinkPolicyTest {
         assertNull(web("https://exam​ple.com/"))
         assertNull(web("https://example.com/‮fdp"))
         assertNull(web(" https://example.com/"))
+        // Supplementary-plane format (a tag character) and private-use code points, as on the Mac.
+        assertNull(web("https://example.com/\uDB40\uDC01"))
+        assertNull(web("https://example.com/\uDB80\uDC00"))
+        // A lone surrogate is not a character at all.
+        assertNull(web("https://example.com/\uD800"))
     }
 
     @Test

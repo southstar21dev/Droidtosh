@@ -29,7 +29,8 @@ object LinkPolicy {
     /** The link if [raw] is acceptable, else null. [allowTel] admits `tel:` numbers (phone side only). */
     fun validate(raw: String, allowTel: Boolean): Link? {
         if (raw.isEmpty() || raw.toByteArray(Charsets.UTF_8).size > MAX_BYTES) return null
-        if (raw.any(::isForbidden)) return null
+        // By code point, so a supplementary-plane format or private-use character is caught too.
+        if (raw.codePoints().anyMatch(::isForbidden)) return null
         if (raw.startsWith("tel:", ignoreCase = true)) return if (allowTel) tel(raw) else null
         return web(raw)
     }
@@ -40,13 +41,14 @@ object LinkPolicy {
         return (validate(trimmed, allowTel = false) as? Web)?.url
     }
 
-    private fun isForbidden(c: Char): Boolean {
-        if (c.isWhitespace() || Character.isISOControl(c)) return true
+    private fun isForbidden(c: Int): Boolean {
+        if (Character.isWhitespace(c) || Character.isSpaceChar(c) || Character.isISOControl(c)) return true
         val type = Character.getType(c)
         // Format characters include bidi overrides and zero-width characters, which disguise a host.
         return type == Character.FORMAT.toInt() ||
             type == Character.PRIVATE_USE.toInt() ||
-            type == Character.UNASSIGNED.toInt()
+            type == Character.UNASSIGNED.toInt() ||
+            type == Character.SURROGATE.toInt()
     }
 
     private fun web(raw: String): Link? {
