@@ -170,6 +170,9 @@ class RelayNotificationListenerService : NotificationListenerService() {
             if (sbn.packageName in mutedSnapshot) Diagnostics.recorder.onNotificationMuted()
             return
         }
+        if (SensitiveNotifications.isRedacted(notification.extras.getCharSequence(Notification.EXTRA_TEXT))) {
+            SensitiveNotifications.onRedactedSeen(applicationContext)
+        }
         val record = maybeWithIcon(
             NotificationRecordMapper.toRecord(
                 packageName = sbn.packageName,

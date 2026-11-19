@@ -57,9 +57,6 @@ too.
 - **Mac:** the app must be in a folder you can write to (normally `/Applications` on an admin
   account). An update that isn't signed with the same certificate as the installed app is refused.
 
-Still stuck? [Open an issue](https://github.com/southstar21dev/Droidtosh/issues) with the
-diagnostics report attached.
-
 ## The phone doesn't wake when the Mac comes back (no Google services)
 
 Phones without Google services (GrapheneOS, /e/) can't use FCM, so use UnifiedPush.
@@ -68,3 +65,16 @@ Phones without Google services (GrapheneOS, /e/) can't use FCM, so use UnifiedPu
 3. Check that the relay is reachable over `https` from the internet: it will not push to loopback or private addresses, and endpoints must be `https`.
 4. If the endpoint is very long (over about 397 characters) the phone can't send it and falls back to checking every minute. Use a distributor with shorter endpoints.
 5. Allow the distributor to run in the background (battery settings), or its wake-ups arrive late.
+
+## Verification codes show as "Sensitive notification content hidden"
+
+Android 15 hides the content of one-time-code notifications from apps that read notifications, so Droidtosh can only mirror the placeholder. The Notifications tab in the phone app shows a hint once it sees one. To let Droidtosh read them, connect the phone to a computer with USB debugging on and run:
+
+```
+adb shell appops set --user 0 dev.southstar21.droidtosh RECEIVE_SENSITIVE_NOTIFICATIONS allow
+```
+
+The setting survives restarts. Undo it with `ignore` in place of `allow`.
+
+Still stuck? [Open an issue](https://github.com/southstar21dev/Droidtosh/issues) with the
+diagnostics report attached.

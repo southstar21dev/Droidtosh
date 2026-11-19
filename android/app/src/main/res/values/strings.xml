@@ -285,6 +285,10 @@
     <string name="notifications_not_relaying_body">Turn on notification access so Droidtosh can relay them</string>
     <string name="section_access">Access</string>
     <string name="notifications_waiting_body">They will reach your Mac once it is connected</string>
+    <string name="sensitive_hint_title">Verification codes are hidden</string>
+    <string name="sensitive_hint_body">Android hides verification codes from Droidtosh. To allow them, run this on a computer with your phone connected:</string>
+    <string name="sensitive_hint_copy">Copy command</string>
+    <string name="sensitive_hint_dismiss">Dismiss</string>
     <!-- Redesign: Calls tab -->
     <string name="calls_subtitle">Answer, decline and place calls from your Mac</string>
     <string name="calls_ready">Calls ring on your Mac too</string>

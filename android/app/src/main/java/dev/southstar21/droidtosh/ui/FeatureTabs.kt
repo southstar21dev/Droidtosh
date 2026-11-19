@@ -61,6 +61,7 @@ fun NotificationsScreen(
                 ShapeIcon(Icons.Default.Notifications, polygon = MaterialShapes.Clover4Leaf, size = 64.dp, iconSize = 28.dp)
             }
         }
+        SensitiveNotificationsHint()
         ListGroup(
             title = stringResource(R.string.section_access),
             content = {
