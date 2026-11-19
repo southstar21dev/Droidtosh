@@ -15,7 +15,7 @@ object FileNames {
      * Normalizes to NFC (so a decomposed name is capped and compared like the Mac does), removes
      * path separators (`/ \ :`), control characters, line/paragraph separators and bidi
      * controls; trims whitespace, strips all leading dots and trims again; caps the result at 200
-     * UTF-8 bytes on character boundaries, keeping a final extension of up to 20 bytes.
+     * UTF-8 bytes on character boundaries, keeping a final extension of up to 20 bytes (not counting its dot).
      */
     fun sanitize(name: String): String {
         val cleaned = buildString {
@@ -49,18 +49,23 @@ object FileNames {
         }
     }
 
-    /** Splits off the last extension including its dot; a leading dot is not an extension. */
+    /**
+     * Splits off the last extension including its dot; a leading dot is not an extension. The
+     * extension (the part after the dot) must be 1 to 20 UTF-8 bytes, as on the Mac; anything else
+     * stays part of the name.
+     */
     fun split(name: String): Pair<String, String> {
         val dot = name.lastIndexOf('.')
-        return if (dot <= 0) name to "" else name.substring(0, dot) to name.substring(dot)
+        if (dot <= 0) return name to ""
+        val extension = name.substring(dot)
+        val extensionBytes = utf8Length(extension) - 1
+        return if (extensionBytes < 1 || extensionBytes > MAX_EXTENSION_BYTES) name to "" else name.substring(0, dot) to extension
     }
 
     private fun truncate(name: String): String {
         if (utf8Length(name) <= MAX_BYTES) return name
         val (base, extension) = split(name)
-        val keep = if (base.isNotEmpty() && utf8Length(extension) <= MAX_EXTENSION_BYTES) extension else ""
-        val source = if (keep.isEmpty()) name else base
-        return takeUtf8(source, MAX_BYTES - utf8Length(keep)) + keep
+        return takeUtf8(base, MAX_BYTES - utf8Length(extension)) + extension
     }
 
     private fun takeUtf8(text: String, maxBytes: Int): String {

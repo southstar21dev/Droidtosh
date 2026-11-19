@@ -168,7 +168,7 @@ Either side can send files; both directions are symmetric. A sender runs **one t
 - **Accepting:** receivers accept automatically when the feature is enabled.
   - The Mac saves to `~/Downloads`.
   - Android saves to `Download/Droidtosh/` through MediaStore.
-- **Names:** sanitise `name` before using it. Normalise it to Unicode NFC first, then strip path separators and control characters, cap it at 200 UTF-8 bytes, and fall back to `file` if nothing is left. If a file with that name already exists, add ` (1)`, ` (2)`, and so on.
+- **Names:** sanitise `name` before using it. Normalise it to Unicode NFC first, then strip path separators and control characters, cap it at 200 UTF-8 bytes (keeping a final extension of 1 to 20 UTF-8 bytes, not counting its dot; a longer or empty one counts as part of the name), and fall back to `file` if nothing is left. If a file with that name already exists, add ` (1)`, ` (2)`, and so on.
 - **Partial files:** write to a temporary partial file and move it into place only after the SHA-256 checks out. Send `FileComplete{saved_as}` with the final display name.
 - **Errors:**
   - A checksum mismatch sends `FileComplete{ok:false, error:"checksum_mismatch"}` and deletes the partial file.

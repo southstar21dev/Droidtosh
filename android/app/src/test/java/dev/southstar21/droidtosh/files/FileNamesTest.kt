@@ -79,6 +79,16 @@ class FileNamesTest {
         assertTrue(result.startsWith("b".repeat(190) + "."))
     }
 
+    // Shared with FileNameSanitizer tests on the Mac: the 20 byte extension cap excludes the dot.
+    @Test
+    fun extensionCapExcludesTheDot() {
+        val exact = FileNames.sanitize("b".repeat(190) + "." + "x".repeat(20))
+        assertEquals("b".repeat(179) + "." + "x".repeat(20), exact)
+        val over = FileNames.sanitize("b".repeat(190) + "." + "x".repeat(21))
+        assertEquals("b".repeat(190) + "." + "x".repeat(9), over)
+        assertEquals("a".repeat(200), FileNames.sanitize("a".repeat(250) + "."))
+    }
+
     @Test
     fun uniqueAddsNumberedSuffixes() {
         val taken = setOf("a.txt", "a (1).txt")

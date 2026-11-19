@@ -50,6 +50,22 @@ final class FileNameSanitizerTests: XCTestCase {
         XCTAssertEqual(capped.count, 50, "cut on character boundaries")
     }
 
+    // Same cases as FileNamesTest.extensionCapExcludesTheDot on Android.
+    func testExtensionCapExcludesTheDot() {
+        XCTAssertEqual(
+            FileNameSanitizer.sanitize(String(repeating: "b", count: 190) + "." + String(repeating: "x", count: 20)),
+            String(repeating: "b", count: 179) + "." + String(repeating: "x", count: 20)
+        )
+        XCTAssertEqual(
+            FileNameSanitizer.sanitize(String(repeating: "b", count: 190) + "." + String(repeating: "x", count: 21)),
+            String(repeating: "b", count: 190) + "." + String(repeating: "x", count: 9)
+        )
+        XCTAssertEqual(
+            FileNameSanitizer.sanitize(String(repeating: "a", count: 250) + "."),
+            String(repeating: "a", count: 200)
+        )
+    }
+
     func testUniqueURLAddsSuffixes() throws {
         let dir = try temporaryDirectory()
         XCTAssertEqual(FileNameSanitizer.uniqueURL(for: "a.txt", in: dir).lastPathComponent, "a.txt")
