@@ -48,6 +48,8 @@ object Base64URL {
 object PairingPayloadParser {
     const val VERSION = 2
     private val ROOM_PATTERN = Regex("^[A-Za-z0-9_-]{43}$")
+    private val HOST_PATTERN = Regex("^(\\[[0-9a-fA-F:.]+]|[A-Za-z0-9.-]+|[0-9a-fA-F:.]*:[0-9a-fA-F:.]*)$")
+    private val IP_LITERAL_PATTERN = Regex("^(\\[[0-9a-fA-F:.]+]|[0-9]{1,3}(\\.[0-9]{1,3}){3}|[0-9a-fA-F:.]*:[0-9a-fA-F:.]*)$")
     private val FINGERPRINT_PATTERN = Regex("^[0-9a-fA-F]{64}$")
 
     fun parse(uri: String): PairingPayload {
@@ -72,6 +74,11 @@ object PairingPayloadParser {
         if (mode.usesRelay && relayFingerprint == null) throw IllegalArgumentException("missing rfp")
         require(relayFingerprint == null || FINGERPRINT_PATTERN.matches(relayFingerprint)) { "invalid rfp" }
         val host = params["host"]?.takeIf { it.isNotEmpty() }
+        // The credential store keeps these on one line each, so a newline or other odd character
+        // would corrupt the stored record.
+        require(host == null || HOST_PATTERN.matches(host)) { "invalid host" }
+        val localHost = params["lhost"]?.takeIf { it.isNotEmpty() }
+        require(localHost == null || IP_LITERAL_PATTERN.matches(localHost)) { "invalid lhost" }
         if (mode.usesRelay && host == null) throw IllegalArgumentException("missing host")
         val port = params["port"]?.let { port(it) ?: throw IllegalArgumentException("invalid port") }
         if (mode.usesRelay && port == null) throw IllegalArgumentException("missing port")
@@ -91,7 +98,7 @@ object PairingPayloadParser {
             relayFingerprint = relayFingerprint?.lowercase(),
             psk = psk,
             mode = mode,
-            localHost = params["lhost"]?.takeIf { it.isNotEmpty() },
+            localHost = localHost,
             localPort = localPort,
         )
     }

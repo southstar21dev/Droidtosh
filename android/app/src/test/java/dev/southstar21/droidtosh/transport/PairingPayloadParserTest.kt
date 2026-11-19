@@ -176,6 +176,34 @@ class PairingPayloadParserTest {
     }
 
     @Test
+    fun rejectsHostsThatCouldCorruptTheStoredRecord() {
+        for (bad in listOf("evil%0Ahost", "a%20b", "host%0D", "a/b", "ho%00st")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                PairingPayloadParser.parse(uri().replace("host=192.168.1.20", "host=$bad"))
+            }
+        }
+    }
+
+    @Test
+    fun acceptsHostnamesAndIpLiterals() {
+        for (good in listOf("relay.example.com", "192.168.1.20", "fe80::1", "%5B::1%5D")) {
+            PairingPayloadParser.parse(uri().replace("host=192.168.1.20", "host=$good"))
+        }
+    }
+
+    @Test
+    fun localHostMustBeAnIpLiteral() {
+        val local = uri() + "&mode=both&lport=9000"
+        assertEquals("10.0.0.5", PairingPayloadParser.parse("$local&lhost=10.0.0.5").localHost)
+        assertEquals("fe80::1", PairingPayloadParser.parse("$local&lhost=fe80::1").localHost)
+        for (bad in listOf("mac.local", "10.0.0.5%0Aevil", "10.0.0.5%20x")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                PairingPayloadParser.parse("$local&lhost=$bad")
+            }
+        }
+    }
+
+    @Test
     fun base64URLRoundTrip() {
         val data = ByteArray(64) { it.toByte() }
         assertArrayEquals(data, Base64URL.decode(Base64URL.encode(data)))
