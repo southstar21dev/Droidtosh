@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -128,6 +129,56 @@ func TestRegistryRejectsNewRoomsAtCapacity(t *testing.T) {
 	}
 }
 
+func TestBarePhoneJoinStoresNoToken(t *testing.T) {
+	r := NewRegistry(nil)
+	r.MaxRooms = 2
+	r.RegisterToken("real-1", "tok-1")
+	r.RegisterToken("real-2", "tok-2")
+	for i := 0; i < 50; i++ {
+		phone, _ := pipePair(t)
+		if _, ok := r.PairPhone(fmt.Sprintf("junk-%d", i), "junk", phone); ok {
+			t.Fatalf("bare join must not pair")
+		}
+	}
+	if r.Token("real-1") != "tok-1" || r.Token("real-2") != "tok-2" || len(r.rooms) != 2 {
+		t.Fatalf("junk joins disturbed real rooms: %v", r.Records())
+	}
+	// A join to a known room refreshes its token even while the mac is
+	// offline (a rotated FCM token); knowing the room id is the proof.
+	phone, _ := pipePair(t)
+	r.PairPhone("real-1", "rotated", phone)
+	if r.Token("real-1") != "rotated" {
+		t.Fatalf("join to a known room did not refresh its token")
+	}
+}
+
+func TestPairedPhoneStoresToken(t *testing.T) {
+	r := NewRegistry(nil)
+	mac, _ := pipePair(t)
+	r.ParkMac("room", mac)
+	phone, _ := pipePair(t)
+	if _, ok := r.PairPhone("room", "tok", phone); !ok {
+		t.Fatalf("expected pairing")
+	}
+	if r.Token("room") != "tok" {
+		t.Fatalf("token not stored on pairing")
+	}
+}
+
+func TestTakeoverPhoneStoresToken(t *testing.T) {
+	r := NewRegistry(nil)
+	r.PhoneHoldTimeout = 20 * time.Millisecond
+	mac, _ := pipePair(t)
+	r.ParkMac("room", mac)
+	phone1, _ := pipePair(t)
+	r.PairPhone("room", "old", phone1)
+	phone2, _ := pipePair(t)
+	r.PairPhone("room", "new", phone2)
+	if r.Token("room") != "new" {
+		t.Fatalf("token not refreshed on takeover: %q", r.Token("room"))
+	}
+}
+
 func TestRegistryEvictsOldestTokenRoomAtCapacity(t *testing.T) {
 	now := time.Unix(1_000_000, 0)
 	r := NewRegistry(nil)
@@ -138,7 +189,8 @@ func TestRegistryEvictsOldestTokenRoomAtCapacity(t *testing.T) {
 	r.RegisterToken("room-2", "tok-2")
 	now = now.Add(time.Minute)
 	phone, _ := pipePair(t)
-	r.PairPhone("room-3", "tok-3", phone)
+	r.RegisterToken("room-3", "tok-3")
+	_ = phone
 	if _, ok := r.rooms["room-1"]; ok {
 		t.Fatalf("expected least recently seen token room to be evicted")
 	}

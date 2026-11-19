@@ -347,11 +347,29 @@ func TestRelayRejectsJoinWhenRegistryFull(t *testing.T) {
 func TestRelayPushesWhenMacParksWithToken(t *testing.T) {
 	notifier := &fakeNotifier{}
 	addr := startTestServer(t, notifier)
-	phone, resp := joinAndRead(t, addr, FormatJoinLine(JoinLine{Room: room, Role: RolePhone, FCMToken: "tok"}))
-	defer phone.Close()
-	if resp != "WAIT" {
-		t.Fatalf("expected WAIT, got %q", resp)
+	mac1, err := dialRelay(addr)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
 	}
+	defer mac1.Close()
+	if _, err := mac1.Write([]byte(FormatJoinLine(JoinLine{Room: room, Role: RoleMac}))); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	// The phone only stores its token once it pairs, so retry until the mac
+	// is parked.
+	paired := false
+	for i := 0; i < 100 && !paired; i++ {
+		phone, resp := joinAndRead(t, addr, FormatJoinLine(JoinLine{Room: room, Role: RolePhone, FCMToken: "tok"}))
+		paired = resp == "PAIRED"
+		defer phone.Close()
+		if !paired {
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	if !paired {
+		t.Fatalf("phone never paired")
+	}
+	_ = mac1.Close()
 	mac, err := dialRelay(addr)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
