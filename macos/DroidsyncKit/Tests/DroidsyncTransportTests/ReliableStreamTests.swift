@@ -77,6 +77,16 @@ final class ReliableStreamTests: XCTestCase {
         XCTAssertEqual(stream.receive(inbound(seq: 3), now: t0), .duplicate)
     }
 
+    func testImplausibleSequenceJumpIsRejectedWithoutWedgingTheStream() {
+        let stream = ReliableStream(streamID: "mac")
+        XCTAssertEqual(stream.receive(inbound(seq: 1), now: t0), .process)
+        XCTAssertEqual(stream.receive(inbound(seq: UInt64.max), now: t0), .rejected)
+        XCTAssertEqual(stream.receive(inbound(seq: 1 << 40), now: t0), .rejected)
+        XCTAssertEqual(stream.lastProcessedSeq, 1)
+        XCTAssertEqual(stream.counters.gaps, 0)
+        XCTAssertEqual(stream.receive(inbound(seq: 2), now: t0), .process)
+    }
+
     func testStandaloneAckAfterOneSecondUnlessPiggybacked() {
         let stream = ReliableStream(streamID: "mac")
         _ = stream.receive(inbound(seq: 1), now: t0)

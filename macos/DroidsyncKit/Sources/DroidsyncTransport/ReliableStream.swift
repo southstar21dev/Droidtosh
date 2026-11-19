@@ -24,7 +24,13 @@ public final class ReliableStream {
     public enum Disposition: Equatable {
         case process
         case duplicate
+        /// The sequence number jumped implausibly far ahead; the envelope is dropped and the
+        /// caller should treat it as a protocol error.
+        case rejected
     }
+
+    /// Largest forward jump in the peer's sequence numbers accepted as a real gap.
+    public static let maxGap: UInt64 = 65_536
 
     public static let maxEntries = 256
     public static let maxBytes = 4 * 1024 * 1024
@@ -157,7 +163,9 @@ public final class ReliableStream {
                 return .duplicate
             }
             if seq > lastProcessed + 1 {
-                _counters.gaps += Int(seq - lastProcessed - 1)
+                let gap = seq - lastProcessed - 1
+                guard gap <= Self.maxGap else { return .rejected }
+                _counters.gaps += Int(gap)
             }
             lastProcessed = seq
             return .process
