@@ -111,7 +111,7 @@ struct WindowVisibilityReader: NSViewRepresentable {
             super.viewDidMoveToWindow()
             observers.forEach(NotificationCenter.default.removeObserver)
             observers = []
-            guard let window else { return }
+            guard let window else { onChange?(false); return }
             observers.append(NotificationCenter.default.addObserver(
                 forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
             ) { [weak self] _ in MainActor.assumeIsolated { self?.report() } })
