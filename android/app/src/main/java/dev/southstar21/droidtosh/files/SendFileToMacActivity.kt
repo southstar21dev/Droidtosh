@@ -63,16 +63,18 @@ class SendFileToMacActivity : ComponentActivity() {
         }
 
     private fun queueShared(): ShareResult {
-        val uris = when (intent?.action) {
+        val requested = when (intent?.action) {
             Intent.ACTION_SEND -> listOfNotNull(intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
             Intent.ACTION_SEND_MULTIPLE ->
                 intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
             else -> emptyList()
         }
+        // Exported target: drop file:// and this app's own provider URIs before touching them.
+        val uris = requested.filter { ShareUriFilter.isAllowed(it, packageName) }
         // Read names and open the files now: the share grant ends with this activity.
         val names = uris.mapNotNull(::displayName)
         val queued = if (uris.isEmpty()) 0 else FileTransfers.send(applicationContext, uris)
-        return ShareResult(queued = queued, total = uris.size, names = if (queued == 0) emptyList() else names)
+        return ShareResult(queued = queued, total = requested.size, names = if (queued == 0) emptyList() else names)
     }
 
     private fun displayName(uri: Uri): String? = runCatching {

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import dev.southstar21.droidtosh.files.ShareUriFilter
 
 class SendToMacActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -13,7 +14,7 @@ class SendToMacActivity : Activity() {
             Intent.ACTION_SEND -> {
                 val uri = intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
                 if (uri != null) {
-                    manager.sendSharedImage(uri)
+                    if (ShareUriFilter.isAllowed(uri, packageName)) manager.sendSharedImage(uri)
                 } else {
                     intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotEmpty() }?.let(manager::sendSharedText)
                 }
