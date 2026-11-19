@@ -63,7 +63,10 @@ class ConnectionService : Service() {
     private var clipboardManager: ClipboardSyncManager? = null
 
     @Volatile
-    private var notificationText = "Connecting"
+    private var notification = NotificationContent(ConnectionNotificationText.APP_TITLE, "Connecting")
+
+    @Volatile
+    private var lastMacName = ""
 
     @Volatile
     private var connection: PhoneConnectionLoop? = null
@@ -110,7 +113,7 @@ class ConnectionService : Service() {
         ServiceCompat.startForeground(
             this,
             NOTIFICATION_ID,
-            buildNotification(notificationText),
+            buildNotification(notification),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
         )
         registerNetworkCallback()
@@ -177,7 +180,8 @@ class ConnectionService : Service() {
                     .build()
                 override fun onState(state: ConnectionState, statusText: String?) {
                     mutableState.value = state
-                    statusText?.let(::updateNotification)
+                    if (state is ConnectionState.Connected && state.macName.isNotBlank()) lastMacName = state.macName
+                    ConnectionNotificationText.forState(state, statusText, lastMacName)?.let(::updateNotification)
                 }
                 override fun onNotPaired() {
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -262,7 +266,7 @@ class ConnectionService : Service() {
         )
     }
 
-    private fun buildNotification(text: String): Notification {
+    private fun buildNotification(content: NotificationContent): Notification {
         val contentIntent = PendingIntent.getActivity(
             this,
             0,
@@ -270,8 +274,8 @@ class ConnectionService : Service() {
             PendingIntent.FLAG_IMMUTABLE,
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Droidtosh")
-            .setContentText(text)
+            .setContentTitle(content.title)
+            .setContentText(content.text)
             .setSmallIcon(R.drawable.ic_brand_glyph)
             .setContentIntent(contentIntent)
             .setOngoing(true)
@@ -290,14 +294,14 @@ class ConnectionService : Service() {
             .build()
     }
 
-    private fun updateNotification(text: String) {
+    private fun updateNotification(content: NotificationContent) {
         if (destroyed) return
-        notificationText = text
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text))
+        notification = content
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(content))
     }
 
     private fun repostConnectionNotification() {
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(notificationText))
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(notification))
     }
 
     /** Drops the current session (if any) and skips the backoff or wait so a new attempt starts now. */
