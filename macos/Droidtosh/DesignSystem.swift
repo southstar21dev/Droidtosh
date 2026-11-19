@@ -402,6 +402,9 @@ struct AttentionItem: Identifiable {
     @MainActor
     static func items(for model: AppModel) -> [AttentionItem] {
         var items: [AttentionItem] = []
+        if let failure = model.pairing.saveFailure {
+            items.append(AttentionItem(id: "save-failed", symbol: "key.slash", title: "Couldn't save the pairing key", detail: "\(failure) The phone must pair again after a relaunch.", actionTitle: nil, action: .none))
+        }
         if !model.connectionConfigured {
             items.append(AttentionItem(id: "connection", symbol: "network.slash", title: "Choose how your phone connects", detail: "Set a relay address, or choose Local network, to pair.", actionTitle: "Set Up", action: .setup))
         } else if !model.pairing.isPaired && !model.connection.phoneConnected {

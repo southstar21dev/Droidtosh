@@ -11,6 +11,8 @@ final class PairingController: ObservableObject {
     @Published private(set) var roomToken: String = PairingController.loadOrCreateRoomToken()
     /// Whether a phone has paired (a paired PSK is stored).
     @Published private(set) var isPaired = false
+    /// Set while the paired key could not be stored, so the phone would be unpaired after a relaunch.
+    @Published private(set) var saveFailure: String?
 
     /// The relay endpoint the pairing URI advertises; nil while the relay settings are incomplete.
     var endpointProvider: () -> RelayEndpoint? = { nil }
@@ -74,11 +76,13 @@ final class PairingController: ObservableObject {
     func handleAuthenticated(psk: Data) {
         pskLock.lock()
         var saveFailure: Error?
+        var saveFailureCleared = false
         let pskMatched = pairedPSK != nil && psk == pairedPSK
         if !pskMatched {
             pairedPSK = psk
             do {
                 try SecretStore.default.save(psk, as: Self.pskName)
+                saveFailureCleared = true
             } catch {
                 DebugLog.log("relay: could not save the paired PSK: \(error)")
                 saveFailure = error
@@ -87,7 +91,9 @@ final class PairingController: ObservableObject {
         }
         pskLock.unlock()
         if let saveFailure {
-            onStatus?("Couldn't save the pairing key (\(saveFailure.localizedDescription)); the phone must pair again after a relaunch")
+            self.saveFailure = saveFailure.localizedDescription
+        } else if saveFailureCleared {
+            self.saveFailure = nil
         }
         isPaired = true
         DebugLog.log("relay: authenticated pskMatched=\(pskMatched)")
@@ -105,6 +111,7 @@ final class PairingController: ObservableObject {
         pendingPSK = randomNonce()
         pskLock.unlock()
         isPaired = false
+        saveFailure = nil
         var failure: Error?
         do {
             try SecretStore.default.delete(Self.pskName)
