@@ -273,6 +273,10 @@ jobs:
           echo "TAG=v$VERSION" >> "$GITHUB_ENV"
       - name: Attach the apps to the hand-made release
         if: github.event_name != 'push'
-        run: gh release upload "$TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          # A rerun replaces files the old manifest's SHA-256 describes. Drop the manifest first, so
+          # updaters see no manifest rather than one that doesn't match the files.
+          gh release delete-asset "$TAG" droidtosh-update.json -y --repo "$GITHUB_REPOSITORY" || true
+          gh release upload "$TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
       - name: Attach the manifest
         run: gh release upload "$TAG" manifest/droidtosh-update.json --clobber --repo "$GITHUB_REPOSITORY"
