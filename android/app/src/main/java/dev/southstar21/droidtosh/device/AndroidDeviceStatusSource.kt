@@ -23,6 +23,9 @@ import android.telephony.TelephonyDisplayInfo
 import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.content.ContextCompat
+import dev.southstar21.droidtosh.background.BackgroundHealth
+import dev.southstar21.droidtosh.background.BackgroundInputs
+import dev.southstar21.droidtosh.background.BackgroundSettings
 import java.util.concurrent.Executor
 
 /**
@@ -97,6 +100,7 @@ class AndroidDeviceStatusSource(
             ringerMode = DeviceStatusMapping.ringerMode(audio.ringerMode),
             doNotDisturb = DeviceStatusMapping.doNotDisturb(notifications.currentInterruptionFilter),
         )
+        refreshBackground()
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_BATTERY_CHANGED)
             addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
@@ -131,7 +135,28 @@ class AndroidDeviceStatusSource(
      * Registers the telephony callbacks if READ_PHONE_STATE was granted since [start] (the user
      * granted it while the service ran); a no-op when they're registered or the permission is missing.
      */
-    fun onPermissionsChanged() = registerTelephony()
+    fun onPermissionsChanged() {
+        registerTelephony()
+        refreshBackground()
+    }
+
+    /** Re-reads the background health (battery optimization, manufacturer step); it has no callback. */
+    private fun refreshBackground() {
+        val inputs = BackgroundInputs(
+            // Notification permissions don't cut the connection and are not part of the reported flag.
+            notificationAccess = true,
+            postNotifications = true,
+            batteryIgnored = power.isIgnoringBatteryOptimizations(context.packageName),
+            vendor = BackgroundSettings.vendor(),
+            vendorHandled = BackgroundSettings.vendorHandled(context),
+        )
+        update {
+            it.copy(
+                backgroundRestricted = BackgroundHealth.restricted(inputs),
+                backgroundReason = BackgroundHealth.reason(inputs),
+            )
+        }
+    }
 
     /**
      * Follows the active data SIM: a watcher on the default manager reports its subscription, and the

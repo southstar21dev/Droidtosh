@@ -73,6 +73,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.southstar21.droidtosh.BuildConfig
+import dev.southstar21.droidtosh.background.BackgroundSettings
 import dev.southstar21.droidtosh.R
 import dev.southstar21.droidtosh.ui.components.LocalAnimationsPaused
 import dev.southstar21.droidtosh.clipboard.SendClipboardActivity
@@ -98,6 +99,7 @@ fun MainShell(
     val clipboardEnabled by state.clipboardEnabled.collectAsStateWithLifecycle()
     val batteryOptimizationIgnored by state.batteryOptimizationIgnored.collectAsStateWithLifecycle()
     val overlayAllowed by state.overlayAllowed.collectAsStateWithLifecycle()
+    val vendorBatteryHandled by state.vendorBatteryHandled.collectAsStateWithLifecycle()
     val filesReceiveEnabled by state.filesReceiveEnabled.collectAsStateWithLifecycle()
     val transfers by state.transfers.collectAsStateWithLifecycle()
     val findEnabled by state.findEnabled.collectAsStateWithLifecycle()
@@ -136,6 +138,8 @@ fun MainShell(
         findRinging = findRinging,
         fullScreenAllowed = fullScreenAllowed,
         batteryOptimizationIgnored = batteryOptimizationIgnored,
+        oemVendor = state.oemVendor,
+        vendorBatteryHandled = vendorBatteryHandled,
         overlayAllowed = overlayAllowed,
         transfers = transfers,
         connectionMode = pairingMode?.mode,
@@ -195,6 +199,10 @@ private fun rememberAppActions(state: AppState): AppActions {
             },
             openBatteryOptimization = {
                 context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            },
+            openVendorBattery = {
+                BackgroundSettings.openVendorSettings(context)
+                state.refreshPermissions()
             },
             openOverlaySettings = { context.startActivity(OverlayPermission.settingsIntent(context)) },
             openFullScreenSettings = {

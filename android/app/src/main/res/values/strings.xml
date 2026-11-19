@@ -153,6 +153,8 @@
     <string name="fix_phone_body">Allow phone access to see, answer and place calls from the Mac.</string>
     <string name="fix_battery_title">Battery optimization may pause Droidtosh</string>
     <string name="fix_battery_body">Let Droidtosh run unrestricted so the connection survives while the phone sleeps.</string>
+    <string name="fix_vendor_battery_title">Your phone’s battery manager may stop Droidtosh</string>
+    <string name="fix_vendor_battery_body">Allow Droidtosh to run in the background in the manufacturer’s battery settings.</string>
     <string name="fix_full_screen_title">Ringing screen can’t show on the lock screen</string>
 
     <!-- Home: feature tiles -->
@@ -194,6 +196,19 @@
     <string name="settings_title">Settings</string>
     <string name="settings_tap_to_allow">Not allowed, tap to allow</string>
     <string name="settings_group_connection">Connection &amp; pairing</string>
+    <string name="background_title">Background</string>
+    <string name="background_footer">These keep Droidtosh connected while the phone is idle. Each Fix opens the right settings screen.</string>
+    <string name="background_all_good">Nothing is likely to stop the connection.</string>
+    <string name="background_notification_access">Notification access</string>
+    <string name="background_notification_access_on">On, notifications reach your Mac</string>
+    <string name="background_notification_access_off">Off, notifications aren’t reaching your Mac</string>
+    <string name="background_post_notifications">Show notifications</string>
+    <string name="background_post_notifications_on">Allowed</string>
+    <string name="background_post_notifications_off">Not allowed, the connection status can’t be shown</string>
+    <string name="background_vendor_title">%1$s battery manager</string>
+    <string name="background_vendor_todo">May stop Droidtosh when idle. Allow it to run in the background there.</string>
+    <string name="background_vendor_done">Opened, tap to review</string>
+    <string name="background_fix">Fix</string>
     <string name="settings_battery_unrestricted">Unrestricted</string>
     <string name="settings_overlay_title">Display over other apps</string>
     <string name="settings_overlay_on">Allowed, app calls can be answered from your Mac while unlocked</string>

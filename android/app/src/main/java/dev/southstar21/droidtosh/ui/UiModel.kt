@@ -2,6 +2,10 @@ package dev.southstar21.droidtosh.ui
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import dev.southstar21.droidtosh.background.BackgroundCheck
+import dev.southstar21.droidtosh.background.BackgroundHealth
+import dev.southstar21.droidtosh.background.BackgroundInputs
+import dev.southstar21.droidtosh.background.OemVendor
 import dev.southstar21.droidtosh.files.TransferInfo
 import dev.southstar21.droidtosh.push.WakeProvider
 import dev.southstar21.droidtosh.transport.ConnectionMode
@@ -22,6 +26,10 @@ data class DroidUiState(
     val findRinging: Boolean = false,
     val fullScreenAllowed: Boolean = true,
     val batteryOptimizationIgnored: Boolean = true,
+    /** The manufacturer whose battery manager can kill the app; null on a phone without one. */
+    val oemVendor: OemVendor? = null,
+    /** The user went through the manufacturer's battery settings. */
+    val vendorBatteryHandled: Boolean = false,
     /** "Display over other apps", which lets the Mac answer VoIP calls while the phone is unlocked. */
     val overlayAllowed: Boolean = true,
     val transfers: List<TransferInfo> = emptyList(),
@@ -72,14 +80,28 @@ data class DroidUiState(
             offered?.let { add(Attention.Update(it)) }
         }
 
+    /** The inputs of the Background checklist; the Connection page and Home's attention line both read it. */
+    val backgroundInputs: BackgroundInputs
+        get() = BackgroundInputs(
+            notificationAccess = permissions.notificationAccess,
+            postNotifications = permissions.notifications,
+            batteryIgnored = batteryOptimizationIgnored,
+            vendor = oemVendor,
+            vendorHandled = vendorBatteryHandled,
+        )
+
     /** Things that stop a feature from working, most important first. */
     val issues: List<Issue>
-        get() = buildList {
-            if (!permissions.notificationAccess) add(Issue.NotificationAccess)
-            if (!permissions.notifications) add(Issue.PostNotifications)
-            if (!permissions.phone) add(Issue.Phone)
-            if (!batteryOptimizationIgnored) add(Issue.BatteryOptimization)
-            if (findEnabled && !fullScreenAllowed) add(Issue.FullScreenIntent)
+        get() {
+            val failing = BackgroundHealth.failing(backgroundInputs).toSet()
+            return buildList {
+                if (BackgroundCheck.NotificationAccess in failing) add(Issue.NotificationAccess)
+                if (BackgroundCheck.PostNotifications in failing) add(Issue.PostNotifications)
+                if (!permissions.phone) add(Issue.Phone)
+                if (BackgroundCheck.BatteryOptimization in failing) add(Issue.BatteryOptimization)
+                if (BackgroundCheck.VendorBattery in failing) add(Issue.VendorBattery)
+                if (findEnabled && !fullScreenAllowed) add(Issue.FullScreenIntent)
+            }
         }
 
     /** Optional extras that make features richer. */
@@ -98,7 +120,7 @@ sealed interface Attention {
     data class Update(val version: String) : Attention
 }
 
-enum class Issue { NotificationAccess, PostNotifications, Phone, BatteryOptimization, FullScreenIntent, CallLog, OutgoingCalls, Contacts, Overlay }
+enum class Issue { NotificationAccess, PostNotifications, Phone, BatteryOptimization, VendorBattery, FullScreenIntent, CallLog, OutgoingCalls, Contacts, Overlay }
 
 /** The app's user actions, so screens and screenshot tests can run without [AppState]. */
 @Stable
@@ -106,6 +128,7 @@ class AppActions(
     val requestPermissions: (Array<String>) -> Unit = {},
     val openNotificationAccess: () -> Unit = {},
     val openBatteryOptimization: () -> Unit = {},
+    val openVendorBattery: () -> Unit = {},
     val openOverlaySettings: () -> Unit = {},
     val openFullScreenSettings: () -> Unit = {},
     val sendFiles: () -> Unit = {},

@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -35,6 +36,8 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import dev.southstar21.droidtosh.background.BackgroundCheck
+import dev.southstar21.droidtosh.background.BackgroundHealth
 import dev.southstar21.droidtosh.push.WakeProvider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -198,21 +201,11 @@ fun ConnectionScreen(
             },
         )
 
+        BackgroundGroup(ui, actions)
+
         ListGroup(
             title = stringResource(R.string.connection_phone_header),
             content = {
-                item { shape ->
-                    GroupRow(
-                        shape = shape,
-                        icon = DroidIcons.Battery,
-                        title = stringResource(R.string.home_action_battery_optimization),
-                        supporting = stringResource(
-                            if (ui.batteryOptimizationIgnored) R.string.settings_battery_unrestricted else R.string.settings_battery_optimized,
-                        ),
-                        tone = if (ui.batteryOptimizationIgnored) RowTone.Good else RowTone.Attention,
-                        onClick = actions.openBatteryOptimization,
-                    )
-                }
                 if (ui.findEnabled && !ui.fullScreenAllowed) {
                     item { shape ->
                         GroupRow(
@@ -270,6 +263,84 @@ fun ConnectionScreen(
             onDismiss = { showUnpairDialog = false },
         )
     }
+}
+
+/** The "Background" checklist: what can stop the connection while the phone is idle, each with a Fix. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun BackgroundGroup(ui: DroidUiState, actions: AppActions) {
+    val inputs = ui.backgroundInputs
+    val checks = BackgroundHealth.applicable(inputs)
+    val allGood = BackgroundHealth.failing(inputs).isEmpty()
+    ListGroup(
+        title = stringResource(R.string.background_title),
+        footer = stringResource(if (allGood) R.string.background_all_good else R.string.background_footer),
+        content = {
+            checks.forEach { check ->
+                item { shape ->
+                    val ok = BackgroundHealth.isOk(check, inputs)
+                    val spec = backgroundRowSpec(check, ui, actions)
+                    GroupRow(
+                        shape = shape,
+                        icon = spec.icon,
+                        title = spec.title,
+                        supporting = if (ok) spec.good else spec.bad,
+                        tone = if (ok) RowTone.Good else RowTone.Attention,
+                        onClick = spec.onClick,
+                        trailing = if (ok) null else {
+                            {
+                                FilledTonalButton(
+                                    onClick = spec.onClick,
+                                    shapes = ButtonDefaults.shapes(),
+                                    modifier = Modifier.heightIn(min = 40.dp),
+                                ) { Text(stringResource(R.string.background_fix)) }
+                            }
+                        },
+                        showChevron = ok,
+                    )
+                }
+            }
+        },
+    )
+}
+
+private class BackgroundRowSpec(
+    val icon: ImageVector,
+    val title: String,
+    val good: String,
+    val bad: String,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun backgroundRowSpec(check: BackgroundCheck, ui: DroidUiState, actions: AppActions): BackgroundRowSpec = when (check) {
+    BackgroundCheck.NotificationAccess -> BackgroundRowSpec(
+        Icons.Default.Notifications,
+        stringResource(R.string.background_notification_access),
+        stringResource(R.string.background_notification_access_on),
+        stringResource(R.string.background_notification_access_off),
+        actions.openNotificationAccess,
+    )
+    BackgroundCheck.PostNotifications -> BackgroundRowSpec(
+        Icons.Default.Notifications,
+        stringResource(R.string.background_post_notifications),
+        stringResource(R.string.background_post_notifications_on),
+        stringResource(R.string.background_post_notifications_off),
+    ) { actions.requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS)) }
+    BackgroundCheck.BatteryOptimization -> BackgroundRowSpec(
+        DroidIcons.Battery,
+        stringResource(R.string.home_action_battery_optimization),
+        stringResource(R.string.settings_battery_unrestricted),
+        stringResource(R.string.settings_battery_optimized),
+        actions.openBatteryOptimization,
+    )
+    BackgroundCheck.VendorBattery -> BackgroundRowSpec(
+        DroidIcons.Battery,
+        stringResource(R.string.background_vendor_title, ui.oemVendor?.label.orEmpty()),
+        stringResource(R.string.background_vendor_done),
+        stringResource(R.string.background_vendor_todo),
+        actions.openVendorBattery,
+    )
 }
 
 /** Reconnect, Copy report and Share logs as one connected button group. */

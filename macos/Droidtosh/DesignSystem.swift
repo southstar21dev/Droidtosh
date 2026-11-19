@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import DroidsyncKit
 
 // The shared look of Droidtosh's windows, popover and panels: black, white and greys, cards,
 // the attention line, motion helpers and the Liquid Glass helpers (with material fallbacks
@@ -412,6 +413,9 @@ struct AttentionItem: Identifiable {
         }
         if case .available(let offer) = model.updates.state {
             items.append(AttentionItem(id: "update", symbol: "arrow.down.circle", title: "Droidtosh \(offer.version) is ready", detail: "Install it and relaunch.", actionTitle: "Install", action: .installUpdate))
+        }
+        if model.device.phoneBackgroundRestricted {
+            items.append(AttentionItem(id: "background", symbol: "battery.50percent", title: PhoneStatusDisplay.backgroundTitle, detail: PhoneStatusDisplay.backgroundDetail, actionTitle: nil, action: .none))
         }
         if model.notifications.notificationsAuthorized == false {
             items.append(AttentionItem(id: "blocked", symbol: "bell.slash", title: "Notifications are blocked", detail: "Allow them for Droidtosh in System Settings.", actionTitle: "Open Settings", action: .openNotificationSettings))

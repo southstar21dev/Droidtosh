@@ -11,6 +11,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.southstar21.droidtosh.LegacyCompanionCleanup
+import dev.southstar21.droidtosh.background.BackgroundSettings
+import dev.southstar21.droidtosh.background.OemVendor
 import dev.southstar21.droidtosh.data.CredentialStore
 import dev.southstar21.droidtosh.data.PairingCredentials
 import dev.southstar21.droidtosh.device.FindPhone
@@ -96,6 +98,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     private val findEnabledState = MutableStateFlow(FindPhone.enabled(application))
     private val fullScreenAllowedState = MutableStateFlow(readFullScreenAllowed())
     private val batteryOptimizationIgnoredState = MutableStateFlow(readBatteryOptimizationIgnored())
+    private val vendorHandledState = MutableStateFlow(BackgroundSettings.vendorHandled(application))
     private val overlayAllowedState = MutableStateFlow(OverlayPermission.granted(application))
     private val pairingModeState = MutableStateFlow(readPairingMode())
     private val setupPreferences = application.getSharedPreferences("droidtosh_setup", Context.MODE_PRIVATE)
@@ -130,6 +133,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     /** Whether the user turned battery optimization off for us, which keeps the connection alive in the background. */
     val batteryOptimizationIgnored: StateFlow<Boolean> = batteryOptimizationIgnoredState.asStateFlow()
+
+    /** The manufacturer whose own battery manager needs a visit, or null on a phone without one. */
+    val oemVendor: OemVendor? = BackgroundSettings.vendor()
+
+    /** Whether the user went through the manufacturer's battery settings. */
+    val vendorBatteryHandled: StateFlow<Boolean> = vendorHandledState.asStateFlow()
 
     /** Whether "Display over other apps" is allowed, so VoIP calls can be answered from the Mac while unlocked. */
     val overlayAllowed: StateFlow<Boolean> = overlayAllowedState.asStateFlow()
@@ -215,6 +224,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
         fullScreenAllowedState.value = readFullScreenAllowed()
         batteryOptimizationIgnoredState.value = readBatteryOptimizationIgnored()
         overlayAllowedState.value = OverlayPermission.granted(getApplication())
+        vendorHandledState.value = BackgroundSettings.vendorHandled(getApplication())
     }
 
     fun setFindEnabled(enabled: Boolean) {

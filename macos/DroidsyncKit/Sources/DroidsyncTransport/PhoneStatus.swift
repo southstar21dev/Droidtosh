@@ -122,6 +122,16 @@ public enum PhoneStatusDisplay {
         return "battery.\(bucket)percent"
     }
 
+    /// True when the phone reports that something can stop the connection while it is idle (section 8.3).
+    /// A status that is not fresh says nothing, so the caller passes only a live one.
+    public static func isBackgroundRestricted(_ status: DSDeviceStatus) -> Bool {
+        status.backgroundRestricted
+    }
+
+    /// The Mac's attention text for a restricted phone: what is wrong and where to fix it.
+    public static let backgroundTitle = "Your phone may disconnect when idle"
+    public static let backgroundDetail = "Fix it on the phone: Droidtosh > Connection > Background"
+
     public static func isLowBattery(_ status: DSDeviceStatus) -> Bool {
         !status.charging && status.batteryPercent >= 0 && status.batteryPercent <= 20
     }

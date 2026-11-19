@@ -412,6 +412,11 @@ internal fun issueSpec(issue: Issue, actions: AppActions): IssueSpec = when (iss
         stringResource(R.string.fix_battery_title),
         actions.openBatteryOptimization,
     )
+    Issue.VendorBattery -> IssueSpec(
+        DroidIcons.Battery,
+        stringResource(R.string.fix_vendor_battery_title),
+        actions.openVendorBattery,
+    )
     Issue.FullScreenIntent -> IssueSpec(
         DroidIcons.Fullscreen,
         stringResource(R.string.fix_full_screen_title),
