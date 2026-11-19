@@ -42,8 +42,15 @@ public struct SecretStore: Sendable {
         }
     }
 
-    public func delete(_ name: String) {
-        try? FileManager.default.removeItem(at: url(name))
+    /// Removes the secret. A secret that does not exist counts as deleted; any other failure throws.
+    public func delete(_ name: String) throws {
+        do {
+            try FileManager.default.removeItem(at: url(name))
+        } catch CocoaError.fileNoSuchFile {
+            return
+        } catch CocoaError.fileReadNoSuchFile {
+            return
+        }
     }
 
     private func url(_ name: String) -> URL {

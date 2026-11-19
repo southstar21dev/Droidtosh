@@ -73,13 +73,22 @@ final class PairingController: ObservableObject {
     /// and the QR code rotates to a new pending PSK.
     func handleAuthenticated(psk: Data) {
         pskLock.lock()
+        var saveFailure: Error?
         let pskMatched = pairedPSK != nil && psk == pairedPSK
         if !pskMatched {
             pairedPSK = psk
-            try? SecretStore.default.save(psk, as: Self.pskName)
+            do {
+                try SecretStore.default.save(psk, as: Self.pskName)
+            } catch {
+                DebugLog.log("relay: could not save the paired PSK: \(error)")
+                saveFailure = error
+            }
             pendingPSK = randomNonce()
         }
         pskLock.unlock()
+        if let saveFailure {
+            onStatus?("Couldn't save the pairing key (\(saveFailure.localizedDescription)); the phone must pair again after a relaunch")
+        }
         isPaired = true
         DebugLog.log("relay: authenticated pskMatched=\(pskMatched)")
         if !pskMatched {
@@ -88,16 +97,30 @@ final class PairingController: ObservableObject {
     }
 
     /// Forgets the paired phone and moves to a new room so it can no longer reach this Mac.
-    func forgetPairing() {
+    /// The in-memory state is always cleared; throws if the stored key or the new room token
+    /// could not be written, in which case the phone may reconnect after a relaunch.
+    func forgetPairing() throws {
         pskLock.lock()
         pairedPSK = nil
         pendingPSK = randomNonce()
         pskLock.unlock()
         isPaired = false
-        SecretStore.default.delete(Self.pskName)
+        var failure: Error?
+        do {
+            try SecretStore.default.delete(Self.pskName)
+        } catch {
+            DebugLog.log("relay: could not delete the paired PSK: \(error)")
+            failure = error
+        }
         let token = RoomToken.generate()
-        try? SecretStore.default.save(Data(token.utf8), as: Self.roomTokenName)
+        do {
+            try SecretStore.default.save(Data(token.utf8), as: Self.roomTokenName)
+        } catch {
+            DebugLog.log("relay: could not save the new room token: \(error)")
+            failure = failure ?? error
+        }
         roomToken = token
+        if let failure { throw failure }
     }
 
     /// No QR code is offered until everything the mode needs is known. With the relay that

@@ -194,7 +194,12 @@ final class AppModel: ObservableObject {
     }
 
     func unpair() {
-        pairing.forgetPairing()
+        var forgetError: Error?
+        do {
+            try pairing.forgetPairing()
+        } catch {
+            forgetError = error
+        }
         calls.resetForUnpair()
         callPanel.update(model: self, visible: false)
         callLog.reset()
@@ -202,5 +207,11 @@ final class AppModel: ObservableObject {
         notifications.resetForUnpair()
         connection.resetForUnpair()
         pairing.refreshPairingURI()
+        if let forgetError {
+            let alert = NSAlert(error: forgetError)
+            alert.messageText = "Couldn't fully unpair the phone"
+            alert.informativeText = "The pairing key could not be removed from disk, so the phone may be able to connect again after Droidtosh restarts. \(forgetError.localizedDescription)"
+            alert.runModal()
+        }
     }
 }
