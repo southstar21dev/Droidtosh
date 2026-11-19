@@ -428,7 +428,8 @@ class FileTransferEngine(
             offer.size > maxFileSize -> "too_large"
             incoming.size >= maxIncoming -> "busy"
             // Room for the partial plus its copy into place (MediaStore can't adopt the partial).
-            store.usableSpace() < offer.size * 2 -> "disk_full"
+            // Bytes other in-flight transfers still have to write count against it too.
+            store.usableSpace() < neededSpace(offer.size) -> "disk_full"
             else -> null
         }
         val name = FileNames.sanitize(offer.name)
@@ -452,6 +453,17 @@ class FileTransferEngine(
         incoming[id] = transfer
         send(accept(id, 0))
         publish()
+    }
+
+    private fun neededSpace(offerSize: Long): Long {
+        var total = offerSize.saturatingAdd(offerSize)
+        for (other in incoming.values) total = total.saturatingAdd((other.size - other.written).coerceAtLeast(0))
+        return total
+    }
+
+    private fun Long.saturatingAdd(other: Long): Long {
+        val sum = this + other
+        return if (((this xor sum) and (other xor sum)) < 0) Long.MAX_VALUE else sum
     }
 
     private fun accept(id: String, offset: Long) = newEnvelope {

@@ -279,6 +279,21 @@ class FileTransferEngineTest {
     }
 
     @Test
+    fun freeSpaceCheckCountsBytesStillToComeFromOtherTransfers() {
+        // Room for one 1000 byte offer (partial plus copy), not for two at once.
+        val link = Link(space = 2500)
+        link.connect()
+        val offer = { id: String ->
+            newEnvelope { setFileOffer(FileOffer.newBuilder().setTransferId(id).setName("$id.bin").setSize(1000)) }
+        }
+        link.mac.onEnvelope(offer("one"))
+        assertTrue(link.toPhone.removeFirst().hasFileAccept())
+        link.mac.onEnvelope(offer("two"))
+        val reject = link.toPhone.removeFirst()
+        assertEquals("disk_full", reject.fileReject.reason)
+    }
+
+    @Test
     fun checksumMismatchIsReportedAndNothingIsSaved() {
         val link = Link()
         link.connect()
