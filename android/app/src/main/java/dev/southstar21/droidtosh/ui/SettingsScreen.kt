@@ -35,6 +35,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import dev.southstar21.droidtosh.push.WakeProvider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -170,6 +171,8 @@ fun ConnectionScreen(
         ui.connectionMode?.let { current ->
             ConnectionModeGroup(current, ui.relayAvailable, actions.setConnectionMode)
         }
+
+        ui.wake?.let { WakeUpGroup(it, actions.setWakeProvider, actions.pickDistributor) }
 
         ListGroup(
             title = stringResource(R.string.connection_relay),
@@ -448,6 +451,62 @@ private fun ConnectionModeGroup(
                                 enabled = enabled,
                             )
                         },
+                    )
+                }
+            }
+        },
+    )
+}
+
+/** How the relay wakes the phone when the Mac returns: Google's FCM, UnifiedPush, or not at all. */
+@Composable
+private fun WakeUpGroup(
+    wake: WakeUiState,
+    onSelect: (WakeProvider) -> Unit,
+    onPickDistributor: () -> Unit,
+) {
+    ListGroup(
+        title = stringResource(R.string.wake_title),
+        footer = stringResource(R.string.wake_note),
+        content = {
+            for (option in wake.options) {
+                item { shape ->
+                    val selected = option == wake.selected
+                    GroupRow(
+                        shape = shape,
+                        icon = if (option == WakeProvider.NONE) DroidIcons.Wifi else DroidIcons.Cloud,
+                        title = stringResource(
+                            when (option) {
+                                WakeProvider.FCM -> R.string.wake_fcm
+                                WakeProvider.UNIFIEDPUSH -> R.string.wake_unifiedpush
+                                WakeProvider.NONE -> R.string.wake_none
+                            }
+                        ),
+                        supporting = stringResource(
+                            when (option) {
+                                WakeProvider.FCM -> R.string.wake_fcm_summary
+                                WakeProvider.UNIFIEDPUSH -> R.string.wake_unifiedpush_summary
+                                WakeProvider.NONE -> R.string.wake_none_summary
+                            }
+                        ),
+                        tone = if (selected) RowTone.Good else RowTone.Neutral,
+                        onClick = if (selected) null else { { onSelect(option) } },
+                        showChevron = false,
+                        trailing = { RadioButton(selected = selected, onClick = null) },
+                    )
+                }
+            }
+            if (wake.selected == WakeProvider.UNIFIEDPUSH) {
+                item { shape ->
+                    GroupRow(
+                        shape = shape,
+                        icon = DroidIcons.Shield,
+                        title = stringResource(R.string.wake_distributor),
+                        supporting = stringResource(
+                            if (wake.unifiedPushRegistered) R.string.wake_distributor_ready
+                            else R.string.wake_distributor_missing
+                        ),
+                        onClick = onPickDistributor,
                     )
                 }
             }

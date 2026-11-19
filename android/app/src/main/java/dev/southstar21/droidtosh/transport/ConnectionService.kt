@@ -27,6 +27,7 @@ import dev.southstar21.droidtosh.diagnostics.DisconnectReason
 import dev.southstar21.droidtosh.protocol.v1.Hello
 import dev.southstar21.droidtosh.update.Updates
 import dev.southstar21.droidtosh.push.PushTokenStore
+import dev.southstar21.droidtosh.push.WakeProvider
 import dev.southstar21.droidtosh.R
 import dev.southstar21.droidtosh.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
@@ -159,7 +160,7 @@ class ConnectionService : Service() {
         val loop = PhoneConnectionLoop(
             host = object : PhoneConnectionLoop.Host {
                 override fun loadCredentials() = credentialStore.load()
-                override fun fcmToken(): String? = pushTokens.token
+                override fun fcmToken(): String? = pushTokens.joinToken()
                 override fun deviceName(): String = deviceDisplayName(applicationContext)
                 override fun hello(deviceName: String): Hello = Hello.newBuilder()
                     .setDeviceName(deviceName)
@@ -190,7 +191,7 @@ class ConnectionService : Service() {
             },
             scope = scope,
             reliableStream = reliableStream,
-            waitPolicy = WaitModePolicy(BuildConfig.FCM_ENABLED),
+            waitPolicy = WaitModePolicy(pushTokens.provider() != WakeProvider.NONE),
             waitSignal = waitSignal,
         )
         connection = loop

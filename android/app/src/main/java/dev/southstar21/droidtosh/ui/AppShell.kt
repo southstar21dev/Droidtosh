@@ -1,7 +1,10 @@
 package dev.southstar21.droidtosh.ui
 
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -74,6 +77,7 @@ import dev.southstar21.droidtosh.R
 import dev.southstar21.droidtosh.ui.components.LocalAnimationsPaused
 import dev.southstar21.droidtosh.clipboard.SendClipboardActivity
 import dev.southstar21.droidtosh.launch.OverlayPermission
+import dev.southstar21.droidtosh.push.UnifiedPushController
 import dev.southstar21.droidtosh.transport.ConnectionState
 import androidx.compose.foundation.layout.Arrangement
 import dev.southstar21.droidtosh.ui.theme.DroidIcons
@@ -102,6 +106,7 @@ fun MainShell(
     val pairingMode by state.pairingMode.collectAsStateWithLifecycle()
     val update by state.update.collectAsStateWithLifecycle()
     val betaUpdates by state.betaUpdates.collectAsStateWithLifecycle()
+    val wake by state.wake.collectAsStateWithLifecycle()
     var lastMacName by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(connection) {
         (connection as? ConnectionState.Connected)?.macName?.takeIf { it.isNotBlank() }?.let { lastMacName = it }
@@ -117,6 +122,7 @@ fun MainShell(
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         state.refreshPermissions()
+        state.refreshWake()
     }
 
     val ui = DroidUiState(
@@ -136,6 +142,7 @@ fun MainShell(
         relayAvailable = pairingMode?.relayAvailable ?: true,
         relayAddress = pairingMode?.relayAddress,
         relayFingerprint = pairingMode?.relayFingerprint,
+        wake = wake.takeIf { pairingMode != null },
         versionName = BuildConfig.VERSION_NAME,
         update = update,
         betaUpdates = betaUpdates,
@@ -208,6 +215,12 @@ private fun rememberAppActions(state: AppState): AppActions {
             setFilesReceiveEnabled = state::setFilesReceiveEnabled,
             setFindEnabled = state::setFindEnabled,
             setConnectionMode = state::setConnectionMode,
+            setWakeProvider = state::setWakeProvider,
+            pickDistributor = {
+                var host: Context? = context
+                while (host is ContextWrapper && host !is Activity) host = host.baseContext
+                (host as? Activity)?.let { UnifiedPushController.pickDistributor(it) { state.refreshWake() } }
+            },
             stopRinging = state::stopRinging,
             reconnectNow = state::reconnectNow,
             unpair = state::unpair,

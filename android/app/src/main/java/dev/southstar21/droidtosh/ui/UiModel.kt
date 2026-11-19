@@ -3,6 +3,7 @@ package dev.southstar21.droidtosh.ui
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import dev.southstar21.droidtosh.files.TransferInfo
+import dev.southstar21.droidtosh.push.WakeProvider
 import dev.southstar21.droidtosh.transport.ConnectionMode
 import dev.southstar21.droidtosh.transport.ConnectionState
 import dev.southstar21.droidtosh.update.UpdateState
@@ -32,6 +33,8 @@ data class DroidUiState(
     val relayAddress: String? = null,
     /** The pinned relay certificate's fingerprint, shortened for display; null without a relay. */
     val relayFingerprint: String? = null,
+    /** The wake-up choices on the Connection page; null while unpaired (nothing to show). */
+    val wake: WakeUiState? = null,
     val versionName: String = "",
     /** The over-the-air updater (docs/RELEASING.md). */
     val update: UpdateState = UpdateState.Idle,
@@ -114,6 +117,8 @@ class AppActions(
     val setFilesReceiveEnabled: (Boolean) -> Unit = {},
     val setFindEnabled: (Boolean) -> Unit = {},
     val setConnectionMode: (ConnectionMode) -> Unit = {},
+    val setWakeProvider: (WakeProvider) -> Unit = {},
+    val pickDistributor: () -> Unit = {},
     val stopRinging: () -> Unit = {},
     val reconnectNow: () -> Unit = {},
     val unpair: () -> Unit = {},
@@ -122,6 +127,13 @@ class AppActions(
     val installUpdate: () -> Unit = {},
     val setBetaUpdates: (Boolean) -> Unit = {},
     val shareDiagnosticsLogs: () -> Unit = {},
+)
+
+/** The wake-up providers that can be chosen here, the one in use, and whether UnifiedPush has an endpoint. */
+data class WakeUiState(
+    val options: List<WakeProvider>,
+    val selected: WakeProvider,
+    val unifiedPushRegistered: Boolean = false,
 )
 
 /** The bottom-bar tabs. [Transfers] is the Files tab (its name is kept for notification intents). */

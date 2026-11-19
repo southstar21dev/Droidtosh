@@ -212,6 +212,17 @@
     <string name="settings_mode_both">Relay, local network as fallback</string>
     <string name="settings_mode_both_summary">Uses the relay; goes direct when the relay can\'t reach your Mac</string>
     <string name="settings_mode_needs_relay">This pairing has no relay, re-pair with a Mac that uses one</string>
+    <string name="wake_title">Wake-ups</string>
+    <string name="wake_fcm">Google (FCM)</string>
+    <string name="wake_fcm_summary">Reconnects when your Mac comes back, through Google Play services</string>
+    <string name="wake_unifiedpush">UnifiedPush</string>
+    <string name="wake_unifiedpush_summary">The same wake-up through your own distributor, such as ntfy, without Google</string>
+    <string name="wake_none">None</string>
+    <string name="wake_none_summary">No wake-ups, the phone checks for your Mac every minute</string>
+    <string name="wake_distributor">Distributor</string>
+    <string name="wake_distributor_ready">Registered, tap to choose another</string>
+    <string name="wake_distributor_missing">Not registered, tap to choose a distributor</string>
+    <string name="wake_note">The wake-up only tells the phone to reconnect. It carries no data from your Mac.</string>
     <string name="settings_mode_note">Your Mac must allow the same mode in its settings.</string>
     <string name="settings_diagnostics_summary">Connection health, counters and logs</string>
     <string name="settings_group_about">About</string>

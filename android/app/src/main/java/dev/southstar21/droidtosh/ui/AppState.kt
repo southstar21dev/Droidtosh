@@ -21,6 +21,10 @@ import dev.southstar21.droidtosh.diagnostics.DiagnosticsSnapshot
 import dev.southstar21.droidtosh.files.FileTransfers
 import dev.southstar21.droidtosh.files.TransferInfo
 import dev.southstar21.droidtosh.launch.OverlayPermission
+import dev.southstar21.droidtosh.BuildConfig
+import dev.southstar21.droidtosh.push.PushTokenStore
+import dev.southstar21.droidtosh.push.UnifiedPushController
+import dev.southstar21.droidtosh.push.WakeProvider
 import dev.southstar21.droidtosh.transport.ConnectionMode
 import dev.southstar21.droidtosh.transport.ConnectionService
 import dev.southstar21.droidtosh.transport.ConnectionState
@@ -104,6 +108,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
         if (paired.value) {
             ConnectionService.start(getApplication())
         }
+        runCatching { UnifiedPushController.ensureRegistered(application) }
     }
 
     val isPaired: StateFlow<Boolean> = paired
@@ -137,6 +142,42 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val transfers: StateFlow<List<TransferInfo>> = FileTransfers.transfers(application)
     val update: StateFlow<UpdateState> = Updates.state
     val betaUpdates: StateFlow<Boolean> = Updates.betaEnabled
+
+    private val pushStore = PushTokenStore(application)
+    private val wakeState = MutableStateFlow(readWake())
+    val wake: StateFlow<WakeUiState> = wakeState.asStateFlow()
+
+    private fun readWake(): WakeUiState {
+        val app = getApplication<Application>()
+        val provider = pushStore.provider()
+        val options = buildList {
+            if (BuildConfig.FCM_ENABLED) add(WakeProvider.FCM)
+            if (provider == WakeProvider.UNIFIEDPUSH || UnifiedPushController.distributorAvailable(app)) {
+                add(WakeProvider.UNIFIEDPUSH)
+            }
+            add(WakeProvider.NONE)
+        }
+        return WakeUiState(options, provider, pushStore.unifiedPushEndpoint != null)
+    }
+
+    /** Re-reads the wake-up state (a distributor may have been installed or registered meanwhile). */
+    fun refreshWake() {
+        wakeState.value = readWake()
+    }
+
+    /** Switches the wake-up provider and rejoins the relay with the matching token. */
+    fun setWakeProvider(provider: WakeProvider) {
+        val app = getApplication<Application>()
+        val previous = pushStore.provider()
+        pushStore.chosenProvider = provider
+        if (provider == WakeProvider.UNIFIEDPUSH) {
+            UnifiedPushController.ensureRegistered(app)
+        } else if (previous == WakeProvider.UNIFIEDPUSH) {
+            UnifiedPushController.unregister(app)
+        }
+        refreshWake()
+        if (paired.value) ConnectionService.restart(app)
+    }
 
     fun checkForUpdates() = Updates.checkNow(getApplication())
 
