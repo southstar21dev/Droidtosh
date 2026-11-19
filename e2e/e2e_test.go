@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var allCapabilities = []string{"calllog", "calls", "clipboard.image", "clipboard.text", "files", "find", "notifications", "phone.status", "reliable"}
+var allCapabilities = []string{"calllog", "calls", "clipboard.image", "clipboard.text", "files", "find", "notifications", "open_url", "phone.status", "reliable"}
 
 func capabilityList(v any) []string {
 	raw, _ := v.([]any)
