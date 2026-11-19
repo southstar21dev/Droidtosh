@@ -378,7 +378,7 @@ final class FindPhoneSessionTests: XCTestCase {
         let cases: [(String, String)] = [
             ("disabled", "Find my phone is turned off on the phone"),
             ("audio_failed", "The phone couldn't play the sound"),
-            ("stale", "The request reached the phone too late — try again"),
+            ("stale", "The request reached the phone too late. Try again"),
             ("", "The phone couldn't ring"),
         ]
         for (error, text) in cases {
@@ -390,7 +390,7 @@ final class FindPhoneSessionTests: XCTestCase {
             XCTAssertEqual(session.statusText, text)
         }
         XCTAssertEqual(FindPhoneEnd(state("x", ringing: false, ended: .findEndTimeout)), .timedOut)
-        XCTAssertEqual(FindPhoneEnd(state("x", ringing: false, ended: .findEndTimeout)).text, "Rang for a minute — stopped")
+        XCTAssertEqual(FindPhoneEnd(state("x", ringing: false, ended: .findEndTimeout)).text, "Rang for a minute, then stopped")
     }
 
     func testReportsForOtherRequestsAreIgnoredWhileOneIsOutstanding() {

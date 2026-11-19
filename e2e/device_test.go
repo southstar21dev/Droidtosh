@@ -412,7 +412,7 @@ func TestFindEndsOnPhoneAndTimeout(t *testing.T) {
 	}
 	s.phone.waitFrom(pm, 5*time.Second, "alarm stopped", isEvent("alarm_stopped"))
 	ui = s.mac.waitFrom(mm, 10*time.Second, "Mac shows timeout", findEnded(id, "timeout"))
-	if ui.str("text") != "Rang for a minute — stopped" {
+	if ui.str("text") != "Rang for a minute, then stopped" {
 		t.Fatalf("timeout UI: %v", ui)
 	}
 }
@@ -489,7 +489,7 @@ func TestFindAcrossFault(t *testing.T) {
 	s.proxy.SetDown(false)
 	s.waitSessionReady(t, mm, 30*time.Second)
 	ui := s.mac.waitFrom(mm, 15*time.Second, "Mac shows stale", findEnded(id, "failed:stale"))
-	if ui.str("text") != "The request reached the phone too late — try again" {
+	if ui.str("text") != "The request reached the phone too late. Try again" {
 		t.Fatalf("stale UI: %v", ui)
 	}
 	sent := s.phone.eventsFrom(pm, findStateSent(id))

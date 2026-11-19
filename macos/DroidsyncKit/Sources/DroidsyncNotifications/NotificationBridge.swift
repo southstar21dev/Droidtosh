@@ -82,7 +82,7 @@ public final class NotificationBridge {
             packageName: record.packageName,
             title: record.title,
             body: body,
-            subtitle: subtitleParts.joined(separator: " · "),
+            subtitle: subtitleParts.joined(separator: ", "),
             categoryIdentifier: categoryPrefix + record.packageName + "." + actionSignature + (code == nil ? "" : ".code"),
             isOngoing: record.isOngoing,
             replyPlaceholder: replyPlaceholder,

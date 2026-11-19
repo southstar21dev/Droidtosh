@@ -38,7 +38,7 @@ public enum FindPhoneEnd: Equatable, Sendable {
         switch self {
         case .stoppedOnPhone: return "Stopped on the phone"
         case .stoppedFromMac: return "Stopped"
-        case .timedOut: return "Rang for a minute — stopped"
+        case .timedOut: return "Rang for a minute, then stopped"
         case .failed(let error): return FindPhoneEnd.describe(error: error)
         case .expired: return "The phone didn't reconnect in time"
         case .unspecified: return "Stopped ringing"
@@ -61,7 +61,7 @@ public enum FindPhoneEnd: Equatable, Sendable {
         switch error {
         case "disabled": return "Find my phone is turned off on the phone"
         case "audio_failed": return "The phone couldn't play the sound"
-        case "stale": return "The request reached the phone too late — try again"
+        case "stale": return "The request reached the phone too late. Try again"
         default: return "The phone couldn't ring"
         }
     }
