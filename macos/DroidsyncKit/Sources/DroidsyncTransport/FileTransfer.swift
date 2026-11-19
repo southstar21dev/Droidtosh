@@ -3,6 +3,23 @@ import Foundation
 import UniformTypeIdentifiers
 import DroidsyncProtocol
 
+/// Marks files received from the phone with `com.apple.quarantine`, so Gatekeeper checks them.
+enum Quarantine {
+    static let attribute = "com.apple.quarantine"
+
+    static func apply(to url: URL, now: Date = Date()) throws {
+        let flags = "0081"  // downloaded, not yet approved by the user
+        let stamp = String(Int(now.timeIntervalSince1970), radix: 16)
+        let value = "\(flags);\(stamp);Droidtosh;\(UUID().uuidString)"
+        let bytes = Array(value.utf8)
+        let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+            return setxattr(path, attribute, bytes, bytes.count, 0, 0)
+        }
+        if result != 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    }
+}
+
 /// Limits from PROTOCOL-v2.md §7.2.
 public enum FileTransferLimits {
     public static let maxFileSize: UInt64 = 2 * 1024 * 1024 * 1024
@@ -780,6 +797,11 @@ public final class FileTransferEngine {
             let destination = FileNameSanitizer.uniqueURL(for: transfer.snapshot.name, in: configuration.downloadsDirectory)
             try fileManager.moveItem(at: transfer.partialURL, to: destination)
             try? fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destination.path)
+            do {
+                try Quarantine.apply(to: destination)
+            } catch {
+                onLog?("file: could not quarantine \(destination.lastPathComponent): \(error)")
+            }
             if transfer.modifiedAtMs > 0 {
                 let date = Date(timeIntervalSince1970: TimeInterval(transfer.modifiedAtMs) / 1000)
                 try? fileManager.setAttributes([.modificationDate: date], ofItemAtPath: destination.path)

@@ -168,6 +168,8 @@ final class FileTransferEngineTests: XCTestCase {
         link.pump()
         let saved = link.dir("b", "Downloads").appendingPathComponent("photo.jpg")
         XCTAssertEqual(try Data(contentsOf: saved), data)
+        let size = getxattr(saved.path, "com.apple.quarantine", nil, 0, 0, 0)
+        XCTAssertGreaterThan(size, 0, "received files are quarantined")
         XCTAssertEqual(link.snapshots[id]?.phase, .completed)
         XCTAssertEqual(link.snapshots[id]?.savedName, "photo.jpg")
         XCTAssertEqual(link.outcomes["a"], [.sent])
