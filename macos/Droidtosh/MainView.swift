@@ -50,7 +50,7 @@ struct MainView: View {
             List(selection: $selection) {
                 Section {
                     SidebarPhoneCard(model: model)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 10, trailing: 0))
+                        .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 8, trailing: 0))
                         .selectionDisabled()
                     sidebarRow(.home)
                     sidebarRow(.notifications)
@@ -105,9 +105,20 @@ struct MainView: View {
     }
 
     private func sidebarRow(_ section: MainSection) -> some View {
-        Label(section.title, systemImage: section.symbol)
-            .badge(badge(for: section))
+        let selected = selection == section
+        let ink: Color = selected ? Brand.onInk : .primary
+        return Label {
+            Text(section.title).foregroundStyle(ink)
+        } icon: {
+            Image(systemName: section.symbol).foregroundStyle(ink)
+        }
+            .badge(Text(badge(for: section) > 0 ? "\(badge(for: section))" : "").foregroundStyle(selected ? Brand.onInk.opacity(0.7) : Color.secondary))
             .tag(section)
+            .listRowBackground(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(selected ? Brand.ink : Color.clear)
+                    .padding(.horizontal, 10)
+            )
     }
 
     private func badge(for section: MainSection) -> Int {
@@ -158,31 +169,33 @@ private struct SidebarPhoneCard: View {
         Button {
             selectSection(.home)
         } label: {
-            HStack(spacing: 10) {
-                TetherView(state: status.tether, size: 24)
+            HStack(spacing: 12) {
+                TetherView(state: status.tether, size: 30)
                     .foregroundStyle(Brand.onInk)
-                    .frame(width: 34, height: 34)
-                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Brand.ink))
-                VStack(alignment: .leading, spacing: 2) {
+                    .frame(width: 42, height: 42)
+                    .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Brand.ink))
+                VStack(alignment: .leading, spacing: 3) {
                     Text(model.connection.connectedDevice ?? (model.pairing.isPaired ? "Your phone" : "No phone"))
-                        .font(.callout.weight(.semibold))
+                        .font(.headline)
                         .lineLimit(1)
                     Text(detail(status))
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }
-            .padding(9)
+            .padding(10)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Brand.surface)
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.separator, lineWidth: 0.5))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.separator, lineWidth: 0.5))
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // The sidebar rows inset their pills further than a plain row, so widen the card to match.
+        .padding(.horizontal, -6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Phone: \(model.connection.connectedDevice ?? "none"), \(status.title)")
     }

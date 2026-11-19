@@ -166,8 +166,8 @@ struct ConnectionView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(connection.connectedDevice ?? (model.pairing.isPaired ? "Paired" : "None"))
                         .font(.callout.weight(.semibold))
-                    if let path = connection.sessionPath {
-                        Text(path == .local ? "Connected via local network" : "Connected via relay")
+                    if connection.sessionPath != nil {
+                        Text(connection.connectedPathText)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

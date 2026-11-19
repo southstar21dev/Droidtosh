@@ -95,8 +95,7 @@ struct MenuBarView: View {
     private var statusLine: String {
         switch status {
         case .connected:
-            let mac = model.connection.macName.isEmpty ? "this Mac" : model.connection.macName
-            return model.connection.sessionPath == .local ? "Connected to \(mac) via local network" : "Connected to \(mac)"
+            return model.connection.connectedPathText
         case .notPaired:
             return model.connectionConfigured ? "Not paired" : "Relay not configured"
         default:

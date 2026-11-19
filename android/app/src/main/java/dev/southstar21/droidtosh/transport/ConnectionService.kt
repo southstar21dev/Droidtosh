@@ -37,6 +37,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import dev.southstar21.droidtosh.sharing.ShareTarget
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
@@ -180,10 +181,15 @@ class ConnectionService : Service() {
                     .build()
                 override fun onState(state: ConnectionState, statusText: String?) {
                     mutableState.value = state
-                    if (state is ConnectionState.Connected && state.macName.isNotBlank()) lastMacName = state.macName
+                    if (state is ConnectionState.Connected && state.macName.isNotBlank()) {
+                        lastMacName = state.macName
+                        val fingerprint = runCatching { credentialStore.load() }.getOrNull()?.fingerprint
+                        ShareTarget.onMacName(applicationContext, fingerprint, state.macName)
+                    }
                     ConnectionNotificationText.forState(state, statusText, lastMacName)?.let(::updateNotification)
                 }
                 override fun onNotPaired() {
+                    ShareTarget.remove(applicationContext)
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 }

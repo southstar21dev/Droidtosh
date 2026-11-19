@@ -403,6 +403,15 @@ final class ConnectionController: ObservableObject {
     /// The status line to show: the cause when there is one, else the raw status text.
     var statusHeadline: String { disconnectCause?.headline ?? statusText }
 
+    /// The short connected line: how the phone is reached, without names that truncate.
+    var connectedPathText: String {
+        switch sessionPath {
+        case .local: return "Connected via local network"
+        case .relay: return "Connected via relay"
+        case nil: return "Connected"
+        }
+    }
+
     private var localListening: Bool {
         if case .listening = localState { return true }
         return false
@@ -466,6 +475,7 @@ extension ConnectionController {
         connectedDevice = device
         phoneConnected = device != nil && status == "Connected"
         negotiatedCapabilities = phoneConnected ? capabilities : []
+        sessionPath = phoneConnected ? .local : nil
         self.macName = macName
         self.macModel = macModel
         statusText = status
