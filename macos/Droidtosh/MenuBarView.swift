@@ -31,13 +31,15 @@ struct MenuBarView: View {
                     .foregroundStyle(FindPhoneText.tint(model.device))
                     .padding(.horizontal, 4)
             }
+            syncToggles
             if !recentTransfers.isEmpty || model.files.phoneSupportsFiles {
                 transfers
             }
-            banners
+            attention
             footer
                 .padding(.top, 2)
         }
+        .animation(.easeOut(duration: 0.2), value: AttentionItem.items(for: model).map(\.id))
         .padding(PopoverMetrics.padding)
         .frame(width: 340)
         .overlay { if dropTargeted { dropOverlay } }
@@ -49,13 +51,15 @@ struct MenuBarView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            BrandBadge(size: 34)
+            TetherView(state: model.device.findCanStop ? .echo : status.tether, size: 24)
+                .foregroundStyle(Brand.onInk)
+                .frame(width: 34, height: 34)
+                .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Brand.ink))
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.connection.connectedDevice ?? "Droidtosh")
                     .font(.headline)
                     .lineLimit(1)
                 HStack(spacing: 5) {
-                    Circle().fill(status.color).frame(width: 7, height: 7)
                     Text(statusLine)
                         .lineLimit(1)
                 }
@@ -106,17 +110,52 @@ struct MenuBarView: View {
             PopoverActionButton(
                 title: model.device.findCanStop ? "Stop Ringing" : "Find Phone",
                 symbol: FindPhoneText.symbol(model.device),
-                tint: model.device.findCanStop ? .red : nil
+                tether: model.device.findCanStop ? .echo : nil
             ) {
                 model.device.toggleFind()
             }
             .disabled(!model.device.showsFind)
             .help(model.device.showsFind ? model.device.findButtonTitle : "Find My Phone isn't available for this phone")
-            PopoverActionButton(title: "Open App", symbol: "macwindow") {
+            PopoverActionButton(title: "Open Window", symbol: "macwindow") {
                 windows.main()
             }
                 .help("Open the Droidtosh window")
         }
+    }
+
+    // MARK: Sync
+
+    private var syncToggles: some View {
+        VStack(spacing: 0) {
+            syncRow("Clipboard", symbol: "doc.on.clipboard", isOn: Binding(
+                get: { model.clipboard.enabled },
+                set: { model.clipboard.enabled = $0 }
+            ))
+            Divider().padding(.leading, 34)
+            syncRow("Receive files", symbol: "tray.and.arrow.down", isOn: Binding(
+                get: { model.files.receivingEnabled },
+                set: { model.files.receivingEnabled = $0 }
+            ))
+        }
+        .padding(.horizontal, PopoverMetrics.padding)
+        .padding(.vertical, 4)
+        .popoverSection()
+    }
+
+    private func syncRow(_ title: String, symbol: String, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .frame(width: 22)
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.callout)
+            Spacer()
+            Toggle(title, isOn: isOn.animation(.spring(response: 0.3, dampingFraction: 0.7)))
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .controlSize(.mini)
+        }
+        .padding(.vertical, 6)
     }
 
     // MARK: Transfers
@@ -163,13 +202,11 @@ struct MenuBarView: View {
 
     private var dropOverlay: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
+            .strokeBorder(Brand.ink, style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.regularMaterial))
             .overlay {
                 VStack(spacing: 8) {
-                    Image(systemName: "arrow.down.doc.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(Color.accentColor)
+                    TetherView(state: .streaming(toPhone: true), size: 40)
                     Text(model.files.phoneSupportsFiles ? "Drop to send to \(model.connection.connectedDevice ?? "your phone")" : "Connect your phone to send files")
                         .font(.headline)
                 }
@@ -180,29 +217,49 @@ struct MenuBarView: View {
 
     // MARK: Problems
 
+    /// One attention line instead of a stack of banners; further items wait behind a count.
     @ViewBuilder
-    private var banners: some View {
-        if !model.connectionConfigured {
-            Banner(.warning, symbol: "network.slash", title: "Relay not configured", message: "Set a relay address in Settings, or choose Local network, to pair.") {
-                Button("Open Settings…") { windows.settings() }
+    private var attention: some View {
+        let items = AttentionItem.items(for: model)
+        if let first = items.first {
+            HStack(spacing: 10) {
+                Image(systemName: first.symbol)
+                    .font(.body.weight(.semibold))
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(first.title)
+                        .font(.callout.weight(.semibold))
+                        .lineLimit(1)
+                    if let detail = first.detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer(minLength: 4)
+                if items.count > 1 {
+                    Menu {
+                        ForEach(items.dropFirst()) { item in
+                            Button(item.title) { item.perform(model: model, setup: windows.pairing) }
+                        }
+                    } label: {
+                        Text("+\(items.count - 1)")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                }
+                if let actionTitle = first.actionTitle {
+                    Button(actionTitle) { first.perform(model: model, setup: windows.pairing) }
+                        .buttonStyle(InkButtonStyle(compact: true))
+                }
             }
-        } else if !model.pairing.isPaired && !model.connection.phoneConnected {
-            Banner(.info, symbol: "qrcode", title: "Pair your phone", message: "Scan the pairing code with Droidtosh on Android.") {
-                Button("Show Pairing Code") { windows.pairing() }
-            }
-        }
-        if case .available(let offer) = model.updates.state {
-            Banner(.info, symbol: "arrow.down.circle.fill", title: "Update available", message: "Droidtosh \(offer.version) is ready to install.") {
-                Button("Install and Relaunch") { model.updates.install() }
-            }
-        }
-        if model.notifications.notificationsAuthorized == false {
-            Banner(.warning, symbol: "bell.slash.fill", title: "Notifications blocked", message: "Enable them for Droidtosh in System Settings.") {
-                Button("Open Notification Settings") { SystemSettings.openNotifications() }
-            }
-        }
-        if !model.notifications.notificationsRelayEnabled {
-            Banner(.warning, symbol: "exclamationmark.triangle.fill", title: "Notification relay is off", message: "Turn it on in the Droidtosh app on your phone.")
+            .padding(10)
+            .popoverSection()
+            .transition(.opacity.combined(with: .move(edge: .bottom)))
+            .accessibilityElement(children: .combine)
         }
     }
 
@@ -214,14 +271,10 @@ struct MenuBarView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button {
-                windows.settings()
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .buttonStyle(.borderless)
-            .help("Settings")
-            .accessibilityLabel("Settings")
+            Button("Settings…") { windows.settings() }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .help("Settings")
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .controlSize(.small)
                 .help("Quit Droidtosh")
@@ -250,7 +303,8 @@ extension View {
 struct PopoverActionButton: View {
     let title: String
     let symbol: String
-    var tint: Color?
+    /// Shown instead of the symbol while something is happening (Find My Phone ringing).
+    var tether: TetherState?
     let action: () -> Void
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
@@ -258,10 +312,15 @@ struct PopoverActionButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .medium))
-                    .frame(height: 18)
-                    .foregroundStyle(tint ?? .primary)
+                Group {
+                    if let tether {
+                        TetherView(state: tether, size: 20)
+                    } else {
+                        Image(systemName: symbol)
+                            .font(.system(size: 15, weight: .medium))
+                    }
+                }
+                .frame(height: 20)
                 Text(title)
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
@@ -273,7 +332,7 @@ struct PopoverActionButton: View {
             .padding(.vertical, 9)
             .contentShape(RoundedRectangle(cornerRadius: PopoverMetrics.cornerRadius, style: .continuous))
         }
-        .buttonStyle(PopoverActionStyle(tint: tint, hovering: hovering && isEnabled))
+        .buttonStyle(PopoverActionStyle(tint: nil, hovering: hovering && isEnabled))
         .onHover { hovering = $0 }
         .accessibilityLabel(title)
     }
@@ -286,6 +345,8 @@ private struct PopoverActionStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .popoverSection(tint: tint, highlight: configuration.isPressed ? 0.08 : hovering ? 0.04 : 0)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(.easeOut(duration: 0.12), value: hovering)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }

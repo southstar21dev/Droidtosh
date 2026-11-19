@@ -47,19 +47,19 @@ struct CallPanelView: View {
         HStack(spacing: 10) {
             if ringing {
                 if call?.kind == .cellular {
-                    CallButton(title: "Mute", symbol: "bell.slash.fill", color: Color.gray) {
+                    CallButton(title: "Mute", symbol: "bell.slash.fill", style: .quiet) {
                         model.calls.performCallAction(CallCoordinator.muteID)
                     }
                     .help("Silence the ringing on your phone")
                 }
-                CallButton(title: "Decline", symbol: "phone.down.fill", color: .red) {
+                CallButton(title: "Decline", symbol: "phone.down.fill", style: .outline) {
                     model.calls.performCallAction(CallCoordinator.declineID)
                 }
-                CallButton(title: "Accept", symbol: "phone.fill", color: .green) {
+                CallButton(title: "Accept", symbol: "phone.fill", style: .ink, pulses: true) {
                     model.calls.performCallAction(CallCoordinator.acceptID)
                 }
             } else {
-                CallButton(title: "End", symbol: "phone.down.fill", color: .red) {
+                CallButton(title: "End", symbol: "phone.down.fill", style: .ink) {
                     model.calls.performCallAction(CallCoordinator.endID)
                 }
             }
@@ -78,12 +78,12 @@ struct CallPanelView: View {
             .background(Circle().fill(Brand.hero))
             .overlay(alignment: .bottomTrailing) {
                 // The phone doesn't say whether a VoIP call is voice or video, so no video badge.
-                Image(systemName: "phone.circle.fill")
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, ringing ? Color.green : Color.accentColor)
-                    .font(.system(size: 18))
-                    .background(Circle().fill(.background).padding(1))
-                    .offset(x: 3, y: 3)
+                TetherView(state: ringing ? .ringing : .linked, size: 16)
+                    .foregroundStyle(Brand.onInk)
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(Brand.ink))
+                    .background(Circle().fill(.background).padding(-1.5))
+                    .offset(x: 4, y: 4)
             }
     }
 
@@ -118,7 +118,7 @@ struct CallPanelView: View {
             parts.append(appName(call))
         }
         if !call.simLabel.isEmpty { parts.append(call.simLabel) }
-        return parts.joined(separator: " · ")
+        return parts.joined(separator: ", ")
     }
 
     private func appName(_ call: CallSnapshot) -> String {
@@ -128,22 +128,40 @@ struct CallPanelView: View {
 
 /// A round call button with its label underneath.
 private struct CallButton: View {
+    enum Style {
+        /// Ink fill: the action you most likely want.
+        case ink
+        /// Outlined.
+        case outline
+        /// A grey fill for a secondary action.
+        case quiet
+    }
+
     let title: String
     let symbol: String
-    let color: Color
+    let style: Style
+    /// A soft ring that keeps pulsing while the call rings.
+    var pulses = false
     let action: () -> Void
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: symbol)
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(style == .ink ? Brand.onInk : Brand.ink)
                     .frame(width: 42, height: 42)
-                    .background(Circle().fill(color.gradient))
-                    .brightness(hovering ? 0.06 : 0)
-                    .shadow(color: color.opacity(0.35), radius: 4, y: 2)
+                    .background(
+                        Circle().fill(style == .ink ? Brand.ink : style == .quiet ? Brand.tile : Color.clear)
+                    )
+                    .overlay(Circle().strokeBorder(style == .outline ? Brand.ink : Color.clear, lineWidth: 1.5))
+                    .background {
+                        if pulses && !reduceMotion { PulseRing() }
+                    }
+                    .scaleEffect(hovering ? 1.05 : 1)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: hovering)
                 Text(title)
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
@@ -153,6 +171,20 @@ private struct CallButton: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityLabel(title)
+    }
+}
+
+/// An ink ring that grows and fades behind the Accept button.
+private struct PulseRing: View {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4
+            Circle()
+                .stroke(Brand.ink, lineWidth: 2)
+                .scaleEffect(1 + 0.45 * t)
+                .opacity(0.45 * (1 - t))
+        }
+        .allowsHitTesting(false)
     }
 }
 
