@@ -35,9 +35,14 @@ class AndroidAlarm(
     private val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
 
     private var player: MediaPlayer? = null
-    private var savedVolume: Int? = null
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    // Also kept on disk: a process death mid-ring would otherwise leave the alarm stream at maximum.
+    private var savedVolume: Int? = prefs.getInt(KEY_SAVED_VOLUME, -1).takeIf { it >= 0 }
 
     init {
+        // Left over from a ring the process died in.
+        restoreVolume()
         notifications.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Find my phone", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Shown while your Mac makes this phone ring"
@@ -52,7 +57,11 @@ class AndroidAlarm(
     @Synchronized
     override fun start(): Boolean {
         stopPlayback()
-        savedVolume = runCatching { audio.getStreamVolume(AudioManager.STREAM_ALARM) }.getOrNull()
+        // A volume still saved is the user's; the stream now is the raised one.
+        if (savedVolume == null) {
+            savedVolume = runCatching { audio.getStreamVolume(AudioManager.STREAM_ALARM) }.getOrNull()
+            savedVolume?.let { prefs.edit().putInt(KEY_SAVED_VOLUME, it).commit() }
+        }
         runCatching {
             audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
         }.onFailure { Log.w(TAG, "can't raise the alarm volume", it) }
@@ -129,6 +138,7 @@ class AndroidAlarm(
     private fun restoreVolume() {
         val volume = savedVolume ?: return
         savedVolume = null
+        prefs.edit().remove(KEY_SAVED_VOLUME).apply()
         runCatching { audio.setStreamVolume(AudioManager.STREAM_ALARM, volume, 0) }
     }
 
@@ -167,6 +177,8 @@ class AndroidAlarm(
     companion object {
         private const val TAG = "DroidsyncFind"
         private const val CHANNEL_ID = "find_phone"
+        private const val PREFS = "find_phone_alarm"
+        private const val KEY_SAVED_VOLUME = "saved_alarm_volume"
         const val NOTIFICATION_ID = 60
         private val VIBRATION_PATTERN = longArrayOf(0, 800, 600)
     }
