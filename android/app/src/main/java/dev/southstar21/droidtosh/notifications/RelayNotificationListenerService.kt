@@ -46,7 +46,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 object RelayState {
     private val mutableEnabled = MutableStateFlow(false)
@@ -104,6 +106,9 @@ class RelayNotificationListenerService : NotificationListenerService() {
         CallManager.dialerNotificationAction = { role -> dialerNotificationAction(role) }
         CallManager.voipCallInProgress = { voipCalls.isNotEmpty() }
         if (muteJob?.isActive != true) {
+            // Read the list before anything is forwarded or snapshotted, so muted apps can't leak.
+            mutedSnapshot = runCatching { runBlocking { settingsStore.mutedPackages.first() } }
+                .getOrDefault(mutedSnapshot)
             muteJob = scope.launch { settingsStore.mutedPackages.collect { mutedSnapshot = it } }
         }
         if (relayStatusJob?.isActive != true) {
