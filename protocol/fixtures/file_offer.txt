@@ -1,0 +1,10 @@
+protocol_version: 2
+message_id: "fixture-file-offer"
+sent_at_ms: 1760000001000
+file_offer {
+  transfer_id: "11111111-2222-3333-4444-555555555555"
+  name: "holiday photo.jpg"
+  mime_type: "image/jpeg"
+  size: 4096
+  modified_at_ms: 1759999000000
+}

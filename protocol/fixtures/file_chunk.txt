@@ -1,0 +1,8 @@
+protocol_version: 2
+message_id: "fixture-file-chunk"
+sent_at_ms: 1760000001100
+file_chunk {
+  transfer_id: "11111111-2222-3333-4444-555555555555"
+  offset: 1024
+  data: "droidtosh\000\377chunk"
+}
