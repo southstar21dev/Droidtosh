@@ -144,6 +144,9 @@ func main() {
 		<-ctx.Done()
 		_ = ln.Close()
 	}()
+	if stateFile != "" {
+		go saveStatePeriodically(ctx, stateFile, registry, stateSaveInterval)
+	}
 	serveErr := serve(ctx, ln, registry, Config{
 		Port:          port,
 		StateFile:     stateFile,

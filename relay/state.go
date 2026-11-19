@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 )
 
@@ -69,4 +72,33 @@ func SaveState(path string, records map[string]RoomRecord) error {
 		_ = dir.Close()
 	}
 	return nil
+}
+
+// stateSaveInterval is how often the registry is checked for changes worth
+// persisting between shutdowns.
+const stateSaveInterval = time.Minute
+
+// saveStatePeriodically writes the registry to path every interval, but only
+// when its records changed since the last write, until ctx is done. A crash or
+// SIGKILL then loses at most one interval of changes.
+func saveStatePeriodically(ctx context.Context, path string, registry *Registry, interval time.Duration) {
+	last := registry.Records()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		cur := registry.Records()
+		if reflect.DeepEqual(cur, last) {
+			continue
+		}
+		if err := SaveState(path, cur); err != nil {
+			log.Printf("state save failed: %v", err)
+			continue
+		}
+		last = cur
+	}
 }
