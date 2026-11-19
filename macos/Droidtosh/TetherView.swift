@@ -1,4 +1,5 @@
 import AppKit
+import DroidsyncKit
 import SwiftUI
 
 /// What the Tether shows: the link between the phone and this Mac, as two points and what
@@ -58,8 +59,8 @@ struct TetherView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var onScreen = true
 
-    /// Calm states hold a still frame, and small marks don't need more than 30 fps.
-    private var isStill: Bool {
+    /// The calm states move slowly, so 30 fps is smooth at every size.
+    private var isSteady: Bool {
         switch state {
         case .linked, .resting: return true
         default: return false
@@ -68,12 +69,12 @@ struct TetherView: View {
 
     var body: some View {
         Group {
-            if reduceMotion || isStill || !onScreen {
-                canvas(time: state.stillTime)
-            } else {
-                TimelineView(.animation(minimumInterval: size <= 28 ? 1.0 / 30 : 1.0 / 60)) { timeline in
+            if MotionPolicy.shouldAnimate(reduceMotion: reduceMotion, onScreen: onScreen) {
+                TimelineView(.animation(minimumInterval: MotionPolicy.frameInterval(size: Double(size), steady: isSteady))) { timeline in
                     canvas(time: timeline.date.timeIntervalSinceReferenceDate)
                 }
+            } else {
+                canvas(time: state.stillTime)
             }
         }
         .frame(width: size, height: size)
@@ -106,15 +107,33 @@ struct WindowVisibilityReader: NSViewRepresentable {
     final class TrackingView: NSView {
         var onChange: ((Bool) -> Void)?
         private var observers: [NSObjectProtocol] = []
+        private var visibleObservation: NSKeyValueObservation?
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             observers.forEach(NotificationCenter.default.removeObserver)
             observers = []
+            visibleObservation = nil
             guard let window else { onChange?(false); return }
-            observers.append(NotificationCenter.default.addObserver(
-                forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
-            ) { [weak self] _ in MainActor.assumeIsolated { self?.report() } })
+            // A window can be attached before it is ordered front (main window, popover), so
+            // watch every way it becomes visible rather than sampling once.
+            let names: [Notification.Name] = [
+                NSWindow.didChangeOcclusionStateNotification,
+                NSWindow.didBecomeKeyNotification,
+                NSWindow.didExposeNotification,
+                NSWindow.didMiniaturizeNotification,
+                NSWindow.didDeminiaturizeNotification,
+                NSWindow.didChangeScreenNotification,
+                NSWindow.willCloseNotification,
+            ]
+            for name in names {
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.report() }
+                })
+            }
+            visibleObservation = window.observe(\.isVisible, options: [.new]) { [weak self] _, _ in
+                DispatchQueue.main.async { MainActor.assumeIsolated { self?.report() } }
+            }
             report()
         }
 
