@@ -284,7 +284,7 @@ class PhoneConnectionLoop(
                         macAsleepMode = mode
                         return true
                     }
-                    else -> TransportHub.dispatch(envelope)
+                    else -> TransportHub.dispatchAwait(envelope)
                 }
             }
         } finally {

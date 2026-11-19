@@ -17,8 +17,8 @@ import java.util.concurrent.atomic.AtomicLong
 
 object TransportHub {
     // Inbound envelopes are routed into one bounded inbox per feature instead of a single broadcast,
-    // so a slow feature only fills its own inbox. The reader never suspends: when an inbox is full the
-    // envelope is dropped and counted (see [droppedInbound]). The clipboard inbox holds more than one
+    // so a slow feature only fills its own inbox. The reader doesn't suspend for unreliable envelopes: when
+    // an inbox is full they are dropped (reliable ones, seq > 0, wait for space via [dispatchAwait]) and counted (see [droppedInbound]). The clipboard inbox holds more than one
     // maximum-size image transfer (32 MB / 256 KB chunks = 128 chunks + start/end), so a transfer is
     // never cut short just because the clipboard handler is busy decoding the previous one.
     // Inboxes buffer until their feature subscribes (e.g. the notification listener binding late), and
@@ -33,6 +33,11 @@ object TransportHub {
 
     /** Envelopes dropped so far because [feature]'s inbox was full. */
     fun droppedInbound(feature: InboundFeature): Long = drops.getValue(feature).get()
+
+    private val SESSION_SCOPED = setOf(
+        Envelope.PayloadCase.SNAPSHOT_REQUEST,
+        Envelope.PayloadCase.APPS_LIST_REQUEST,
+    )
 
     private val mutableConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = mutableConnected.asStateFlow()
@@ -93,8 +98,14 @@ object TransportHub {
         writerJob?.cancel()
         writerJob = null
         inboxes.values.forEach { inbox ->
-            while (inbox.tryReceive().isSuccess) {
+            // Reliable envelopes (seq > 0) were already acked to the Mac, so they are never replayed
+            // and must survive; only session-scoped requests are stale for a new session.
+            val kept = mutableListOf<Envelope>()
+            while (true) {
+                val envelope = inbox.tryReceive().getOrNull() ?: break
+                if (envelope.seq > 0L && envelope.payloadCase !in SESSION_SCOPED) kept += envelope
             }
+            kept.forEach { inbox.trySend(it) }
         }
         this.client = client
         reliable = stream
@@ -176,6 +187,18 @@ object TransportHub {
      * Routes [envelope] to its feature's inbox without blocking. Returns false if it has no feature
      * (connection-level payloads are handled by the session itself) or its inbox was full.
      */
+    /**
+     * Like [dispatch], but a reliable envelope (seq > 0, already counted towards our ack) waits for
+     * inbox space instead of being dropped.
+     */
+    suspend fun dispatchAwait(envelope: Envelope): Boolean {
+        if (envelope.seq == 0L) return dispatch(envelope)
+        val feature = InboundFeature.of(envelope) ?: return false
+        Diagnostics.recorder.onInbound(feature)
+        inboxes.getValue(feature).send(envelope)
+        return true
+    }
+
     fun dispatch(envelope: Envelope): Boolean {
         val feature = InboundFeature.of(envelope) ?: return false
         Diagnostics.recorder.onInbound(feature)

@@ -8,14 +8,18 @@ import dev.southstar21.droidtosh.protocol.v1.Envelope
 import dev.southstar21.droidtosh.protocol.v1.FindPhoneRequest
 import dev.southstar21.droidtosh.protocol.v1.FindPhoneState
 import dev.southstar21.droidtosh.protocol.v1.Ping
+import dev.southstar21.droidtosh.protocol.v1.SnapshotRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -102,6 +106,36 @@ class TransportHubTest {
         TransportHub.dispatch(dial("fresh"))
         val first = withTimeout(2_000) { TransportHub.incoming(InboundFeature.CALLS).first() }
         assertEquals("fresh", first.dialRequest.number)
+        TransportHub.detach()
+    }
+
+    @Test
+    fun attachKeepsReliableEnvelopesButDropsSessionScopedRequests() = runBlocking {
+        TransportHub.attach(client(FakeDuplexStream()))
+        TransportHub.dispatch(dial("unreliable"))
+        TransportHub.dispatch(dial("reliable").toBuilder().setSeq(5).build())
+        TransportHub.dispatch(
+            newEnvelope { setSnapshotRequest(SnapshotRequest.getDefaultInstance()) }.toBuilder().setSeq(6).build(),
+        )
+        TransportHub.attach(client(FakeDuplexStream()))
+        val kept = withTimeout(2_000) { TransportHub.incoming(InboundFeature.CALLS).first() }
+        assertEquals("reliable", kept.dialRequest.number)
+        assertEquals(null, withTimeoutOrNull(100) { TransportHub.incoming(InboundFeature.NOTIFICATIONS).first() })
+        TransportHub.detach()
+    }
+
+    @Test
+    fun dispatchAwaitWaitsForSpaceInsteadOfDroppingReliableEnvelopes() = runBlocking {
+        TransportHub.attach(client(FakeDuplexStream()))
+        val total = InboundFeature.CALLS.capacity + 5
+        val sender = launch {
+            repeat(total) { TransportHub.dispatchAwait(dial("$it").toBuilder().setSeq(it + 1L).build()) }
+        }
+        val received = withTimeout(5_000) {
+            TransportHub.incoming(InboundFeature.CALLS).take(total).toList().map { it.dialRequest.number }
+        }
+        sender.join()
+        assertEquals((0 until total).map { "$it" }, received)
         TransportHub.detach()
     }
 
