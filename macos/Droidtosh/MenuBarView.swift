@@ -7,6 +7,7 @@ import DroidsyncKit
 struct MenuBarView: View {
     @ObservedObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openSettings) private var openSettings
     @State private var dropTargeted = false
 
@@ -169,7 +170,7 @@ struct MenuBarView: View {
         .padding(.horizontal, PopoverMetrics.padding)
         .padding(.vertical, 8)
         .popoverSection()
-        .animation(.easeOut(duration: 0.2), value: model.notifications.pausedUntil)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.notifications.pausedUntil)
     }
 
     private func syncRow(_ title: String, symbol: String, isOn: Binding<Bool>) -> some View {
