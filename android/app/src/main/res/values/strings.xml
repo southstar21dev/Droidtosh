@@ -286,6 +286,7 @@
     <string name="settings_moved_note">Looking for notifications, calls, files or the relay? Their options now live on those tabs, and the connection opens from the Mac card on Home.</string>
     <!-- Redesign: guided setup -->
     <string name="setup_scan_title">Scan the code on your Mac</string>
+    <string name="setup_open_scanner">Open the scanner</string>
     <string name="setup_scan_waiting">Ready when your Mac shows its code</string>
     <string name="setup_paired">Paired with your Mac, connecting…</string>
     <string name="setup_permissions_subtitle">Each one turns on a part of Droidtosh. You can change them later on its tab.</string>

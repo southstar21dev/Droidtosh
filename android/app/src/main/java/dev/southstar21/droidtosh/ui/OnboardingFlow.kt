@@ -66,6 +66,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -324,6 +325,7 @@ private fun ScanStep(repairNeeded: Boolean, onScan: () -> Unit) {
 /** A dark viewfinder card: corner marks, the Tether seeking, and the waiting line. Tapping scans. */
 @Composable
 private fun Viewfinder(onScan: () -> Unit) {
+    val scanLabel = stringResource(R.string.setup_open_scanner)
     val interaction = remember { MutableInteractionSource() }
     Surface(
         onClick = onScan,
@@ -335,7 +337,8 @@ private fun Viewfinder(onScan: () -> Unit) {
             .fillMaxWidth()
             .widthIn(max = 420.dp)
             .aspectRatio(1.15f)
-            .pressScale(interaction, pressed = 0.97f),
+            .pressScale(interaction, pressed = 0.97f)
+            .semantics(mergeDescendants = true) { onClick(label = scanLabel, action = null) },
     ) {
         Box(contentAlignment = Alignment.Center) {
             Box(
