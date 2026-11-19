@@ -29,9 +29,12 @@ public enum LinkPolicy {
     /// The link if `raw` is acceptable, else nil. `allowTel` admits `tel:` numbers.
     public static func validate(_ raw: String, allowTel: Bool) -> Link? {
         guard !raw.isEmpty, raw.utf8.count <= maxBytes else { return nil }
-        guard !raw.unicodeScalars.contains(where: isForbidden) else { return nil }
-        if raw.lowercased().hasPrefix("tel:") { return allowTel ? tel(raw) : nil }
-        return web(raw)
+        // By code point, like the phone: a String compares by grapheme cluster, so a combining mark
+        // right after a `/`, `?`, `#` or `://` would otherwise hide the delimiter.
+        let scalars = Array(raw.unicodeScalars)
+        guard !scalars.contains(where: isForbidden) else { return nil }
+        if hasASCIIPrefix(scalars, "tel:") { return allowTel ? tel(scalars) : nil }
+        return web(raw, scalars)
     }
 
     /// `text` as a link when, ignoring surrounding whitespace, it is exactly one http(s) URL.
@@ -52,14 +55,27 @@ public enum LinkPolicy {
         }
     }
 
-    private static func web(_ raw: String) -> Link? {
-        guard let separator = raw.range(of: "://") else { return nil }
-        let scheme = raw[raw.startIndex..<separator.lowerBound].lowercased()
-        guard scheme == "http" || scheme == "https" else { return nil }
-        let rest = raw[separator.upperBound...]
-        let authority = rest.prefix { $0 != "/" && $0 != "?" && $0 != "#" }
-        guard let host = parseHost(String(authority)) else { return nil }
+    private static func web(_ raw: String, _ scalars: [Unicode.Scalar]) -> Link? {
+        guard scalars.count >= 3,
+              let separator = (0...(scalars.count - 3)).first(where: {
+                  scalars[$0] == ":" && scalars[$0 + 1] == "/" && scalars[$0 + 2] == "/"
+              })
+        else { return nil }
+        let scheme = scalars[..<separator].map(asciiLowercased)
+        guard scheme == Array("http".unicodeScalars) || scheme == Array("https".unicodeScalars) else { return nil }
+        let authority = scalars[(separator + 3)...].prefix { $0 != "/" && $0 != "?" && $0 != "#" }
+        guard let host = parseHost(String(String.UnicodeScalarView(authority))) else { return nil }
         return .web(url: raw, host: host)
+    }
+
+    /// Lowercases ASCII letters only, so no other letter (such as U+017F) can pass for one.
+    private static func asciiLowercased(_ scalar: Unicode.Scalar) -> Unicode.Scalar {
+        scalar.value >= 0x41 && scalar.value <= 0x5A ? Unicode.Scalar(scalar.value + 32)! : scalar
+    }
+
+    private static func hasASCIIPrefix(_ scalars: [Unicode.Scalar], _ prefix: String) -> Bool {
+        let wanted = Array(prefix.unicodeScalars)
+        return scalars.count >= wanted.count && zip(scalars, wanted).allSatisfy { asciiLowercased($0) == $1 }
     }
 
     /// The host of an authority under the one rule both platforms share (PROTOCOL-v2.md section 10),
@@ -97,11 +113,7 @@ public enum LinkPolicy {
             guard !port.isEmpty, port.count <= 5, port.allSatisfy({ $0.value >= 0x30 && $0.value <= 0x39 }) else { return nil }
             guard let number = Int(String(String.UnicodeScalarView(port))), (1...65535).contains(number) else { return nil }
         }
-        var lowered = String.UnicodeScalarView()
-        for scalar in host {
-            lowered.append(scalar.value >= 0x41 && scalar.value <= 0x5A ? Unicode.Scalar(scalar.value + 32)! : scalar)
-        }
-        return String(lowered)
+        return String(String.UnicodeScalarView(host.map(asciiLowercased)))
     }
 
     private static func isHostScalar(_ scalar: Unicode.Scalar) -> Bool {
@@ -118,11 +130,13 @@ public enum LinkPolicy {
         }
     }
 
-    private static func tel(_ raw: String) -> Link? {
-        let number = String(raw.dropFirst("tel:".count))
+    private static func tel(_ scalars: [Unicode.Scalar]) -> Link? {
+        let number = scalars.dropFirst("tel:".count)
+        let isDigit = { (scalar: Unicode.Scalar) in scalar.value >= 0x30 && scalar.value <= 0x39 }
         guard !number.isEmpty, number.count <= maxTelLength else { return nil }
-        guard number.allSatisfy({ $0.isASCII && ($0.isNumber || "+*#().-".contains($0)) }) else { return nil }
-        guard number.contains(where: { $0.isNumber }) else { return nil }
-        return .tel(url: "tel:\(number)", number: number)
+        guard number.allSatisfy({ isDigit($0) || "+*#().-".unicodeScalars.contains($0) }) else { return nil }
+        guard number.contains(where: isDigit) else { return nil }
+        let text = String(String.UnicodeScalarView(number))
+        return .tel(url: "tel:\(text)", number: text)
     }
 }

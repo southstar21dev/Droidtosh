@@ -29,7 +29,7 @@ object LinkPolicy {
         if (raw.isEmpty() || raw.toByteArray(Charsets.UTF_8).size > MAX_BYTES) return null
         // By code point, so a supplementary-plane format or private-use character is caught too.
         if (raw.codePoints().anyMatch(::isForbidden)) return null
-        if (raw.startsWith("tel:", ignoreCase = true)) return if (allowTel) tel(raw) else null
+        if (asciiLowercase(raw.take(4)) == "tel:") return if (allowTel) tel(raw) else null
         return web(raw)
     }
 
@@ -52,8 +52,9 @@ object LinkPolicy {
     private fun web(raw: String): Link? {
         val separator = raw.indexOf("://")
         if (separator < 0) return null
-        val scheme = raw.substring(0, separator)
-        if (!scheme.equals("http", ignoreCase = true) && !scheme.equals("https", ignoreCase = true)) return null
+        // Not equals(ignoreCase = true): that takes U+017F (long s) for "s", which the Mac rejects.
+        val scheme = asciiLowercase(raw.substring(0, separator))
+        if (scheme != "http" && scheme != "https") return null
         val rest = raw.substring(separator + 3)
         val end = rest.indexOfFirst { it == '/' || it == '?' || it == '#' }
         val authority = if (end < 0) rest else rest.substring(0, end)
@@ -95,8 +96,12 @@ object LinkPolicy {
             if (port.isEmpty() || port.length > 5 || !port.all { it in '0'..'9' }) return null
             if (port.toInt() !in 1..65535) return null
         }
-        return buildString(host.length) { host.forEach { append(if (it in 'A'..'Z') it + 32 else it) } }
+        return asciiLowercase(host)
     }
+
+    /** Lowercases ASCII letters only, so no other letter can pass for one. */
+    private fun asciiLowercase(text: String): String =
+        buildString(text.length) { text.forEach { append(if (it in 'A'..'Z') it + 32 else it) } }
 
     private fun isHostChar(c: Int): Boolean {
         if (c < 0x80) return c.toChar().let { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_' }

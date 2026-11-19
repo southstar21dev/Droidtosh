@@ -110,6 +110,9 @@ class LinkPolicyTest {
         "https://example.com./" to "example.com.",
         "https://192.168.0.1:3000/" to "192.168.0.1",
         "https://a-b.c-d/" to "a-b.c-d",
+        "https://example.com/\u0301x" to "example.com",
+        "https://example.com?\u0301" to "example.com",
+        "https://example.com#\u20dd" to "example.com",
     )
 
     private val rejectedHosts = listOf(
@@ -146,6 +149,8 @@ class LinkPolicyTest {
         "https://example。com/",
         "https://exa(mple.com/",
         "https://example.com\\path",
+        "http\u017f://example.com/",
+        "https:/\u0301/example.com/",
     )
 
     @Test

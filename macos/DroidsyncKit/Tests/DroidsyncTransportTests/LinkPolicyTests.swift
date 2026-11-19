@@ -94,6 +94,9 @@ final class LinkPolicyTests: XCTestCase {
         ("https://example.com./", "example.com."),
         ("https://192.168.0.1:3000/", "192.168.0.1"),
         ("https://a-b.c-d/", "a-b.c-d"),
+        ("https://example.com/\u{0301}x", "example.com"),
+        ("https://example.com?\u{0301}", "example.com"),
+        ("https://example.com#\u{20DD}", "example.com"),
     ]
 
     private let rejectedHosts: [String] = [
@@ -130,6 +133,8 @@ final class LinkPolicyTests: XCTestCase {
         "https://example。com/",
         "https://exa(mple.com/",
         "https://example.com\\path",
+        "http\u{017F}://example.com/",
+        "https:/\u{0301}/example.com/",
     ]
 
     func testHostRuleCorpusMatchesThePhone() {
