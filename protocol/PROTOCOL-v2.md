@@ -79,7 +79,7 @@ Both apps have a connection mode setting:
 ## 2. Pairing URI
 `droidsync://pair?v=2&did=…&name=…&host=…&port=…&fp=<mac cert sha256>&rfp=<relay cert sha256>&psk=…&room=…&mode=…&lhost=…&lport=…`
 
-- `v=2` is required. The phone rejects an older code with "Pairing code is from an older version — re-pair".
+- `v=2` is required. The phone rejects an older code with "Pairing code is from an older version. Pair again."
 - `mode` is `relay`, `local` or `both` (§1.5). It defaults to `relay` when absent, so older codes stay valid.
 - `host`, `port` and `rfp` are required unless `mode=local`, where they are omitted.
 - `room` is always present.

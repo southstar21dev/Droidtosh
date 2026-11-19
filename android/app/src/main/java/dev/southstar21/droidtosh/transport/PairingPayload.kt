@@ -63,7 +63,7 @@ object PairingPayloadParser {
                 URLDecoder.decode(pieces[0], "UTF-8") to URLDecoder.decode(pieces.getOrElse(1) { "" }, "UTF-8")
             }
         val version = params["v"]?.toIntOrNull() ?: throw IllegalArgumentException("missing version")
-        if (version < VERSION) throw PairingVersionException("Pairing code is from an older version — re-pair")
+        if (version < VERSION) throw PairingVersionException("Pairing code is from an older version. Pair again.")
         require(version == VERSION) { "unsupported version $version" }
         val mode = params["mode"]?.let { ConnectionMode.fromWire(it) ?: throw IllegalArgumentException("invalid mode") }
             ?: ConnectionMode.RELAY

@@ -109,7 +109,7 @@ class PairingPayloadParserTest {
         val thrown = assertThrows(PairingVersionException::class.java) {
             PairingPayloadParser.parse(uri(version = 1, relayFingerprint = null))
         }
-        assertEquals("Pairing code is from an older version — re-pair", thrown.message)
+        assertEquals("Pairing code is from an older version. Pair again.", thrown.message)
     }
 
     @Test
