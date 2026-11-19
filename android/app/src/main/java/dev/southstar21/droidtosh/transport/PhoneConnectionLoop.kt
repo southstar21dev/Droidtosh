@@ -64,6 +64,12 @@ class PhoneConnectionLoop(
          * Where to find the Mac on the local network, best first (protocol/PROTOCOL-v2.md §1.4). The app
          * puts Bonjour results ahead of this default, the pairing's `lhost:lport`.
          */
+        /**
+         * Whether the phone is on Wi-Fi or Ethernet, the only networks a Mac can be reached on
+         * directly. False makes local mode wait for one instead of probing.
+         */
+        fun localNetworkAvailable(): Boolean = true
+
         suspend fun localCandidates(credentials: PairingCredentials): List<LocalEndpoint> =
             listOfNotNull(
                 credentials.localHost?.let { LocalEndpoint(it, credentials.localPort ?: LocalEndpoint.DEFAULT_PORT) },
@@ -102,6 +108,21 @@ class PhoneConnectionLoop(
                 return
             }
             val mode = credentials.mode
+            val plan = LocalNetworkPlan.decide(mode, credentials.hasRelay, host.localNetworkAvailable())
+            if (plan.waitForLocalNetwork) {
+                // Nothing to dial and nothing to back off from: sleep until a Wi-Fi or Ethernet network
+                // comes up (the owner signals it) or the user asks to reconnect.
+                host.onState(
+                    ConnectionState.Disconnected("No Wi-Fi or Ethernet network", DisconnectCause.NoWifiLocal),
+                    "Waiting for Wi-Fi",
+                )
+                attempt = 0
+                select {
+                    networkSignal.onReceive {}
+                    waitSignal.onReceive {}
+                }
+                continue
+            }
             diagnostics.onEndpoint(
                 credentials.host,
                 credentials.port,
@@ -119,11 +140,11 @@ class PhoneConnectionLoop(
             var authenticated = false
             try {
                 // §1.5: the relay first (unless local-only), then the local network on WAIT or failure.
-                val relayResult = if (mode.usesRelay && credentials.hasRelay) dialRelay(credentials, attempt) else null
+                val relayResult = if (plan.dialRelay) dialRelay(credentials, attempt) else null
                 var socket = (relayResult as? RelayConnectResult.Connected)?.socket
                 var path = SessionPath.RELAY
                 var localError: Exception? = null
-                if (socket == null && mode.usesLocal) {
+                if (socket == null && plan.dialLocal) {
                     try {
                         socket = dialLocal(credentials)
                         path = SessionPath.LOCAL

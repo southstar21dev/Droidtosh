@@ -60,6 +60,9 @@ class PhoneConnectionLoopTest {
     ) : PhoneConnectionLoop.Host {
         val states = mutableListOf<ConnectionState>()
 
+        @Volatile
+        var localNetwork = true
+
         override fun loadCredentials() = PairingCredentials(
             host = if (relay) "relay.invalid" else null,
             port = if (relay) 443 else null,
@@ -79,6 +82,7 @@ class PhoneConnectionLoopTest {
         }
         override fun onNotPaired() = Unit
         override val isDestroyed = false
+        override fun localNetworkAvailable() = localNetwork
     }
 
     @Before
@@ -201,6 +205,44 @@ class PhoneConnectionLoopTest {
         val job = launch { loop(FakeHost(ConnectionMode.BOTH, relay = false), connector).run() }
         runCurrent()
         assertEquals(listOf("local 192.168.1.5:7444"), connector.attempts)
+        job.cancel()
+    }
+
+    @Test
+    fun localModeWithoutWifiDoesNotDialOrWakeUpUntilANetworkAppears() = runTest {
+        val connector = RecordingConnector { error("relay must not be dialled") }
+        val host = FakeHost(ConnectionMode.LOCAL, relay = false).apply { localNetwork = false }
+        val loop = loop(host, connector)
+        val job = launch { loop.run() }
+        runCurrent()
+        assertEquals(emptyList<String>(), connector.attempts)
+        assertEquals(
+            ConnectionState.Disconnected("No Wi-Fi or Ethernet network", DisconnectCause.NoWifiLocal),
+            host.states.last(),
+        )
+        // No backoff wake-ups however long it takes.
+        advanceTimeBy(10 * 60_000L)
+        assertEquals(emptyList<String>(), connector.attempts)
+        // Another kind of network coming up (cellular) wakes the loop once, which finds nothing to dial.
+        loop.signalNetwork()
+        runCurrent()
+        assertEquals(emptyList<String>(), connector.attempts)
+        // Wi-Fi appearing resumes at once.
+        host.localNetwork = true
+        loop.signalNetwork()
+        runCurrent()
+        assertEquals(listOf("local 192.168.1.5:7444"), connector.attempts)
+        job.cancel()
+    }
+
+    @Test
+    fun bothModeWithoutWifiSkipsOnlyTheLocalCandidates() = runTest {
+        val connector = RecordingConnector { RelayConnectResult.Failed(IOException("relay down")) }
+        val host = FakeHost(ConnectionMode.BOTH).apply { localNetwork = false }
+        val job = launch { loop(host, connector).run() }
+        runCurrent()
+        assertEquals(listOf("relay"), connector.attempts)
+        assertEquals(ConnectionState.Disconnected("relay down", DisconnectCause.RelayUnreachable), host.states.last())
         job.cancel()
     }
 }

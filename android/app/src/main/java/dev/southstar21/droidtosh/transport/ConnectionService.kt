@@ -76,6 +76,11 @@ class ConnectionService : Service() {
     @Volatile
     private var currentNetwork: Network? = null
 
+    /** Wi-Fi and Ethernet networks, the only ones a Mac is reachable on directly (local mode). */
+    private val localNetwork by lazy {
+        LocalNetworkMonitor(applicationContext) { available -> onLocalNetworkChanged(available) }
+    }
+
     /** Bonjour discovery of the Mac, running while the pairing's mode uses the local network. */
     private val localDiscovery by lazy {
         LocalDiscovery(applicationContext) {
@@ -109,6 +114,7 @@ class ConnectionService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
         )
         registerNetworkCallback()
+        localNetwork.start()
         dev.southstar21.droidtosh.calls.CallManager.start(applicationContext)
         dev.southstar21.droidtosh.files.FileTransfers.start(applicationContext, scope)
         dev.southstar21.droidtosh.device.PhoneStatus.start(applicationContext, scope)
@@ -134,6 +140,7 @@ class ConnectionService : Service() {
             }
         }
         networkCallback = null
+        localNetwork.stop()
         localDiscovery.close()
         loopJob?.cancel()
         dev.southstar21.droidtosh.files.FileTransfers.stop()
@@ -155,7 +162,7 @@ class ConnectionService : Service() {
         val pushTokens = PushTokenStore(applicationContext)
         // Start Bonjour early so the first local attempt already has results.
         runCatching { credentialStore.load() }.getOrNull()
-            ?.takeIf { it.mode.usesLocal }
+            ?.takeIf { it.mode.usesLocal && localNetwork.available }
             ?.let { localDiscovery.start(it.fingerprint) }
         val loop = PhoneConnectionLoop(
             host = object : PhoneConnectionLoop.Host {
@@ -177,6 +184,7 @@ class ConnectionService : Service() {
                     stopSelf()
                 }
                 override val isDestroyed: Boolean get() = destroyed
+                override fun localNetworkAvailable(): Boolean = localNetwork.available
                 override suspend fun localCandidates(credentials: PairingCredentials): List<LocalEndpoint> {
                     localDiscovery.start(credentials.fingerprint)
                     // Give a just-started discovery a moment to resolve the Mac.
@@ -196,6 +204,23 @@ class ConnectionService : Service() {
         )
         connection = loop
         loop.run()
+    }
+
+    /**
+     * Wi-Fi or Ethernet came or went. Without one, Bonjour discovery stops (nothing to find) and local
+     * mode waits; when one appears the loop is woken at once and discovery resumes.
+     */
+    private fun onLocalNetworkChanged(available: Boolean) {
+        if (destroyed) return
+        if (available) {
+            runCatching { CredentialStore(applicationContext).load() }.getOrNull()
+                ?.takeIf { it.mode.usesLocal }
+                ?.let { localDiscovery.start(it.fingerprint) }
+        } else {
+            localDiscovery.stop()
+        }
+        connection?.signalNetwork()
+        waitSignal.trySend(Unit)
     }
 
     private fun registerNetworkCallback() {
