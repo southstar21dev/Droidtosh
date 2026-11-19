@@ -87,6 +87,19 @@ final class ReliableStreamTests: XCTestCase {
         XCTAssertEqual(stream.receive(inbound(seq: 2), now: t0), .process)
     }
 
+    func testFirstSeqOfANewPeerStreamIsTheBaselineEvenPastMaxGap() {
+        let stream = ReliableStream(streamID: "mac")
+        let far = UInt64(ReliableStream.maxGap) + 70_000
+        XCTAssertEqual(stream.receive(inbound(seq: far), now: t0), .process, "fresh stream")
+        XCTAssertEqual(stream.lastProcessedSeq, far)
+        XCTAssertEqual(stream.counters.gaps, 0)
+        XCTAssertEqual(stream.receive(inbound(seq: far + 1), now: t0), .process)
+
+        _ = stream.applyPeerResume(resume(stream: "phone-2", peer: "", last: 0), now: t0)
+        XCTAssertEqual(stream.receive(inbound(seq: far * 2), now: t0), .process, "after the peer restarted")
+        XCTAssertEqual(stream.receive(inbound(seq: far * 2 + UInt64(ReliableStream.maxGap) + 2), now: t0), .rejected)
+    }
+
     func testStandaloneAckAfterOneSecondUnlessPiggybacked() {
         let stream = ReliableStream(streamID: "mac")
         _ = stream.receive(inbound(seq: 1), now: t0)

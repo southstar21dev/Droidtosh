@@ -162,7 +162,9 @@ public final class ReliableStream {
                 _counters.duplicates += 1
                 return .duplicate
             }
-            if seq > lastProcessed + 1 {
+            // The first seq of a new peer stream (fresh stream, or reset by the peer's Resume) is the
+            // baseline: a long-running peer may already be far past maxGap, which is not a gap.
+            if lastProcessed > 0, seq > lastProcessed + 1 {
                 let gap = seq - lastProcessed - 1
                 guard gap <= Self.maxGap else { return .rejected }
                 _counters.gaps += Int(gap)
