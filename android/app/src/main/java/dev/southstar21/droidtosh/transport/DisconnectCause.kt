@@ -18,7 +18,10 @@ enum class DisconnectCause {
     MacNotOnNetwork,
     PairingExpired,
     VersionMismatch,
-    /** An established session dropped; the loop is dialling again. */
+    /**
+     * An established session dropped, or the relay answered WAIT during the short grace after a start or
+     * a dropped session (the Mac has not re-parked yet); the loop is dialling again.
+     */
     ConnectionLost,
     Other,
 }

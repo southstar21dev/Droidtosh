@@ -172,7 +172,8 @@ class PhoneConnectionLoop(
                             TransportLog.d(TAG, "relay WAIT soon after a start or session; retrying in ${retryWaitMs}ms")
                             diagnostics.onSessionEnd(DisconnectReason.RELAY_WAIT, "Mac not re-parked yet")
                             host.onState(
-                                ConnectionState.Disconnected("Reconnecting to Mac", DisconnectCause.MacAsleepOrOffline),
+                                // Not "Mac asleep": during the grace the Mac is most likely re-parking.
+                                ConnectionState.Disconnected("Reconnecting to Mac", DisconnectCause.ConnectionLost),
                                 "Disconnected - reconnecting",
                             )
                         } else {

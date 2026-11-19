@@ -117,6 +117,29 @@ class PhoneConnectionLoopTest {
     }
 
     @Test
+    fun aWaitInsideTheGraceReadsAsReconnectingAndPastItAsAsleep() = runTest {
+        val connector = WaitingConnector { testScheduler.currentTime }
+        val host = FakeHost()
+        val loop = PhoneConnectionLoop(
+            host = host,
+            scope = this,
+            reliableStream = ReliableStream(clock = { testScheduler.currentTime }),
+            waitPolicy = WaitModePolicy(fcmEnabled = false),
+            waitSignal = Channel(Channel.CONFLATED),
+            connector = connector,
+            reconnectPolicy = ReconnectPolicy(jitterFraction = { 0.0 }),
+            clock = { testScheduler.currentTime },
+        )
+        val job = launch { loop.run() }
+        runCurrent()
+        // Right after a start the Mac may simply not have re-parked yet.
+        assertEquals(DisconnectCause.ConnectionLost, (host.states.last() as ConnectionState.Disconnected).cause)
+        advanceTimeBy(31_001L)
+        assertEquals(DisconnectCause.MacAsleepOrOffline, (host.states.last() as ConnectionState.Disconnected).cause)
+        job.cancel()
+    }
+
+    @Test
     fun aPushDuringAWaitRetryWakesTheLoopAtOnce() = runTest {
         val connector = WaitingConnector { testScheduler.currentTime }
         val waitSignal = Channel<Unit>(Channel.CONFLATED)
