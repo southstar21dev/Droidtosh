@@ -102,7 +102,7 @@ public final class PhoneStatusTracker {
 public enum PhoneStatusDisplay {
     public static func batteryText(_ status: DSDeviceStatus) -> String {
         let percent = status.batteryPercent
-        guard percent >= 0, percent <= 100 else { return "—" }
+        guard percent >= 0, percent <= 100 else { return "–" }
         return "\(percent)%"
     }
 
@@ -186,7 +186,7 @@ public enum PhoneStatusDisplay {
         case .none:
             return status.airplaneMode ? "Airplane mode" : "No network"
         case .unspecified, .UNRECOGNIZED:
-            return status.airplaneMode ? "Airplane mode" : "—"
+            return status.airplaneMode ? "Airplane mode" : "–"
         }
     }
 
@@ -207,7 +207,7 @@ public enum PhoneStatusDisplay {
         case .normal: return "Ringer on"
         case .vibrate: return "Vibrate"
         case .silent: return "Silent"
-        case .unspecified, .UNRECOGNIZED: return "—"
+        case .unspecified, .UNRECOGNIZED: return "–"
         }
     }
 

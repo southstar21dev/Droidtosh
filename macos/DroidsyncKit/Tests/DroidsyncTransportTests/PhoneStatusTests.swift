@@ -147,7 +147,7 @@ final class PhoneStatusDisplayTests: XCTestCase {
     func testBattery() {
         var status = DSDeviceStatus()
         status.batteryPercent = -1
-        XCTAssertEqual(PhoneStatusDisplay.batteryText(status), "—")
+        XCTAssertEqual(PhoneStatusDisplay.batteryText(status), "–")
         XCTAssertEqual(PhoneStatusDisplay.batterySymbol(status), "battery.0percent")
         XCTAssertNil(PhoneStatusDisplay.chargingText(status))
         let expected: [(Int32, String)] = [
@@ -176,7 +176,7 @@ final class PhoneStatusDisplayTests: XCTestCase {
         var status = DSDeviceStatus()
         status.wifiLevel = -1
         status.cellularLevel = 3
-        XCTAssertEqual(PhoneStatusDisplay.networkLabel(status), "—")
+        XCTAssertEqual(PhoneStatusDisplay.networkLabel(status), "–")
         XCTAssertNil(PhoneStatusDisplay.bars(status))
         status.networkType = .cellular
         status.cellularGeneration = "5G"
@@ -203,7 +203,7 @@ final class PhoneStatusDisplayTests: XCTestCase {
 
     func testRinger() {
         var status = DSDeviceStatus()
-        XCTAssertEqual(PhoneStatusDisplay.ringerLabel(status), "—")
+        XCTAssertEqual(PhoneStatusDisplay.ringerLabel(status), "–")
         status.ringerMode = .normal
         XCTAssertEqual(PhoneStatusDisplay.ringerLabel(status), "Ringer on")
         XCTAssertEqual(PhoneStatusDisplay.ringerSymbol(status), "bell.fill")

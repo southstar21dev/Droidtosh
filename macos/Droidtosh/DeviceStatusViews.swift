@@ -226,6 +226,6 @@ struct PhoneDetailsCard: View {
         var ringer = status
         ringer.doNotDisturb = false
         let mode = PhoneStatusDisplay.ringerLabel(ringer)
-        return mode == "—" ? "Do Not Disturb" : "Do Not Disturb, \(mode)"
+        return mode == "–" ? "Do Not Disturb" : "Do Not Disturb, \(mode)"
     }
 }
