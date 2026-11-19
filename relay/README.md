@@ -33,8 +33,8 @@ for phones without Google services, a UnifiedPush endpoint sent as
 
 UnifiedPush needs no setup on the relay. It POSTs exactly
 `{"type":"mac_online"}` to the endpoint the phone registered, over `https`
-only, with a 15 s timeout, never following redirects and refusing loopback,
-private and link-local addresses. Endpoints are capability URLs, so the log
+only, with a 10 s timeout, never following redirects and refusing loopback,
+private, link-local, carrier-grade NAT and other non-public addresses. Endpoints are capability URLs, so the log
 shows only a short hash. A 404 or 410 drops the endpoint. Set
 `UNIFIEDPUSH_DISABLED=1` to turn it off.
 

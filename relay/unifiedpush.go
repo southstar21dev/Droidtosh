@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"syscall"
@@ -82,11 +83,43 @@ func publicOnly(network, address string, _ syscall.RawConn) error {
 	if err != nil {
 		return err
 	}
-	ip := net.ParseIP(host)
-	if ip == nil || !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+	ip, err := netip.ParseAddr(host)
+	if err != nil || !isPublicAddr(ip) {
 		return errors.New("unifiedpush endpoint resolves to a non-public address")
 	}
 	return nil
+}
+
+// nonPublicRanges are special-purpose ranges the standard library predicates
+// do not cover. Carrier-grade NAT is blocked because on most hosts it is a
+// tailnet or an internal provider network (some clouds serve instance
+// metadata from it). NAT64, 6to4 and Teredo can embed any IPv4 address,
+// private ones included.
+var nonPublicRanges = []netip.Prefix{
+	netip.MustParsePrefix("100.64.0.0/10"),  // carrier-grade NAT, Tailscale
+	netip.MustParsePrefix("192.0.0.0/24"),   // IETF protocol assignments
+	netip.MustParsePrefix("198.18.0.0/15"),  // benchmarking
+	netip.MustParsePrefix("240.0.0.0/4"),    // reserved, broadcast
+	netip.MustParsePrefix("64:ff9b::/96"),   // NAT64
+	netip.MustParsePrefix("64:ff9b:1::/48"), // local-use NAT64
+	netip.MustParsePrefix("2002::/16"),      // 6to4
+	netip.MustParsePrefix("2001::/32"),      // Teredo
+	netip.MustParsePrefix("fec0::/10"),      // deprecated site-local
+}
+
+// isPublicAddr reports whether ip is a global unicast address the relay may
+// connect to. IPv4-mapped IPv6 is judged as the IPv4 address it carries.
+func isPublicAddr(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+		return false
+	}
+	for _, p := range nonPublicRanges {
+		if p.Contains(ip) {
+			return false
+		}
+	}
+	return true
 }
 
 func NewUnifiedPushNotifier() *UnifiedPushNotifier {
