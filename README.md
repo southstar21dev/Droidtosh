@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/brand/droidtosh-stacked-cream.svg">
-    <img alt="Droidtosh" src=".github/brand/droidtosh-stacked-darkroast.svg" width="220">
+    <source media="(prefers-color-scheme: dark)" srcset=".github/brand/droidtosh-stacked-white.svg">
+    <img alt="Droidtosh" src=".github/brand/droidtosh-stacked-black.svg" width="220">
   </picture>
 </p>
 
@@ -23,11 +23,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/southstar21dev/Droidtosh/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/southstar21dev/Droidtosh?include_prereleases&label=release&style=flat-square&color=1F1A17"></a>
+  <a href="https://github.com/southstar21dev/Droidtosh/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/southstar21dev/Droidtosh?include_prereleases&label=release&style=flat-square&color=000000"></a>
   <a href="https://github.com/southstar21dev/Droidtosh/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/southstar21dev/Droidtosh/ci.yml?branch=master&label=CI&style=flat-square"></a>
-  <img alt="Android 13+" src="https://img.shields.io/badge/Android-13%2B-1F1A17?style=flat-square&logo=android&logoColor=F5ECD7">
-  <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-1F1A17?style=flat-square&logo=apple&logoColor=F5ECD7">
-  <a href="LICENSE"><img alt="License GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-1F1A17?style=flat-square"></a>
+  <img alt="Android 13+" src="https://img.shields.io/badge/Android-13%2B-000000?style=flat-square&logo=android&logoColor=FFFFFF">
+  <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-000000?style=flat-square&logo=apple&logoColor=FFFFFF">
+  <a href="LICENSE"><img alt="License GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-000000?style=flat-square"></a>
 </p>
 
 <p align="center">
