@@ -92,7 +92,10 @@ class ReliableStream(
         if (peerResumed && !envelope.hasResume()) trimAcked(envelope.ack)
         val seq = envelope.seq
         if (seq == 0L) return Decision.PROCESS
-        if (seq < 0L || seq - lastProcessed - 1 > MAX_GAP) return Decision.REJECTED
+        // Nothing received yet from this peer stream (first contact, or the peer restarted): its
+        // first seq is the baseline. A long-lived peer's counter can be far past MAX_GAP by then,
+        // and rejecting it would close every session and redial forever.
+        if (seq < 0L || (lastProcessed > 0L && seq - lastProcessed - 1 > MAX_GAP)) return Decision.REJECTED
         if (ackPendingSince == null) ackPendingSince = clock()
         return when {
             seq <= lastProcessed -> {

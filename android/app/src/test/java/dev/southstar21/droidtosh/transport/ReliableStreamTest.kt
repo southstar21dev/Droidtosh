@@ -62,6 +62,16 @@ class ReliableStreamTest {
     }
 
     @Test
+    fun firstSeqFromANewPeerStreamIsTheBaselineHoweverLarge() {
+        val s = stream()
+        val far = 10 * ReliableStream.MAX_GAP
+        assertEquals(ReliableStream.Decision.PROCESS, s.onReceive(incoming(far)))
+        assertEquals(ReliableStream.Decision.PROCESS, s.onReceive(incoming(far + 1)))
+        assertEquals(ReliableStream.Decision.REJECTED, s.onReceive(incoming(far + 1 + 1 + ReliableStream.MAX_GAP + 1)))
+        assertEquals(far + 1, s.resume().lastReceivedSeq)
+    }
+
+    @Test
     fun hugeAndNegativeSeqAreRejectedWithoutAdvancing() {
         val s = stream()
         assertEquals(ReliableStream.Decision.PROCESS, s.onReceive(incoming(1)))
