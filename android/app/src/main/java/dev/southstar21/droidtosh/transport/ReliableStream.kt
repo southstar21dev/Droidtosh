@@ -20,7 +20,8 @@ class ReliableStream(
     private val ttlMs: Long = TTL_MS,
     private val ackDelayMs: Long = ACK_DELAY_MS,
 ) {
-    enum class Decision { PROCESS, DUPLICATE }
+    /** [REJECTED]: the seq is negative or jumps implausibly far ahead; drop it and treat it as a protocol error. */
+    enum class Decision { PROCESS, DUPLICATE, REJECTED }
 
     data class Stats(
         val outboxSize: Int,
@@ -91,6 +92,7 @@ class ReliableStream(
         if (peerResumed && !envelope.hasResume()) trimAcked(envelope.ack)
         val seq = envelope.seq
         if (seq == 0L) return Decision.PROCESS
+        if (seq < 0L || seq - lastProcessed - 1 > MAX_GAP) return Decision.REJECTED
         if (ackPendingSince == null) ackPendingSince = clock()
         return when {
             seq <= lastProcessed -> {
@@ -167,6 +169,8 @@ class ReliableStream(
     }
 
     companion object {
+        /** Largest forward jump in the peer's seq accepted as a real gap (same as the Mac). */
+        const val MAX_GAP = 65_536L
         const val MAX_ENTRIES = 256
         const val MAX_BYTES = 4L * 1024 * 1024
         const val TTL_MS = 120_000L

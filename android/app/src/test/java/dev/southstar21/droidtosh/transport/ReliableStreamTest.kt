@@ -62,6 +62,19 @@ class ReliableStreamTest {
     }
 
     @Test
+    fun hugeAndNegativeSeqAreRejectedWithoutAdvancing() {
+        val s = stream()
+        assertEquals(ReliableStream.Decision.PROCESS, s.onReceive(incoming(1)))
+        assertEquals(ReliableStream.Decision.REJECTED, s.onReceive(incoming(1 + 1 + ReliableStream.MAX_GAP + 1)))
+        assertEquals(ReliableStream.Decision.REJECTED, s.onReceive(incoming(Long.MAX_VALUE)))
+        assertEquals(ReliableStream.Decision.REJECTED, s.onReceive(incoming(-5)))
+        assertEquals(ReliableStream.Decision.REJECTED, s.onReceive(incoming(Long.MIN_VALUE)))
+        assertEquals(1L, s.resume().lastReceivedSeq)
+        // The largest accepted jump is still a plain gap.
+        assertEquals(ReliableStream.Decision.PROCESS, s.onReceive(incoming(1 + 1 + ReliableStream.MAX_GAP)))
+    }
+
+    @Test
     fun duplicatesAreDroppedAndGapsCounted() {
         val s = stream()
         assertEquals(ReliableStream.Decision.PROCESS, s.onReceive(incoming(1)))

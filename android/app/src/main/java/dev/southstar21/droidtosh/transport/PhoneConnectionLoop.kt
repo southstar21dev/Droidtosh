@@ -251,7 +251,11 @@ class PhoneConnectionLoop(
         try {
             while (currentCoroutineContext().isActive) {
                 val envelope = client.receive()
-                if (stream?.onReceive(envelope) == ReliableStream.Decision.DUPLICATE) continue
+                when (stream?.onReceive(envelope)) {
+                    ReliableStream.Decision.DUPLICATE -> continue
+                    ReliableStream.Decision.REJECTED -> throw java.io.IOException("implausible sequence number ${envelope.seq}")
+                    else -> Unit
+                }
                 if (envelope.seq > 0L) ackSignal.trySend(Unit)
                 when {
                     envelope.hasResume() && stream != null -> {
