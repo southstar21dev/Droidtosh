@@ -22,6 +22,13 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
@@ -65,6 +72,26 @@ sealed interface TetherState {
     data object Resting : TetherState
 }
 
+/** True while a page covers the tabs: the Tether and spinning shapes hold still to save battery. */
+val LocalAnimationsPaused = compositionLocalOf { false }
+
+/**
+ * Turns the shape slowly. The angle is read inside the graphics layer, so each frame redraws
+ * the layer instead of recomposing the caller.
+ */
+@Composable
+fun Modifier.spinning(enabled: Boolean, periodMs: Int, label: String): Modifier {
+    if (!enabled || LocalAnimationsPaused.current) return this
+    val transition = rememberInfiniteTransition(label = label)
+    val angle = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(periodMs, easing = LinearEasing)),
+        label = "$label-angle",
+    )
+    return graphicsLayer { rotationZ = angle.value }
+}
+
 /** A representative still, in seconds, for when animations are off. */
 private val TetherState.stillTime: Double
     get() = when (this) {
@@ -91,9 +118,10 @@ fun Tether(
 ) {
     val context = LocalContext.current
     val inspection = LocalInspectionMode.current
-    val animate = remember(context, inspection) {
+    val animationsOn = remember(context, inspection) {
         !inspection && Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
     }
+    val animate = animationsOn && !LocalAnimationsPaused.current
     var time by remember(state) { mutableDoubleStateOf(state.stillTime) }
     if (animate) {
         LaunchedEffect(state) {

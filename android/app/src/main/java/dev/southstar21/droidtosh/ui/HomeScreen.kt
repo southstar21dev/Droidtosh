@@ -221,7 +221,8 @@ private fun MacCard(ui: DroidUiState, onOpen: () -> Unit, onReconnect: () -> Uni
                         tetherSize = 52.dp,
                         containerColor = onHero,
                         contentColor = MaterialTheme.colorScheme.inverseSurface,
-                        spin = state != TetherState.Resting,
+                        // Only the reaching-out states turn; a steady link holds still.
+                        spin = state == TetherState.Handshake || state == TetherState.Seeking,
                     )
                 }
                 Spacer(Modifier.weight(1f))

@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailItem
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -70,6 +71,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.southstar21.droidtosh.BuildConfig
 import dev.southstar21.droidtosh.R
+import dev.southstar21.droidtosh.ui.components.LocalAnimationsPaused
 import dev.southstar21.droidtosh.clipboard.SendClipboardActivity
 import dev.southstar21.droidtosh.launch.OverlayPermission
 import dev.southstar21.droidtosh.transport.ConnectionState
@@ -264,70 +266,51 @@ fun MainScaffold(
     } else {
         Modifier
     }
-    BoxWithConstraints(Modifier.fillMaxSize().then(tabsModifier)) {
-        val wide = maxWidth >= WideLayoutMinWidth
-        val content: @Composable (PaddingValues) -> Unit = { padding ->
-            AnimatedContent(
-                targetState = destination,
-                transitionSpec = {
-                    (fadeIn(effects) + scaleIn(spatial, initialScale = 0.96f)).togetherWith(fadeOut(fastEffects))
-                },
-                label = "destination",
-            ) { target ->
-                val screenModifier = Modifier
-                    .fillMaxSize()
-                    .wrapContentWidth(Alignment.CenterHorizontally)
-                    .widthIn(max = 720.dp)
-                when (target) {
-                    Destination.Home -> HomeScreen(
-                        ui = ui,
-                        actions = actions,
-                        onOpenTransfers = { onDestinationChange(Destination.Transfers) },
-                        onOpenConnection = { onPageChange(Page.Connection) },
-                        onOpenSettings = { onPageChange(Page.Settings) },
-                        modifier = screenModifier,
-                        contentPadding = padding,
-                    )
-                    Destination.Transfers -> TransfersScreen(ui, actions, screenModifier, padding)
-                    Destination.Notifications -> NotificationsScreen(ui, actions, screenModifier, padding)
-                    Destination.Calls -> CallsScreen(ui, actions, screenModifier, padding)
-                }
-            }
-        }
-
-        if (wide) {
-            Row(Modifier.fillMaxSize()) {
-                WideNavigationRail(
-                    arrangement = Arrangement.Center,
-                ) {
-                    Destination.entries.forEach { item ->
-                        WideNavigationRailItem(
-                            selected = destination == item,
-                            onClick = { onDestinationChange(item) },
-                            icon = { NavIcon(item, activeCount) },
-                            label = { Text(destinationLabel(item)) },
-                            railExpanded = false,
-                            colors = WideNavigationRailItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedIndicatorColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                            ),
+    CompositionLocalProvider(LocalAnimationsPaused provides (page != null)) {
+        BoxWithConstraints(Modifier.fillMaxSize().then(tabsModifier)) {
+            val wide = maxWidth >= WideLayoutMinWidth
+            val content: @Composable (PaddingValues) -> Unit = { padding ->
+                AnimatedContent(
+                    targetState = destination,
+                    transitionSpec = {
+                        (fadeIn(effects) + scaleIn(spatial, initialScale = 0.96f)).togetherWith(fadeOut(fastEffects))
+                    },
+                    label = "destination",
+                ) { target ->
+                    val screenModifier = Modifier
+                        .fillMaxSize()
+                        .wrapContentWidth(Alignment.CenterHorizontally)
+                        .widthIn(max = 720.dp)
+                    when (target) {
+                        Destination.Home -> HomeScreen(
+                            ui = ui,
+                            actions = actions,
+                            onOpenTransfers = { onDestinationChange(Destination.Transfers) },
+                            onOpenConnection = { onPageChange(Page.Connection) },
+                            onOpenSettings = { onPageChange(Page.Settings) },
+                            modifier = screenModifier,
+                            contentPadding = padding,
                         )
+                        Destination.Transfers -> TransfersScreen(ui, actions, screenModifier, padding)
+                        Destination.Notifications -> NotificationsScreen(ui, actions, screenModifier, padding)
+                        Destination.Calls -> CallsScreen(ui, actions, screenModifier, padding)
                     }
                 }
-                Scaffold(modifier = Modifier.weight(1f)) { padding -> content(padding) }
             }
-        } else {
-            Scaffold(
-                bottomBar = {
-                    ShortNavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+
+            if (wide) {
+                Row(Modifier.fillMaxSize()) {
+                    WideNavigationRail(
+                        arrangement = Arrangement.Center,
+                    ) {
                         Destination.entries.forEach { item ->
-                            ShortNavigationBarItem(
+                            WideNavigationRailItem(
                                 selected = destination == item,
                                 onClick = { onDestinationChange(item) },
                                 icon = { NavIcon(item, activeCount) },
                                 label = { Text(destinationLabel(item)) },
-                                colors = ShortNavigationBarItemDefaults.colors(
+                                railExpanded = false,
+                                colors = WideNavigationRailItemDefaults.colors(
                                     selectedIconColor = MaterialTheme.colorScheme.onPrimary,
                                     selectedIndicatorColor = MaterialTheme.colorScheme.primary,
                                     selectedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -335,8 +318,29 @@ fun MainScaffold(
                             )
                         }
                     }
-                },
-            ) { padding -> content(padding) }
+                    Scaffold(modifier = Modifier.weight(1f)) { padding -> content(padding) }
+                }
+            } else {
+                Scaffold(
+                    bottomBar = {
+                        ShortNavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                            Destination.entries.forEach { item ->
+                                ShortNavigationBarItem(
+                                    selected = destination == item,
+                                    onClick = { onDestinationChange(item) },
+                                    icon = { NavIcon(item, activeCount) },
+                                    label = { Text(destinationLabel(item)) },
+                                    colors = ShortNavigationBarItemDefaults.colors(
+                                        selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                        selectedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                ) { padding -> content(padding) }
+            }
         }
     }
 
