@@ -1,5 +1,7 @@
 package dev.southstar21.droidtosh.clipboard
 
+import android.content.ClipDescription
+
 object ClipboardTransfer {
     const val CHUNK_SIZE = 256 * 1024
     const val MAX_BLOB_SIZE = 32 * 1024 * 1024
@@ -91,4 +93,13 @@ class ClipboardAssembler(
 object ClipboardPolicy {
     fun shouldAutoSend(isImage: Boolean, metered: Boolean, enabled: Boolean): Boolean =
         enabled && (!isImage || !metered)
+
+    val SENSITIVE_KEYS = listOf(
+        ClipDescription.EXTRA_IS_SENSITIVE,
+        "android.content.extra.IS_SENSITIVE",
+    )
+
+    // Password managers mark their copies sensitive; those must never leave the phone.
+    fun isSensitive(flag: (String) -> Boolean): Boolean =
+        SENSITIVE_KEYS.any(flag)
 }

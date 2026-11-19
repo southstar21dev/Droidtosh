@@ -50,6 +50,22 @@ final class FileNameSanitizerTests: XCTestCase {
         XCTAssertEqual(capped.count, 50, "cut on character boundaries")
     }
 
+    // Same cases as FileNamesTest.extensionCapExcludesTheDot on Android.
+    func testExtensionCapExcludesTheDot() {
+        XCTAssertEqual(
+            FileNameSanitizer.sanitize(String(repeating: "b", count: 190) + "." + String(repeating: "x", count: 20)),
+            String(repeating: "b", count: 179) + "." + String(repeating: "x", count: 20)
+        )
+        XCTAssertEqual(
+            FileNameSanitizer.sanitize(String(repeating: "b", count: 190) + "." + String(repeating: "x", count: 21)),
+            String(repeating: "b", count: 190) + "." + String(repeating: "x", count: 9)
+        )
+        XCTAssertEqual(
+            FileNameSanitizer.sanitize(String(repeating: "a", count: 250) + "."),
+            String(repeating: "a", count: 200)
+        )
+    }
+
     func testUniqueURLAddsSuffixes() throws {
         let dir = try temporaryDirectory()
         XCTAssertEqual(FileNameSanitizer.uniqueURL(for: "a.txt", in: dir).lastPathComponent, "a.txt")
@@ -168,6 +184,8 @@ final class FileTransferEngineTests: XCTestCase {
         link.pump()
         let saved = link.dir("b", "Downloads").appendingPathComponent("photo.jpg")
         XCTAssertEqual(try Data(contentsOf: saved), data)
+        let size = getxattr(saved.path, "com.apple.quarantine", nil, 0, 0, 0)
+        XCTAssertGreaterThan(size, 0, "received files are quarantined")
         XCTAssertEqual(link.snapshots[id]?.phase, .completed)
         XCTAssertEqual(link.snapshots[id]?.savedName, "photo.jpg")
         XCTAssertEqual(link.outcomes["a"], [.sent])
@@ -248,6 +266,27 @@ final class FileTransferEngineTests: XCTestCase {
         XCTAssertEqual(link.snapshots[id]?.phase, .completed)
         XCTAssertTrue(link.outcomes["a"]!.contains(.resumed))
         XCTAssertTrue(link.outcomes["b"]!.contains(.resumed))
+    }
+
+    func testResumeRestartsWhenThePartialFileIsMissing() throws {
+        let link = try Link()
+        link.connect()
+        let (url, data) = try makeFile(link, size: 300_000)
+        let id = try link.a.enqueue(fileAt: url)
+        link.pump(limit: 6)
+        link.disconnect()
+        let partials = try FileManager.default.contentsOfDirectory(at: link.dir("b", "partial"), includingPropertiesForKeys: nil)
+        XCTAssertEqual(partials.count, 1)
+        try FileManager.default.removeItem(at: partials[0])
+        link.connect()
+        let accepts = link.sent(from: "b").compactMap { payload -> UInt64? in
+            if case .fileAccept(let accept) = payload { return accept.resumeOffset }
+            return nil
+        }
+        XCTAssertEqual(accepts.last, 0, "restarted from zero")
+        let saved = link.dir("b", "Downloads").appendingPathComponent("photo.jpg")
+        XCTAssertEqual(try Data(contentsOf: saved), data)
+        XCTAssertEqual(link.snapshots[id]?.phase, .completed)
     }
 
     func testDuplicateOfferWhileSendingIsTreatedAsResumeAndIgnoredBySender() throws {
@@ -336,6 +375,22 @@ final class FileTransferEngineTests: XCTestCase {
         link.b.isReceivingEnabled = { false }
         offer.transferID = "off"
         XCTAssertEqual(reject(offer), "disabled")
+    }
+
+    func testFreeSpaceCheckCountsBytesStillToComeFromOtherTransfers() throws {
+        let link = try Link()
+        link.b.availableCapacity = { _ in 1500 }
+        var first = DSFileOffer()
+        first.transferID = "one"
+        first.name = "a.bin"
+        first.size = 1000
+        link.b.handle(.fileOffer(first))
+        var second = first
+        second.transferID = "two"
+        second.name = "b.bin"
+        link.b.handle(.fileOffer(second))
+        guard case .fileReject(let reject)? = link.sent(from: "b").last else { return XCTFail("expected reject") }
+        XCTAssertEqual(reject.reason, "disk_full")
     }
 
     func testRejectedOfferFailsSenderAndStartsNext() throws {

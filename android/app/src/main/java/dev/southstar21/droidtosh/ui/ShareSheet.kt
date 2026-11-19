@@ -49,16 +49,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.southstar21.droidtosh.R
+import androidx.compose.material3.LinearWavyProgressIndicator
 import dev.southstar21.droidtosh.ui.components.ShapeIcon
+import dev.southstar21.droidtosh.ui.components.ShapeTether
+import dev.southstar21.droidtosh.ui.components.TetherState
 import dev.southstar21.droidtosh.ui.theme.DroidIcons
 
 /** What the "Send file to Mac" share target managed to queue. */
 data class ShareResult(val queued: Int, val total: Int, val names: List<String>)
 
 /**
- * The share-sheet target: a bottom sheet confirming what was queued for the Mac. The files are
- * queued before it shows (the share grant ends with the activity); this only reports and offers
- * a way into Transfers.
+ * The share-sheet target: a bottom sheet that first asks before anything is sent (when [onSend] is
+ * set, [result] then describes what would be sent), and afterwards confirms what was queued for the
+ * Mac and offers a way into Transfers.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -67,12 +70,15 @@ fun ShareSheet(
     onDone: () -> Unit,
     onOpenTransfers: () -> Unit,
     animateIn: Boolean = true,
+    onSend: (() -> Unit)? = null,
 ) {
+    val confirming = onSend != null
     val visible = remember { MutableTransitionState(!animateIn).apply { targetState = true } }
     val failed = result.queued == 0
     val message = when {
         failed -> stringResource(R.string.files_share_nothing)
         result.queued < result.total -> stringResource(R.string.files_share_partial, result.queued, result.total)
+        confirming -> pluralStringResource(R.plurals.files_share_confirm, result.queued, result.queued)
         else -> pluralStringResource(R.plurals.files_share_queued, result.queued, result.queued)
     }
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntOffset>()
@@ -123,22 +129,37 @@ fun ShareSheet(
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
                             )
                         } else {
-                            ShapeIcon(
-                                icon = DroidIcons.Upload,
-                                polygon = MaterialShapes.Cookie9Sided,
+                            // Files on their way: the Tether streams toward the Mac on a soft burst.
+                            ShapeTether(
+                                state = if (confirming) TetherState.Handshake else TetherState.Streaming(toPhone = false),
+                                polygon = MaterialShapes.SoftBurst,
                                 size = 64.dp,
-                                iconSize = 30.dp,
-                                spin = animateIn,
-                                spinPeriodMs = 6_000,
+                                tetherSize = 40.dp,
+                                spin = animateIn && !confirming,
+                                spinPeriodMs = 12_000,
                             )
                         }
                         Spacer(Modifier.width(16.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
-                                stringResource(if (failed) R.string.share_sheet_title_failed else R.string.share_sheet_title),
+                                stringResource(
+                                    when {
+                                        failed -> R.string.share_sheet_title_failed
+                                        confirming -> R.string.share_sheet_title_confirm
+                                        else -> R.string.share_sheet_title
+                                    },
+                                ),
                                 style = MaterialTheme.typography.titleLarge,
                             )
                             Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (!failed && !confirming) {
+                        Spacer(Modifier.size(16.dp))
+                        if (animateIn) {
+                            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        } else {
+                            LinearWavyProgressIndicator(progress = { 0.4f }, modifier = Modifier.fillMaxWidth())
                         }
                     }
                     if (result.names.isNotEmpty()) {
@@ -159,9 +180,15 @@ fun ShareSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     ) {
                         TextButton(onClick = onDone, modifier = Modifier.heightIn(min = 48.dp)) {
-                            Text(stringResource(R.string.share_sheet_done))
+                            Text(stringResource(if (confirming && !failed) R.string.share_sheet_cancel else R.string.share_sheet_done))
                         }
-                        if (!failed) {
+                        if (confirming && !failed) {
+                            Button(
+                                onClick = onSend!!,
+                                shapes = ButtonDefaults.shapes(),
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) { Text(stringResource(R.string.share_sheet_send)) }
+                        } else if (!failed) {
                             Button(
                                 onClick = onOpenTransfers,
                                 shapes = ButtonDefaults.shapes(),

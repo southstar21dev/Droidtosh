@@ -136,6 +136,13 @@ dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging")
+    // UnifiedPush connector: wake-ups through the user's distributor (ntfy, ...) on phones without
+    // FCM. Pulls only kotlin-stdlib and Tink, no Google Play Services.
+    implementation("org.unifiedpush.android:connector:3.3.6") {
+        // The connector's Tink needs full protobuf-java, which clashes with the app's protobuf-lite.
+        exclude(group = "com.google.crypto.tink", module = "tink")
+    }
+    implementation("com.google.crypto.tink:tink-android:1.24.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")

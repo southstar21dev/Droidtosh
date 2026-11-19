@@ -34,6 +34,9 @@ class NotificationActionExecutor(
         if (actionIndex !in actions.indices) {
             return ActionOutcome(false, "bad_action_index", "action index out of range")
         }
+        if (replyText != null && actions[actionIndex].remoteInputs.isNullOrEmpty()) {
+            return ActionOutcome(false, "not_replyable", "action does not accept a reply")
+        }
         val result = sender.send(actions[actionIndex], replyText)
         return if (result.ok) {
             ActionOutcome(true)

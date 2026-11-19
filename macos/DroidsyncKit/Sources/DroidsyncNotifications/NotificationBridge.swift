@@ -7,6 +7,7 @@ public final class NotificationBridge {
     public static let replyPrefix = "reply."
     public static let actionPrefix = "action."
     public static let maxCustomActions = 4
+    public static let copyCodeIdentifier = "copy-code"
 
     private let presenter: NotificationPresenting
     private var presentedKeys: Set<String> = []
@@ -53,12 +54,17 @@ public final class NotificationBridge {
         let replies = record.actions.filter(\.hasRemoteInput_p)
         let customActions = record.actions.filter { !$0.hasRemoteInput_p }
         let selectedActions = Array((replies + customActions).prefix(maxCustomActions))
-        let actions = selectedActions.map { action in
+        var actions = selectedActions.map { action in
             PendingAction(
                 identifier: actionIdentifier(for: action),
                 title: action.title,
                 isReply: action.hasRemoteInput_p
             )
+        }
+        let body = record.bigText.isEmpty ? record.text : record.bigText
+        let code = VerificationCodeDetector.code(title: record.title, body: body)
+        if code != nil {
+            actions.insert(PendingAction(identifier: copyCodeIdentifier, title: "Copy Code", isReply: false), at: 0)
         }
         let replyPlaceholder = record.remoteInputHint.isEmpty ? "Reply" : record.remoteInputHint
         // Categories are registered once per identifier with their button titles, so the
@@ -71,17 +77,19 @@ public final class NotificationBridge {
                     selectedActions.map(\.title) + (replies.isEmpty ? [] : [replyPlaceholder])
                 )
         let subtitleParts = [record.appLabel, record.subText].filter { !$0.isEmpty }
-        return PendingNotification(
+        var pending = PendingNotification(
             identifier: record.key,
             packageName: record.packageName,
             title: record.title,
-            body: record.bigText.isEmpty ? record.text : record.bigText,
-            subtitle: subtitleParts.joined(separator: " · "),
-            categoryIdentifier: categoryPrefix + record.packageName + "." + actionSignature,
+            body: body,
+            subtitle: subtitleParts.joined(separator: ", "),
+            categoryIdentifier: categoryPrefix + record.packageName + "." + actionSignature + (code == nil ? "" : ".code"),
             isOngoing: record.isOngoing,
             replyPlaceholder: replyPlaceholder,
             actions: actions
         )
+        pending.verificationCode = code
+        return pending
     }
 
     private static func labelHash(_ labels: [String]) -> String {

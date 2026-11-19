@@ -14,10 +14,10 @@ network when the relay can't be reached. See the main [README](../README.md#how-
 
 Every connection to the relay is TLS (protocol v2, see
 `protocol/PROTOCOL-v2.md`). The relay uses a self-signed certificate that the
-apps pin by fingerprint, so the room ID and the phone's FCM token in the join
+apps pin by fingerprint, so the room ID and the phone's push token in the join
 line are no longer visible on the network path. Plain TCP is not accepted.
 
-- Join line, sent inside TLS: `DROIDSYNC/2 <room> mac|phone [fcm-token]\n`
+- Join line, sent inside TLS: `DROIDSYNC/2 <room> mac|phone [push-token]\n`
   (max 512 bytes). A join line for any other protocol version gets `ERROR upgrade`.
 - Responses: exactly one line, `PAIRED\n`, `WAIT\n`, or `ERROR <reason>\n`
 - Default port: `7443` (TLS over TCP)
@@ -25,9 +25,18 @@ line are no longer visible on the network path. Plain TCP is not accepted.
 - Max concurrent connections: `512` total, `16` per source IP; further
   connections get `ERROR busy` immediately
 
-When a Mac parks in a room that has a registered FCM token, the relay sends a
+When a Mac parks in a room that has a registered push token, the relay sends a
 data-only `mac_online` push so the phone can wake and reconnect. The push never
-contains notification or call content.
+contains notification or call content. The token is either an FCM token or,
+for phones without Google services, a UnifiedPush endpoint sent as
+`up:<https url>` (see `protocol/PROTOCOL-v2.md` 1.2.1).
+
+UnifiedPush needs no setup on the relay. It POSTs exactly
+`{"type":"mac_online"}` to the endpoint the phone registered, over `https`
+only, with a 10 s timeout, never following redirects and refusing loopback,
+private, link-local, carrier-grade NAT and other non-public addresses. Endpoints are capability URLs, so the log
+shows only a short hash. A 404 or 410 drops the endpoint. Set
+`UNIFIEDPUSH_DISABLED=1` to turn it off.
 
 ## Configuration
 
@@ -36,7 +45,8 @@ contains notification or call content.
 | `PORT`               | no       | Listen port, default `7443`.                                                   |
 | `FCM_SERVICE_ACCOUNT`| no       | Firebase service-account JSON (the whole file contents). Enables `mac_online` pushes. |
 | `FCM_PROJECT_ID`     | no       | Firebase project ID; falls back to `project_id` from the service-account JSON. |
-| `STATE_FILE`         | no       | Path to persist room → FCM token state (e.g. `/data/state.json`).              |
+| `UNIFIEDPUSH_DISABLED`| no      | Any value stops the relay from POSTing to UnifiedPush endpoints.              |
+| `STATE_FILE`         | no       | Path to persist room → push token state (e.g. `/data/state.json`).             |
 | `MAX_CONNS_PER_IP`   | no       | Concurrent connections allowed from one source IP, default `16`.               |
 | `CERT_FILE`          | no       | TLS certificate (PEM), default `/data/relay-cert.pem`. Generated on first start. |
 | `KEY_FILE`           | no       | TLS private key (PEM, written `0600`), default `/data/relay-key.pem`.          |
@@ -62,7 +72,7 @@ To read it without starting the relay, run `droidtosh-relay -print-fingerprint`
 (or `go run . -print-fingerprint`, or
 `docker compose run --rm relay -print-fingerprint`).
 
-Paste it into the Mac's **Settings › Connection › Relay › Fingerprint**. If you leave that
+Paste it into **Fingerprint** under **Relay** on the Mac's **Connection** page. If you leave that
 field empty, the Mac trusts the certificate it sees on first connect and
 shows its fingerprint so you can compare it with the log line. The Mac puts
 the fingerprint into the pairing QR code, and the phone pins it.
@@ -82,8 +92,8 @@ start rather than silently using a different certificate. When it does
 generate a new certificate, it logs `WARNING: generated a NEW relay
 certificate`; seeing that on every deploy means `/data` isn't persistent.
 
-If `FCM_SERVICE_ACCOUNT` is unset, the relay logs `FCM not configured: mac_online
-pushes disabled` and runs without pushes.
+If `FCM_SERVICE_ACCOUNT` is unset, the relay logs `FCM not configured: FCM pushes
+disabled` and runs without FCM pushes (UnifiedPush wake-ups still work).
 
 With `STATE_FILE` set, state is loaded at startup and written on graceful
 shutdown (SIGINT/SIGTERM). It is not written on every change, so a hard
@@ -91,7 +101,7 @@ kill can lose the most recent token registrations; phones re-register their
 token on their next connect.
 
 The relay holds up to 1024 rooms. A token is kept for 30 days after the room's
-last join. Tokens FCM reports as invalid are dropped. When the table is full,
+last join. Tokens FCM reports as invalid, and UnifiedPush endpoints that answer 404 or 410, are dropped. When the table is full,
 the least recently seen room with no open connection is evicted.
 
 ## Local development
@@ -125,7 +135,7 @@ Point the Mac app's relay address at `127.0.0.1:7443` and pair as usual.
 3. Download `google-services.json` and place it at `android/app/google-services.json`
    (gitignored). Rebuild the Android app.
 4. In Firebase: **Project settings → Service accounts → Generate new private
-   key**. A service-account JSON file downloads. Copy its full contents — this
+   key**. A service-account JSON file downloads. Copy its full contents: this
    is the relay's `FCM_SERVICE_ACCOUNT`.
 5. Set `FCM_PROJECT_ID` only if it differs from the `project_id` inside the
    service-account JSON.
@@ -166,11 +176,11 @@ contains only public project configuration.
 
 ## Pair the Mac
 
-1. In Droidtosh on the Mac, open **Settings › Connection**. Choose **Relay**
-   (or **Relay, local network as fallback**), then enter the relay host and
+1. In Droidtosh on the Mac, open the **Connection** page. Choose **Relay**
+   (or **Relay, Wi-Fi as fallback**), then enter the relay host and
    port (for example `relay.example.com` / `7443`) and, optionally, the relay
    fingerprint.
-2. Choose **Show Pairing Code**.
+2. Choose **Show Pairing Code** (or **Pair Phone…** in the menu bar).
 3. On the phone, open Droidtosh and scan the code. The phone connects to the
    relay, the Mac parks in the same room, and both show connected.
 
@@ -178,6 +188,6 @@ contains only public project configuration.
 
 - FCM payloads contain only `{"type": "mac_online"}`; notification, call,
   clipboard and file content stays end-to-end encrypted between the devices.
-- FCM tokens are persisted only when `STATE_FILE` is set.
+- FCM tokens and UnifiedPush endpoints are persisted only when `STATE_FILE` is set.
 - The relay is stateless otherwise; restart it at any time and both devices
   reconnect.

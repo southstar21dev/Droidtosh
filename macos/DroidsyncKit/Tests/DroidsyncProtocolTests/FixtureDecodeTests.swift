@@ -103,13 +103,85 @@ final class FixtureDecodeTests: XCTestCase {
         XCTAssertEqual(status.ringerMode, .vibrate)
         XCTAssertTrue(status.doNotDisturb)
         XCTAssertEqual(status.sampledAtMs, 1_759_999_999_500)
+        XCTAssertTrue(status.backgroundRestricted)
+        XCTAssertEqual(status.backgroundReason, .vendorBattery)
         XCTAssertEqual(try envelope.serializedData(), data)
     }
 
     func testEveryFixtureIsProtocolV2() throws {
-        for name in ["hello", "ping", "notification_record", "call_state", "resume", "device_status"] {
+        for name in ["hello", "ping", "notification_record", "call_state", "resume", "device_status", "file_offer", "file_chunk", "find_phone_request", "find_phone_state", "open_url"] {
             let envelope = try DSEnvelope(serializedBytes: try load(name))
             XCTAssertEqual(envelope.protocolVersion, ProtocolV2.version, name)
         }
+    }
+
+    func testFileOfferFixture() throws {
+        let data = try load("file_offer")
+        let envelope = try DSEnvelope(serializedBytes: data)
+        XCTAssertEqual(envelope.messageID, "fixture-file-offer")
+        guard case .fileOffer(let offer)? = envelope.payload else {
+            return XCTFail("expected file_offer payload")
+        }
+        XCTAssertEqual(offer.transferID, "11111111-2222-3333-4444-555555555555")
+        XCTAssertEqual(offer.name, "holiday photo.jpg")
+        XCTAssertEqual(offer.mimeType, "image/jpeg")
+        XCTAssertEqual(offer.size, 4096)
+        XCTAssertEqual(offer.modifiedAtMs, 1_759_999_000_000)
+        XCTAssertEqual(try envelope.serializedData(), data)
+    }
+
+    func testFileChunkFixture() throws {
+        let data = try load("file_chunk")
+        let envelope = try DSEnvelope(serializedBytes: data)
+        XCTAssertEqual(envelope.messageID, "fixture-file-chunk")
+        guard case .fileChunk(let chunk)? = envelope.payload else {
+            return XCTFail("expected file_chunk payload")
+        }
+        XCTAssertEqual(chunk.transferID, "11111111-2222-3333-4444-555555555555")
+        XCTAssertEqual(chunk.offset, 1024)
+        var expected = Data("droidtosh".utf8)
+        expected.append(contentsOf: [0x00, 0xFF])
+        expected.append(Data("chunk".utf8))
+        XCTAssertEqual(chunk.data, expected)
+        XCTAssertEqual(try envelope.serializedData(), data)
+    }
+
+    func testFindPhoneRequestFixture() throws {
+        let data = try load("find_phone_request")
+        let envelope = try DSEnvelope(serializedBytes: data)
+        XCTAssertEqual(envelope.messageID, "fixture-find-phone-request")
+        guard case .findPhoneRequest(let request)? = envelope.payload else {
+            return XCTFail("expected find_phone_request payload")
+        }
+        XCTAssertEqual(request.requestID, "find-req-1")
+        XCTAssertEqual(request.action, .start)
+        XCTAssertEqual(try envelope.serializedData(), data)
+    }
+
+    func testFindPhoneStateFixture() throws {
+        let data = try load("find_phone_state")
+        let envelope = try DSEnvelope(serializedBytes: data)
+        XCTAssertEqual(envelope.messageID, "fixture-find-phone-state")
+        guard case .findPhoneState(let state)? = envelope.payload else {
+            return XCTFail("expected find_phone_state payload")
+        }
+        XCTAssertEqual(state.requestID, "find-req-1")
+        XCTAssertFalse(state.ringing)
+        XCTAssertEqual(state.ended, .findEndStoppedOnPhone)
+        XCTAssertEqual(try envelope.serializedData(), data)
+    }
+
+    func testOpenUrlFixture() throws {
+        let data = try load("open_url")
+        let envelope = try DSEnvelope(serializedBytes: data)
+        XCTAssertEqual(envelope.messageID, "fixture-open-url")
+        guard case .openURL(let link)? = envelope.payload else {
+            return XCTFail("expected open_url payload")
+        }
+        XCTAssertEqual(link.url, "https://example.com/path?q=1")
+        XCTAssertEqual(try envelope.serializedData(), data)
+        XCTAssertEqual(ProtocolV2.requiredCapability(for: .openURL(link)), ProtocolV2.Capability.openUrl)
+        XCTAssertTrue(ProtocolV2.isReliableFromMac(.openURL(link)))
+        XCTAssertTrue(ProtocolV2.macCapabilities.contains(ProtocolV2.Capability.openUrl))
     }
 }

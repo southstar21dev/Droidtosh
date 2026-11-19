@@ -1,0 +1,7 @@
+protocol_version: 2
+message_id: "fixture-find-phone-request"
+sent_at_ms: 1760000002000
+find_phone_request {
+  request_id: "find-req-1"
+  action: FIND_ACTION_START
+}

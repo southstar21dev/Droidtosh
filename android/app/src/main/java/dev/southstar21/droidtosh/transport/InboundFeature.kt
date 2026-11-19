@@ -13,6 +13,8 @@ enum class InboundFeature(val capacity: Int) {
     FILES(64),
     // Find my phone requests: a few at most, and only the latest matters.
     DEVICE(16),
+    // Links from the Mac: each becomes a tap-to-open notification.
+    LINK(16),
     ;
 
     companion object {
@@ -44,6 +46,7 @@ enum class InboundFeature(val capacity: Int) {
             PayloadCase.FILE_COMPLETE,
             PayloadCase.FILE_CANCEL -> FILES
             PayloadCase.FIND_PHONE_REQUEST -> DEVICE
+            PayloadCase.OPEN_URL -> LINK
             else -> null
         }
     }

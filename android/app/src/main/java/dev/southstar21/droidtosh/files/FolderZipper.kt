@@ -141,7 +141,7 @@ class TemporaryFileSource(
     override val mimeType: String = "application/zip"
     override val size: Long = file.length()
     override val modifiedAtMs: Long = file.lastModified()
-    override fun open(offset: Long): InputStream = file.inputStream().also { it.channel.position(offset) }
+    override fun open(offset: Long): InputStream = file.inputStream().also { it.channel.position(offset.coerceIn(0, file.length())) }
     override fun currentSize(): Long = file.length()
     override fun close() {
         cleanup.deleteRecursively()

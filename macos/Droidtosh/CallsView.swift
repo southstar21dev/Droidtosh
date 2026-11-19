@@ -47,12 +47,19 @@ struct CallsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            dialer
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
+        HStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    dialer
+                    CallOptions(model: model)
+                }
+                .padding(18)
+            }
+            .frame(width: 300)
+            .background(Brand.card.opacity(0.6))
             Divider()
             callLog
+                .frame(minWidth: 320, maxWidth: .infinity)
         }
         .navigationTitle("Calls")
         .searchable(text: $search, placement: .toolbar, prompt: "Search calls")
@@ -91,38 +98,39 @@ struct CallsView: View {
     }
 
     private var dialer: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "circle.grid.3x3.fill")
+        OptionGroup("Call from your phone") {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Number")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-                TextField("Enter a phone number", text: $number)
-                    .textFieldStyle(.plain)
-                    .font(.title3)
-                    .onSubmit(placeCall)
-                    .accessibilityLabel("Phone number")
+                HStack(spacing: 8) {
+                    Image(systemName: "circle.grid.3x3")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    TextField("Enter a phone number", text: $number)
+                        .textFieldStyle(.plain)
+                        .font(.title3)
+                        .onSubmit(placeCall)
+                        .accessibilityLabel("Phone number")
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Brand.surface))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.separator, lineWidth: 0.5))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(CardBackground(cornerRadius: 10))
-            .frame(maxWidth: 340)
             if model.calls.phoneAccounts.count > 1 {
                 Picker("SIM", selection: accountBinding) {
                     ForEach(model.calls.phoneAccounts, id: \.id) { account in
                         Text(account.label.isEmpty ? account.id : account.label).tag(account.id)
                     }
                 }
-                .labelsHidden()
-                .fixedSize()
                 .help("Which SIM to call from")
             }
             Button(action: placeCall) {
-                Label("Call", systemImage: "phone.fill")
-                    .padding(.horizontal, 6)
+                Label("Call", systemImage: "phone")
+                    .frame(maxWidth: .infinity)
             }
-            .controlSize(.large)
-            .droidtoshProminentButton()
-            .tint(.green)
+            .buttonStyle(InkButtonStyle())
             .disabled(trimmedNumber.isEmpty)
             .keyboardShortcut(.defaultAction)
             if !model.notifications.voipApps.isEmpty {
@@ -133,13 +141,10 @@ struct CallsView: View {
                         }
                     }
                 } label: {
-                    Label("Call via App", systemImage: "video.fill")
+                    Label("Call via App", systemImage: "video")
                 }
-                .controlSize(.large)
-                .fixedSize()
                 .help("Open a calling app on your phone")
             }
-            Spacer(minLength: 0)
         }
         .onChange(of: model.calls.phoneAccounts) { _, accounts in
             if !accounts.contains(where: { $0.id == selectedAccount }) {
@@ -222,8 +227,7 @@ private struct CallLogRow: View {
             ContactAvatar(name: entry.contactName, number: entry.number, size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(CallText.title(entry))
-                    .foregroundStyle(missed ? .red : .primary)
-                    .fontWeight(missed ? .medium : .regular)
+                    .fontWeight(missed ? .semibold : .regular)
                 HStack(spacing: 4) {
                     Image(systemName: CallText.symbol(entry.type))
                         .imageScale(.small)
@@ -238,7 +242,7 @@ private struct CallLogRow: View {
                     Image(systemName: "phone.fill")
                 }
                 .buttonStyle(.borderless)
-                .foregroundStyle(.green)
+                .foregroundStyle(.primary)
                 .help("Call back")
                 .accessibilityLabel("Call back")
             }
@@ -260,7 +264,48 @@ private struct CallLogRow: View {
     }
 }
 
-/// Initials (or a person symbol) in a tinted circle.
+/// The call options: desktop duplicates and the phone's SIMs (moved here from Settings).
+private struct CallOptions: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        OptionGroup("Desktop app duplicates") {
+            Toggle(isOn: Binding(
+                get: { model.calls.dedupCallsEnabled },
+                set: { model.calls.setDedupCallsEnabled($0) }
+            )) {
+                Text("Hide mirrored calls while the Mac app is running")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            ForEach(DedupApp.all) { app in
+                Toggle(isOn: Binding(
+                    get: { !model.calls.dedupCallsDisabledPackages.contains(app.id) },
+                    set: { model.calls.setDedupCallsDisabled(package: app.id, disabled: !$0) }
+                )) {
+                    Text("\(app.label) calls")
+                }
+                .toggleStyle(.checkbox)
+                .disabled(!model.calls.dedupCallsEnabled)
+                .padding(.leading, 4)
+            }
+            OptionFootnote("When WhatsApp or Telegram is open on this Mac, its own call window rings instead of Droidtosh's.")
+        }
+        OptionGroup("Phone") {
+            OptionRow("SIMs", detail: simText)
+            OptionFootnote("Incoming calls show a panel with Accept, Decline and Mute.")
+        }
+    }
+
+    private var simText: String {
+        let accounts = model.calls.phoneAccounts
+        if accounts.isEmpty { return "None reported" }
+        return accounts.map { $0.label.isEmpty ? $0.id : $0.label }.joined(separator: ", ")
+    }
+}
+
+/// Initials (or a person symbol) in a grey circle.
 struct ContactAvatar: View {
     let name: String
     let number: String
@@ -323,7 +368,7 @@ enum CallText {
         if !entry.contactName.isEmpty, !entry.number.isEmpty { parts.append(entry.number) }
         if entry.durationS > 0 { parts.append(duration(entry.durationS)) }
         if !entry.simLabel.isEmpty { parts.append(entry.simLabel) }
-        return parts.joined(separator: " · ")
+        return parts.joined(separator: ", ")
     }
 
     static func duration(_ seconds: UInt32) -> String {

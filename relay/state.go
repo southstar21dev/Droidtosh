@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 )
 
@@ -13,7 +16,9 @@ type RoomRecord struct {
 }
 
 // LoadState reads persisted room records. It also accepts the original
-// format, a plain room → token map, whose records get a zero LastSeen.
+// format, a plain room to token map, whose records get a zero LastSeen.
+// Malformed entries are skipped (and counted in the log) rather than failing
+// the whole file; only an unreadable file returns an error.
 func LoadState(path string) (map[string]RoomRecord, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -24,6 +29,7 @@ func LoadState(path string) (map[string]RoomRecord, error) {
 		return nil, err
 	}
 	records := make(map[string]RoomRecord, len(raw))
+	skipped := 0
 	for room, value := range raw {
 		var token string
 		if err := json.Unmarshal(value, &token); err == nil {
@@ -32,9 +38,13 @@ func LoadState(path string) (map[string]RoomRecord, error) {
 		}
 		var rec RoomRecord
 		if err := json.Unmarshal(value, &rec); err != nil {
-			return nil, err
+			skipped++
+			continue
 		}
 		records[room] = rec
+	}
+	if skipped > 0 {
+		log.Printf("state load: skipped %d malformed entries in %s", skipped, path)
 	}
 	return records, nil
 }
@@ -69,4 +79,43 @@ func SaveState(path string, records map[string]RoomRecord) error {
 		_ = dir.Close()
 	}
 	return nil
+}
+
+// stateSaveInterval is how often the registry is checked for changes worth
+// persisting between shutdowns.
+const stateSaveInterval = time.Minute
+
+// saveStatePeriodically writes the registry to path every interval, but only
+// when its records changed since the last write, until ctx is done. A crash or
+// SIGKILL then loses at most one interval of changes.
+func saveStatePeriodically(ctx context.Context, path string, registry *Registry, interval time.Duration) {
+	last := registry.Records()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		cur := registry.Records()
+		if reflect.DeepEqual(cur, last) {
+			continue
+		}
+		if err := SaveState(path, cur); err != nil {
+			log.Printf("state save failed: %v", err)
+			continue
+		}
+		last = cur
+	}
+}
+
+// quarantineState moves an unreadable state file aside so the next save can't
+// overwrite what might still be recoverable. It returns the new path.
+func quarantineState(path string, now time.Time) (string, error) {
+	dest := path + ".corrupt-" + now.UTC().Format("20060102T150405Z")
+	if err := os.Rename(path, dest); err != nil {
+		return "", err
+	}
+	return dest, nil
 }

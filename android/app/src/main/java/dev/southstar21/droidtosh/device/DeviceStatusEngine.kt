@@ -1,5 +1,6 @@
 package dev.southstar21.droidtosh.device
 
+import dev.southstar21.droidtosh.protocol.v1.BackgroundReason
 import dev.southstar21.droidtosh.protocol.v1.ChargeSource
 import dev.southstar21.droidtosh.protocol.v1.DeviceStatus
 import dev.southstar21.droidtosh.protocol.v1.Envelope
@@ -22,6 +23,9 @@ data class PhoneStatusSnapshot(
     val airplaneMode: Boolean = false,
     val ringerMode: RingerMode = RingerMode.RINGER_MODE_UNSPECIFIED,
     val doNotDisturb: Boolean = false,
+    /** The background health check found something that can cut the connection while idle (section 8.3). */
+    val backgroundRestricted: Boolean = false,
+    val backgroundReason: BackgroundReason = BackgroundReason.BACKGROUND_REASON_UNSPECIFIED,
 ) {
     /** Whether a change from [other] must reach the Mac within a second instead of being coalesced. */
     fun differsInFastFields(other: PhoneStatusSnapshot): Boolean =
@@ -29,7 +33,8 @@ data class PhoneStatusSnapshot(
             networkType != other.networkType ||
             airplaneMode != other.airplaneMode ||
             ringerMode != other.ringerMode ||
-            doNotDisturb != other.doNotDisturb
+            doNotDisturb != other.doNotDisturb ||
+            backgroundRestricted != other.backgroundRestricted
 
     fun toProto(sampledAtMs: Long): DeviceStatus = DeviceStatus.newBuilder()
         .setBatteryPercent(batteryPercent)
@@ -44,6 +49,8 @@ data class PhoneStatusSnapshot(
         .setAirplaneMode(airplaneMode)
         .setRingerMode(ringerMode)
         .setDoNotDisturb(doNotDisturb)
+        .setBackgroundRestricted(backgroundRestricted)
+        .setBackgroundReason(backgroundReason)
         .setSampledAtMs(sampledAtMs)
         .build()
 }

@@ -1,0 +1,8 @@
+protocol_version: 2
+message_id: "fixture-find-phone-state"
+sent_at_ms: 1760000002100
+find_phone_state {
+  request_id: "find-req-1"
+  ringing: false
+  ended: FIND_END_STOPPED_ON_PHONE
+}

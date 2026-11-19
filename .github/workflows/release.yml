@@ -32,7 +32,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SEMANTIC_RELEASE: semantic-release@25.0.9 @semantic-release/exec@7.1.0 conventional-changelog-conventionalcommits@8.0.0
   TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
 jobs:
@@ -47,21 +46,26 @@ jobs:
       ref: ${{ steps.v.outputs.ref }}
       commit: ${{ steps.v.outputs.commit }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         if: github.event_name == 'push'
         with:
           node-version: '24'
+      # From the committed lockfile (.github/release-tools), with no lifecycle scripts: the job holds
+      # a write token, so nothing resolved fresh or run at install time may reach it.
+      - name: Install semantic-release
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p "$RUNNER_TEMP/semrel"
+          cp .github/release-tools/package.json .github/release-tools/package-lock.json "$RUNNER_TEMP/semrel/"
+          npm ci --ignore-scripts --no-audit --no-fund --prefix "$RUNNER_TEMP/semrel"
       - name: Decide the version
         if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # $SEMANTIC_RELEASE is a list of packages: split on purpose.
-          # shellcheck disable=SC2086
-          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/semrel" $SEMANTIC_RELEASE
           "$RUNNER_TEMP/semrel/node_modules/.bin/semantic-release" --dry-run
       # Semantic versioning (docs/RELEASING.md): a hand-made release's tag must be vX.Y.Z or
       # vX.Y.Z-(alpha|beta|rc).N and be marked as a pre-release exactly when it has a suffix.
@@ -107,21 +111,21 @@ jobs:
       DROIDTOSH_VERSION: ${{ needs.plan.outputs.version }}
       DROIDTOSH_BUILD: ${{ needs.plan.outputs.build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.plan.outputs.ref }}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: '17'
       # The action's default package list includes `tools`, which current SDK repositories no
       # longer carry.
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       # CI saves the Gradle cache; a release only reads it instead of re-uploading ~350 MB.
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4.4.3
         with:
           cache-read-only: true
       - name: Release key
@@ -144,10 +148,13 @@ jobs:
         run: |
           mkdir dist
           cp android/app/build/outputs/apk/release/app-release.apk "dist/Droidtosh-${DROIDTOSH_VERSION}-${DROIDTOSH_BUILD}.apk"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: android
           path: dist/
+      - name: Remove the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.p12"
 
   mac:
     needs: plan
@@ -157,10 +164,10 @@ jobs:
       DROIDTOSH_VERSION: ${{ needs.plan.outputs.version }}
       DROIDTOSH_BUILD: ${{ needs.plan.outputs.build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.plan.outputs.ref }}
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: latest-stable
       - name: Signing identity
@@ -179,14 +186,23 @@ jobs:
           security set-keychain-settings -lut 3600 "$keychain"
           security unlock-keychain -p "$keychain_password" "$keychain"
           security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/signing.p12"
           security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" >/dev/null
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+      - name: Install XcodeGen
+        env:
+          XCODEGEN_VERSION: 2.48.0
+          XCODEGEN_SHA256: 620c9f0dc10849f94728ab5df52d225ebab8187439dd6fee1925e59e80dff892
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/$XCODEGEN_VERSION/xcodegen.zip"
+          echo "$XCODEGEN_SHA256  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
       - name: Build
         working-directory: macos
         run: |
-          brew install xcodegen
-          xcodegen generate
+          "$RUNNER_TEMP/xcodegen/bin/xcodegen" generate
           xcodebuild -project Droidtosh.xcodeproj -scheme Droidtosh -configuration Release \
             -derivedDataPath build/release \
             MARKETING_VERSION="${DROIDTOSH_VERSION%%-*}" CURRENT_PROJECT_VERSION="$DROIDTOSH_BUILD" \
@@ -200,10 +216,15 @@ jobs:
           codesign -d -r- "$app" 2>&1 | grep 'certificate leaf = H"40925259b86c734a3f001ded61bd741ea01d9f98"'
           mkdir dist
           ditto -c -k --keepParent "$app" "dist/Droidtosh-${DROIDTOSH_VERSION}-${DROIDTOSH_BUILD}-mac.zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mac
           path: dist/
+      - name: Remove the signing keychain and certificate
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/signing.p12"
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
 
   publish:
     needs: [plan, android, mac]
@@ -216,10 +237,10 @@ jobs:
       COMMIT: ${{ needs.plan.outputs.commit }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: release-assets
           merge-multiple: true
@@ -235,17 +256,23 @@ jobs:
               android: {file: $apk, sha256: $apk_sha}, mac: {file: $zip, sha256: $zip_sha}}' \
             > manifest/droidtosh-update.json
           cat manifest/droidtosh-update.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         if: github.event_name == 'push'
         with:
           node-version: '24'
+      # From the committed lockfile (.github/release-tools), with no lifecycle scripts: the job holds
+      # a write token, so nothing resolved fresh or run at install time may reach it.
+      - name: Install semantic-release
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p "$RUNNER_TEMP/semrel"
+          cp .github/release-tools/package.json .github/release-tools/package-lock.json "$RUNNER_TEMP/semrel/"
+          npm ci --ignore-scripts --no-audit --no-fund --prefix "$RUNNER_TEMP/semrel"
       - name: Tag and publish the GitHub release
         if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # shellcheck disable=SC2086
-          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/semrel" $SEMANTIC_RELEASE
           "$RUNNER_TEMP/semrel/node_modules/.bin/semantic-release"
           released="$(cat .release-version 2>/dev/null || true)"
           if [ "$released" != "$VERSION" ]; then
@@ -255,6 +282,10 @@ jobs:
           echo "TAG=v$VERSION" >> "$GITHUB_ENV"
       - name: Attach the apps to the hand-made release
         if: github.event_name != 'push'
-        run: gh release upload "$TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          # A rerun replaces files the old manifest's SHA-256 describes. Drop the manifest first, so
+          # updaters see no manifest rather than one that doesn't match the files.
+          gh release delete-asset "$TAG" droidtosh-update.json -y --repo "$GITHUB_REPOSITORY" || true
+          gh release upload "$TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
       - name: Attach the manifest
         run: gh release upload "$TAG" manifest/droidtosh-update.json --clobber --repo "$GITHUB_REPOSITORY"

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package droidsync.v1;
+
+option java_package = "dev.southstar21.droidtosh.protocol.v1";
+option java_multiple_files = true;
+option swift_prefix = "DS";
+
+// Send a link or phone number to the other device ("open_url" capability, either direction).
+// See protocol/PROTOCOL-v2.md section 10.
+
+// The receiver never opens it by itself: it shows a notification and opens the link only when
+// the user taps it.
+message OpenUrl {
+  string url = 1;  // http or https, or tel: toward the phone; at most 2048 bytes, no control characters
+}

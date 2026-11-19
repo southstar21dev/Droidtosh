@@ -44,10 +44,17 @@ import dev.southstar21.droidtosh.files.FileTransfers
 import dev.southstar21.droidtosh.files.TransferDirection
 import dev.southstar21.droidtosh.files.TransferInfo
 import dev.southstar21.droidtosh.files.TransferStatus
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import dev.southstar21.droidtosh.ui.components.EmptyState
-import dev.southstar21.droidtosh.ui.components.PageHeader
+import dev.southstar21.droidtosh.ui.components.ListGroup
 import dev.southstar21.droidtosh.ui.components.SectionHeader
-import dev.southstar21.droidtosh.ui.components.ShapeIcon
+import dev.southstar21.droidtosh.ui.components.SwitchRow
+import dev.southstar21.droidtosh.ui.components.TabTitle
+import dev.southstar21.droidtosh.ui.components.Tether
 import dev.southstar21.droidtosh.ui.components.groupItemShape
 import dev.southstar21.droidtosh.ui.theme.DroidIcons
 
@@ -67,19 +74,23 @@ fun TransfersScreen(
     ) {
         item(key = "header") {
             Column(Modifier.padding(horizontal = 16.dp)) {
-                PageHeader(
-                    title = stringResource(R.string.transfers_title),
+                TabTitle(
+                    title = stringResource(R.string.nav_files),
                     subtitle = if (ui.filesReceiveEnabled) {
                         stringResource(R.string.transfers_subtitle_receiving)
                     } else {
                         stringResource(R.string.transfers_subtitle_send_only)
                     },
                 )
-                Spacer(Modifier.size(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(Modifier.size(14.dp))
+                // A connected button group: Send files leads, Send folder trails.
+                Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
                     Button(
                         onClick = actions.sendFiles,
-                        shapes = ButtonDefaults.shapes(),
+                        shapes = ButtonDefaults.shapes(
+                            shape = ButtonGroupDefaults.connectedLeadingButtonShape,
+                            pressedShape = ButtonGroupDefaults.connectedLeadingButtonPressShape,
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 56.dp),
@@ -90,7 +101,10 @@ fun TransfersScreen(
                     }
                     FilledTonalButton(
                         onClick = actions.sendFolder,
-                        shapes = ButtonDefaults.shapes(),
+                        shapes = ButtonDefaults.shapes(
+                            shape = ButtonGroupDefaults.connectedTrailingButtonShape,
+                            pressedShape = ButtonGroupDefaults.connectedTrailingButtonPressShape,
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 56.dp),
@@ -153,6 +167,25 @@ fun TransfersScreen(
                 )
             }
         }
+        // Receiving lives with the files it controls (it was in Settings).
+        item(key = "receive") {
+            ListGroup(
+                footer = stringResource(R.string.files_note),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp),
+                content = {
+                    item { shape ->
+                        SwitchRow(
+                            shape = shape,
+                            icon = DroidIcons.Download,
+                            title = stringResource(R.string.files_receive),
+                            supporting = stringResource(if (ui.filesReceiveEnabled) R.string.files_receive_on else R.string.files_receive_off),
+                            checked = ui.filesReceiveEnabled,
+                            onCheckedChange = actions.setFilesReceiveEnabled,
+                        )
+                    }
+                },
+            )
+        }
         item(key = "bottom") { Spacer(Modifier.size(24.dp)) }
     }
 }
@@ -163,21 +196,13 @@ private fun ActiveTransferCard(transfer: TransferInfo, onCancel: () -> Unit, mod
     val outgoing = transfer.direction == TransferDirection.OUTGOING
     Surface(
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 18.dp)) {
+        Column(Modifier.padding(start = 14.dp, end = 8.dp, top = 14.dp, bottom = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ShapeIcon(
-                    icon = if (outgoing) DroidIcons.Upload else DroidIcons.Download,
-                    polygon = if (outgoing) MaterialShapes.Cookie6Sided else MaterialShapes.Cookie9Sided,
-                    size = 48.dp,
-                    containerColor = if (outgoing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = if (outgoing) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
-                    spin = transfer.status == TransferStatus.ACTIVE,
-                    spinPeriodMs = 6_000,
-                )
-                Spacer(Modifier.width(16.dp))
+                TransferProgress(transfer)
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = transfer.saved?.displayName ?: transfer.name,
@@ -187,7 +212,7 @@ private fun ActiveTransferCard(transfer: TransferInfo, onCancel: () -> Unit, mod
                     )
                     Text(
                         text = stringResource(if (outgoing) R.string.transfers_to_mac else R.string.transfers_from_mac) +
-                            " · " + transferStatusText(transfer),
+                            ", " + transferStatusText(transfer),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -205,17 +230,30 @@ private fun ActiveTransferCard(transfer: TransferInfo, onCancel: () -> Unit, mod
                     Icon(Icons.Default.Close, contentDescription = stringResource(R.string.files_cancel))
                 }
             }
-            Spacer(Modifier.size(14.dp))
-            Row(Modifier.padding(end = 8.dp)) {
-                if (transfer.status == TransferStatus.ACTIVE && transfer.size > 0) {
-                    LinearWavyProgressIndicator(
-                        progress = { (transfer.transferred.toFloat() / transfer.size).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
-                }
+        }
+    }
+}
+
+/**
+ * A transfer's progress: a circular wavy ring with the Tether streaming inside while bytes move,
+ * and the morphing loading indicator while a folder is zipped or the transfer waits its turn.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun TransferProgress(transfer: TransferInfo) {
+    Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+        if (transfer.status == TransferStatus.ACTIVE) {
+            if (transfer.size > 0) {
+                CircularWavyProgressIndicator(
+                    progress = { (transfer.transferred.toFloat() / transfer.size).coerceIn(0f, 1f) },
+                    modifier = Modifier.size(56.dp),
+                )
+            } else {
+                CircularWavyProgressIndicator(modifier = Modifier.size(56.dp))
             }
+            Tether(state = transferTether(transfer), size = 30.dp)
+        } else {
+            LoadingIndicator(modifier = Modifier.size(56.dp))
         }
     }
 }

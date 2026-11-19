@@ -3,6 +3,23 @@ import Foundation
 import UniformTypeIdentifiers
 import DroidsyncProtocol
 
+/// Marks files received from the phone with `com.apple.quarantine`, so Gatekeeper checks them.
+enum Quarantine {
+    static let attribute = "com.apple.quarantine"
+
+    static func apply(to url: URL, now: Date = Date()) throws {
+        let flags = "0081"  // downloaded, not yet approved by the user
+        let stamp = String(Int(now.timeIntervalSince1970), radix: 16)
+        let value = "\(flags);\(stamp);Droidtosh;\(UUID().uuidString)"
+        let bytes = Array(value.utf8)
+        let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+            return setxattr(path, attribute, bytes, bytes.count, 0, 0)
+        }
+        if result != 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    }
+}
+
 /// Limits from PROTOCOL-v2.md §7.2.
 public enum FileTransferLimits {
     public static let maxFileSize: UInt64 = 2 * 1024 * 1024 * 1024
@@ -659,7 +676,14 @@ public final class FileTransferEngine {
             sendReject(id, reason: "too_large")
             return
         }
-        if let free = availableCapacity(configuration.downloadsDirectory), free < Int64(clamping: offer.size) {
+        // Bytes other in-flight transfers still have to write also count against free space.
+        let pendingBytes = incoming.values.reduce(UInt64(0)) { total, other in
+            let (sum, overflow) = total.addingReportingOverflow(other.snapshot.size - min(other.written, other.snapshot.size))
+            return overflow ? UInt64.max : sum
+        }
+        let (needed, neededOverflow) = offer.size.addingReportingOverflow(pendingBytes)
+        if let free = availableCapacity(configuration.downloadsDirectory),
+           free < Int64(clamping: neededOverflow ? UInt64.max : needed) {
             sendReject(id, reason: "disk_full")
             return
         }
@@ -694,9 +718,21 @@ public final class FileTransferEngine {
     private func resumeIncoming(_ transfer: inout Incoming) {
         let id = transfer.snapshot.id
         let wasParked = transfer.snapshot.phase == .waitingForReconnect
+        // The partial file must hold exactly the bytes we hashed; otherwise start over.
+        let onDisk = (try? fileManager.attributesOfItem(atPath: transfer.partialURL.path)[.size] as? UInt64) ?? 0
+        let restart = onDisk != transfer.written
+        if restart {
+            onLog?("file: \(id) partial on disk (\(onDisk)) does not match received (\(transfer.written)); restarting")
+            transfer.sink?.close()
+            transfer.sink = nil
+            transfer.written = 0
+            transfer.hasher = SHA256()
+            transfer.snapshot.transferred = 0
+            try? fileManager.removeItem(at: transfer.partialURL)
+        }
         if transfer.sink == nil {
             do {
-                transfer.sink = try makeSink(transfer.partialURL, true)
+                transfer.sink = try makeSink(transfer.partialURL, !restart)
             } catch {
                 discardIncoming(id, phase: .failed("write_failed"))
                 sendReject(id, reason: "invalid")
@@ -780,6 +816,11 @@ public final class FileTransferEngine {
             let destination = FileNameSanitizer.uniqueURL(for: transfer.snapshot.name, in: configuration.downloadsDirectory)
             try fileManager.moveItem(at: transfer.partialURL, to: destination)
             try? fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destination.path)
+            do {
+                try Quarantine.apply(to: destination)
+            } catch {
+                onLog?("file: could not quarantine \(destination.lastPathComponent): \(error)")
+            }
             if transfer.modifiedAtMs > 0 {
                 let date = Date(timeIntervalSince1970: TimeInterval(transfer.modifiedAtMs) / 1000)
                 try? fileManager.setAttributes([.modificationDate: date], ofItemAtPath: destination.path)

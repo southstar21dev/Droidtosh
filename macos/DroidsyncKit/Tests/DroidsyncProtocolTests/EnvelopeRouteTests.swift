@@ -16,6 +16,7 @@ final class EnvelopeRouteTests: XCTestCase {
         XCTAssertEqual(EnvelopeRoute.features(for: .fileComplete(DSFileComplete())), [.files])
         XCTAssertEqual(EnvelopeRoute.features(for: .deviceStatus(DSDeviceStatus())), [.device])
         XCTAssertEqual(EnvelopeRoute.features(for: .findPhoneState(DSFindPhoneState())), [.device])
+        XCTAssertEqual(EnvelopeRoute.features(for: .openURL(DSOpenUrl())), [.link])
     }
 
     func testFindRequestIsReliableAndNeedsFind() {

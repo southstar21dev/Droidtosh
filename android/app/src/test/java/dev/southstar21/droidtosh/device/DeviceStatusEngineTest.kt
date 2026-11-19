@@ -139,6 +139,7 @@ class DeviceStatusEngineTest {
             { it.copy(airplaneMode = !it.airplaneMode) },
             { it.copy(ringerMode = RingerMode.RINGER_MODE_SILENT) },
             { it.copy(doNotDisturb = !it.doNotDisturb) },
+            { it.copy(backgroundRestricted = !it.backgroundRestricted) },
         )
         connected()
         for (block in changes) {

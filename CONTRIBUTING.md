@@ -14,7 +14,7 @@ brew install protobuf xcodegen
 
 The Xcode project is generated from `macos/project.yml`; the build scripts run XcodeGen for you.
 
-For wake-up pushes, put your Firebase `google-services.json` in `android/app/` (see [Firebase setup](relay/README.md#firebase-setup-free)). Without it, the app builds, runs and reconnects without push.
+For Firebase wake-ups, put your Firebase `google-services.json` in `android/app/` (see [Firebase setup](relay/README.md#firebase-setup-free)). Without it, the app builds and runs with UnifiedPush or no wake-ups, as the release builds do.
 
 ## Repository layout
 

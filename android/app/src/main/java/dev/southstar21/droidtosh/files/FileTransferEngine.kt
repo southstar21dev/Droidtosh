@@ -137,6 +137,8 @@ class FileTransferEngine(
     // Outgoing transfers whose file is still being made, by id: their names.
     private val preparing = LinkedHashMap<String, String>()
     private val incoming = LinkedHashMap<String, Incoming>()
+    // Verified transfers whose commit runs outside the lock; their repeats are ignored meanwhile.
+    private val committing = HashSet<String>()
     private val finished = ArrayDeque<TransferInfo>()
     // Replies to re-sent Ends of transfers that already finished, so a retransmission gets the same answer.
     private val completions = LinkedHashMap<String, Envelope>()
@@ -267,7 +269,8 @@ class FileTransferEngine(
         val length = minOf(chunkSize.toLong(), size - transfer.position, windowBytes - (transfer.position - transfer.received)).toInt()
         val data = try {
             read(transfer, length)
-        } catch (error: IOException) {
+        } catch (error: Exception) {
+            // Not only IOException: one bad message or source must not crash the process.
             fail(transfer, "read_failed", notifyPeer = true)
             return true
         }
@@ -338,7 +341,7 @@ class FileTransferEngine(
             return
         }
         // The digest covers exactly what was read so far, so never resume past it.
-        val offset = minOf(accept.resumeOffset, transfer.hashedUpTo, transfer.source.size)
+        val offset = minOf(accept.resumeOffset, transfer.hashedUpTo, transfer.source.size).coerceAtLeast(0)
         if (offset > 0 && !transfer.resumed) {
             transfer.resumed = true
             listener.onResumed(info(transfer, TransferStatus.ACTIVE))
@@ -406,8 +409,27 @@ class FileTransferEngine(
             send(it)
             return
         }
+        if (id in committing) return
         incoming[id]?.let { existing ->
             if (existing.size == offer.size) {
+                // The partial must hold exactly the bytes we hashed; otherwise start over.
+                if (existing.partial.length() != existing.written) {
+                    runCatching { existing.out?.close() }
+                    existing.written = 0
+                    existing.progressSent = 0
+                    existing.digest.reset()
+                    existing.partial.delete()
+                    try {
+                        existing.partial.parentFile?.mkdirs()
+                        existing.out = FileOutputStream(existing.partial, false)
+                    } catch (error: IOException) {
+                        incoming.remove(id)
+                        send(newEnvelope { setFileReject(FileReject.newBuilder().setTransferId(id).setReason("write_failed")) })
+                        finish(TransferInfo(id, TransferDirection.INCOMING, existing.name, existing.size, 0, TransferStatus.FAILED, "write_failed"))
+                        publish()
+                        return
+                    }
+                }
                 // A re-offer (or a retransmitted offer) of a transfer in progress is a resume request.
                 if (existing.written > 0) listener.onResumed(info(existing, TransferStatus.ACTIVE))
                 send(accept(id, existing.written))
@@ -424,7 +446,8 @@ class FileTransferEngine(
             offer.size > maxFileSize -> "too_large"
             incoming.size >= maxIncoming -> "busy"
             // Room for the partial plus its copy into place (MediaStore can't adopt the partial).
-            store.usableSpace() < offer.size * 2 -> "disk_full"
+            // Bytes other in-flight transfers still have to write count against it too.
+            store.usableSpace() < neededSpace(offer.size) -> "disk_full"
             else -> null
         }
         val name = FileNames.sanitize(offer.name)
@@ -448,6 +471,17 @@ class FileTransferEngine(
         incoming[id] = transfer
         send(accept(id, 0))
         publish()
+    }
+
+    private fun neededSpace(offerSize: Long): Long {
+        var total = offerSize.saturatingAdd(offerSize)
+        for (other in incoming.values) total = total.saturatingAdd((other.size - other.written).coerceAtLeast(0))
+        return total
+    }
+
+    private fun Long.saturatingAdd(other: Long): Long {
+        val sum = this + other
+        return if (((this xor sum) and (other xor sum)) < 0) Long.MAX_VALUE else sum
     }
 
     private fun accept(id: String, offset: Long) = newEnvelope {
@@ -489,43 +523,58 @@ class FileTransferEngine(
         publish()
     }
 
-    private fun handleEnd(end: FileEnd) {
+    /**
+     * Returns the commit to run once the lock is released: copying into place can take long, so it
+     * must not block other callers (cancel, enqueue) on the engine monitor.
+     */
+    private fun handleEnd(end: FileEnd): (() -> Unit)? {
         val id = end.transferId
-        completions[id]?.let { send(it); return }
+        completions[id]?.let { send(it); return null }
+        if (id in committing) return null
         val transfer = incoming[id]
         if (transfer == null) {
             send(complete(id, ok = false, error = "unknown_transfer"))
-            return
+            return null
         }
         // Bytes are still missing (lost with a dropped session); the sender re-offers on reconnect.
-        if (transfer.written < transfer.size) return
+        if (transfer.written < transfer.size) return null
         incoming.remove(id)
         runCatching { transfer.out?.close() }
         transfer.out = null
         val sha = transfer.digest.digest()
-        val reply: Envelope
         if (!sha.contentEquals(end.sha256.toByteArray())) {
             transfer.partial.delete()
-            reply = complete(id, ok = false, error = "checksum_mismatch")
+            val reply = complete(id, ok = false, error = "checksum_mismatch")
             finish(info(transfer, TransferStatus.FAILED, "checksum_mismatch"))
-        } else {
+            remember(id, reply)
+            send(reply)
+            publish()
+            return null
+        }
+        committing += id
+        publish()
+        return {
             val saved = try {
                 store.commit(transfer.partial, transfer.name, transfer.mimeType)
             } catch (error: Exception) {
                 null
             }
             transfer.partial.delete()
-            if (saved == null) {
-                reply = complete(id, ok = false, error = "write_failed")
-                finish(info(transfer, TransferStatus.FAILED, "write_failed"))
-            } else {
-                reply = complete(id, ok = true, savedAs = saved.displayName)
-                finish(info(transfer, TransferStatus.COMPLETED).copy(saved = saved))
+            synchronized(this) {
+                committing -= id
+                val reply: Envelope
+                if (saved == null) {
+                    reply = complete(id, ok = false, error = "write_failed")
+                    finish(info(transfer, TransferStatus.FAILED, "write_failed"))
+                } else {
+                    reply = complete(id, ok = true, savedAs = saved.displayName)
+                    finish(info(transfer, TransferStatus.COMPLETED).copy(saved = saved))
+                }
+                remember(id, reply)
+                send(reply)
+                publish()
             }
         }
-        remember(id, reply)
-        send(reply)
-        publish()
     }
 
     private fun complete(id: String, ok: Boolean, error: String = "", savedAs: String = "") = newEnvelope {
@@ -565,19 +614,24 @@ class FileTransferEngine(
 
     // Both directions
 
-    @Synchronized
     fun onEnvelope(envelope: Envelope) {
+        val commit = synchronized(this) { dispatch(envelope) }
+        commit?.invoke()
+    }
+
+    private fun dispatch(envelope: Envelope): (() -> Unit)? {
         when (envelope.payloadCase) {
             PayloadCase.FILE_OFFER -> handleOffer(envelope.fileOffer)
             PayloadCase.FILE_ACCEPT -> handleAccept(envelope.fileAccept)
             PayloadCase.FILE_REJECT -> handleReject(envelope.fileReject)
             PayloadCase.FILE_CHUNK -> handleChunk(envelope.fileChunk)
             PayloadCase.FILE_PROGRESS -> handleProgress(envelope.fileProgress)
-            PayloadCase.FILE_END -> handleEnd(envelope.fileEnd)
+            PayloadCase.FILE_END -> return handleEnd(envelope.fileEnd)
             PayloadCase.FILE_COMPLETE -> handleComplete(envelope.fileComplete)
             PayloadCase.FILE_CANCEL -> handleCancel(envelope.fileCancel)
             else -> Unit
         }
+        return null
     }
 
     private fun handleCancel(cancel: FileCancel) {

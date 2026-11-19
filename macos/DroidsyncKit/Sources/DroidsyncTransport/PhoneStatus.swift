@@ -102,7 +102,7 @@ public final class PhoneStatusTracker {
 public enum PhoneStatusDisplay {
     public static func batteryText(_ status: DSDeviceStatus) -> String {
         let percent = status.batteryPercent
-        guard percent >= 0, percent <= 100 else { return "—" }
+        guard percent >= 0, percent <= 100 else { return "–" }
         return "\(percent)%"
     }
 
@@ -121,6 +121,16 @@ public enum PhoneStatusDisplay {
         }
         return "battery.\(bucket)percent"
     }
+
+    /// True when the phone reports that something can stop the connection while it is idle (section 8.3).
+    /// A status that is not fresh says nothing, so the caller passes only a live one.
+    public static func isBackgroundRestricted(_ status: DSDeviceStatus) -> Bool {
+        status.backgroundRestricted
+    }
+
+    /// The Mac's attention text for a restricted phone: what is wrong and where to fix it.
+    public static let backgroundTitle = "Your phone may disconnect when idle"
+    public static let backgroundDetail = "Fix it on the phone: Droidtosh > Connection > Background"
 
     public static func isLowBattery(_ status: DSDeviceStatus) -> Bool {
         !status.charging && status.batteryPercent >= 0 && status.batteryPercent <= 20
@@ -176,7 +186,7 @@ public enum PhoneStatusDisplay {
         case .none:
             return status.airplaneMode ? "Airplane mode" : "No network"
         case .unspecified, .UNRECOGNIZED:
-            return status.airplaneMode ? "Airplane mode" : "—"
+            return status.airplaneMode ? "Airplane mode" : "–"
         }
     }
 
@@ -197,7 +207,7 @@ public enum PhoneStatusDisplay {
         case .normal: return "Ringer on"
         case .vibrate: return "Vibrate"
         case .silent: return "Silent"
-        case .unspecified, .UNRECOGNIZED: return "—"
+        case .unspecified, .UNRECOGNIZED: return "–"
         }
     }
 

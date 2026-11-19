@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -23,6 +24,10 @@ type FCMConfig struct {
 	HTTPClient         *http.Client
 }
 
+// fcmHTTPTimeout bounds each HTTP exchange with Google, including the OAuth
+// token fetch, so a stalled endpoint can't hang every push.
+var fcmHTTPTimeout = 15 * time.Second
+
 type fcmNotifier struct {
 	projectID string
 	client    *http.Client
@@ -32,8 +37,10 @@ func NewFCMNotifier(cfg FCMConfig) (FCMNotifier, error) {
 	if len(cfg.ServiceAccountJSON) == 0 {
 		return nil, nil
 	}
+	// The token source uses the http.Client in its context for every refresh.
+	tokenCtx := context.WithValue(context.Background(), oauth2.HTTPClient, &http.Client{Timeout: fcmHTTPTimeout})
 	creds, err := google.CredentialsFromJSON(
-		context.Background(),
+		tokenCtx,
 		cfg.ServiceAccountJSON,
 		"https://www.googleapis.com/auth/firebase.messaging",
 	)
@@ -55,7 +62,10 @@ func NewFCMNotifier(cfg FCMConfig) (FCMNotifier, error) {
 	}
 	client := cfg.HTTPClient
 	if client == nil {
-		client = oauth2.NewClient(context.Background(), creds.TokenSource)
+		client = &http.Client{
+			Timeout:   fcmHTTPTimeout,
+			Transport: &oauth2.Transport{Source: creds.TokenSource},
+		}
 	}
 	return &fcmNotifier{projectID: projectID, client: client}, nil
 }

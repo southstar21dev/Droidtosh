@@ -10,6 +10,9 @@ final class NotificationsController: ObservableObject {
     @Published private(set) var installedApps: [DSAppInfo] = []
     @Published private(set) var dedupEnabled = true
     @Published private(set) var dedupDisabledPackages: Set<String> = []
+    @Published private(set) var copyCodesAutomatically = false
+    /// When phone notifications resume; `Date.distantFuture` until turned back on, nil when not paused.
+    @Published private(set) var pausedUntil: Date?
     @Published private(set) var notificationsRelayEnabled = true
     @Published private(set) var notificationsAuthorized: Bool?
     /// The phone's labels for its apps, from the app list and from notification records.
@@ -17,11 +20,16 @@ final class NotificationsController: ObservableObject {
 
     private let presenter: NotificationPresenter
     private let send: (DSEnvelope) -> Void
+    private let codeCopier = CodeCopier()
+    private var resumeTask: Task<Void, Never>?
     private var coordinator: NotificationCoordinator?
 
     init(presenter: NotificationPresenter, send: @escaping (DSEnvelope) -> Void) {
         self.presenter = presenter
         self.send = send
+        presenter.onCopyCode = { [weak self] code in
+            Task { @MainActor in self?.codeCopier.copy(code) }
+        }
     }
 
     var voipApps: [DSAppInfo] {
@@ -42,6 +50,16 @@ final class NotificationsController: ObservableObject {
             muteList: MuteListStore()
         )
         coordinator.attach(send: send)
+        copyCodesAutomatically = defaults.bool(forKey: "copy-codes-automatically")
+        if let stored = defaults.object(forKey: Self.pausedUntilKey) as? Double {
+            applyPause(until: Date(timeIntervalSince1970: stored))
+        }
+        coordinator.autoCopyCodes = { [weak self] code in
+            guard let self, self.copyCodesAutomatically else { return }
+            // Paused means quiet: the Copy Code action on the banner still works on click.
+            if let until = self.pausedUntil, until > Date() { return }
+            self.codeCopier.copy(code)
+        }
         self.coordinator = coordinator
         mutedPackages = coordinator.mutedPackages
     }
@@ -121,6 +139,53 @@ final class NotificationsController: ObservableObject {
         presenter.refreshAuthorizationStatus { [weak self] allowed in
             Task { @MainActor in self?.notificationsAuthorized = allowed }
         }
+    }
+
+    private static let pausedUntilKey = "notifications-paused-until"
+
+    var isPaused: Bool { pausedUntil != nil }
+
+    /// "Paused until 14:30", or nil when notifications are on.
+    func pauseStatusText(now: Date = Date()) -> String? {
+        pausedUntil.map { NotificationPause.statusText(until: $0, now: now) }
+    }
+
+    func pause(_ duration: NotificationPause) {
+        let end = duration.endDate(from: Date())
+        UserDefaults.standard.set(end.timeIntervalSince1970, forKey: Self.pausedUntilKey)
+        applyPause(until: end)
+    }
+
+    func resume() {
+        UserDefaults.standard.removeObject(forKey: Self.pausedUntilKey)
+        applyPause(until: nil)
+    }
+
+    private func applyPause(until end: Date?) {
+        resumeTask?.cancel()
+        resumeTask = nil
+        guard let end, end > Date() else {
+            if end != nil { UserDefaults.standard.removeObject(forKey: Self.pausedUntilKey) }
+            pausedUntil = nil
+            presenter.pausedUntil = nil
+            return
+        }
+        pausedUntil = end
+        presenter.pausedUntil = end
+        guard !NotificationPause.isIndefinite(end) else { return }
+        resumeTask = Task { [weak self] in
+            // Sleep in short steps so a Mac that slept through the end resumes promptly.
+            while !Task.isCancelled, end > Date() {
+                try? await Task.sleep(for: .seconds(min(max(end.timeIntervalSinceNow, 1), 60)))
+            }
+            guard !Task.isCancelled else { return }
+            self?.resume()
+        }
+    }
+
+    func setCopyCodesAutomatically(_ enabled: Bool) {
+        copyCodesAutomatically = enabled
+        UserDefaults.standard.set(enabled, forKey: "copy-codes-automatically")
     }
 
     func setDedupEnabled(_ enabled: Bool) {

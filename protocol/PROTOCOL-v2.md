@@ -28,9 +28,19 @@ phone ── TCP ── [outer TLS: client ↔ relay] ── relay ── [outer
 - **Phone:** always strict; it uses the `rfp` value from the pairing URI.
 
 ### 1.2 Join line (inside outer TLS)
-`DROIDSYNC/2 <room> mac|phone [fcm-token]\n`
+`DROIDSYNC/2 <room> mac|phone [push-token]\n`
+
+The optional push token is phone-only and tells the relay how to wake the phone (§1.2.1).
 
 Max 512 bytes, 5 s deadline. The relay answers with exactly one line: `PAIRED`, `WAIT` or `ERROR <reason>`. The room is 43 characters of base64url (`[A-Za-z0-9_-]`). A join line for any other protocol version (`DROIDSYNC/<n>`) gets `ERROR upgrade`.
+
+#### 1.2.1 Push token
+The token field holds one of two things, told apart by a prefix:
+
+- **FCM token** (no prefix): up to 256 bytes with no spaces.
+- **UnifiedPush endpoint**: `up:<endpoint>`, where the endpoint is an absolute `https` URL with a host, no userinfo and no fragment, no whitespace, at most 397 bytes (the whole field is at most 400, which keeps the join line under 512). A bad token field gets `ERROR` like any malformed join line. A phone whose endpoint does not fit sends no token (it still joins, it just gets no wake-up).
+
+When a Mac parks, the relay delivers the same content-free `{"type":"mac_online"}`: as an FCM data message to an FCM token, or as an HTTP `POST` of exactly that JSON body to a UnifiedPush endpoint. For endpoints the relay uses `https` only, a 10 s timeout, no redirects and a block on loopback, private, link-local, carrier-grade NAT and other non-public addresses (checked on the resolved address at connect time), and rate-limits per room like FCM. An endpoint answering 404 or 410 is dropped. Relays and phones that predate UnifiedPush never see the prefix unless a new phone talks to an old relay. An old relay caps the whole field at 256 bytes: a shorter `up:` field is treated as an FCM token that never delivers (harmless, the relay drops it after FCM refuses it), but a longer one makes the old relay answer `ERROR bad-join`, so a phone must handle that: when the relay answers `ERROR bad-join` to a join that carried a token, the phone retries at once without the token, joins without wake-ups, and remembers (per relay address and pinned fingerprint) that this relay refuses that token, so it does not send it again until the app version or the token changes or a day has passed (the relay may have been updated by then). The relay needs updating to get UnifiedPush wake-ups; the phone shows that on its Connection page and polls meanwhile.
 
 ### 1.3 Pipe
 After `PAIRED`, the relay pipes the decrypted outer-TLS byte streams between the two clients. Those bytes are the inner TLS, so the relay still never sees plaintext. The inner TLS is pinned to the Mac's certificate, and frames are length-prefixed (4-byte big-endian length, max 1 MiB).
@@ -45,7 +55,7 @@ phone ── TCP ── mac (listening on the LAN)
 
 - **No outer TLS and no join line.** The phone opens TCP and starts the inner TLS at once. Everything from the inner TLS up (pinning to `fp`, §3 auth, §4 reliable delivery, §5 resume, features) is identical to the relay path.
 - **Mac listener:** TCP on all interfaces, port `7444` by default (configurable in the Mac settings).
-  - It accepts connections only from loopback, private and link-local addresses: `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `100.64.0.0/10`, `::1`, `fc00::/7`, `fe80::/10` (IPv4-mapped IPv6 is checked as IPv4). Anything else is closed at once.
+  - It accepts connections only from loopback, private, link-local and carrier-grade NAT addresses (the last is what Tailscale uses, so local mode works over a tailnet): `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `100.64.0.0/10`, `::1`, `fc00::/7`, `fe80::/10` (IPv4-mapped IPv6 is checked as IPv4). Anything else is closed at once. This is only a first filter: the inner TLS pin and the §3 authentication still decide who gets in.
   - At most 4 connections may be unauthenticated at a time; further ones are closed. TLS and authentication must finish within 10 s.
 - **Bonjour:** the Mac advertises `_droidtosh._tcp` with the Mac's name as the instance name and the TXT record `v=2`, `fp=<first 16 hex characters of the Mac certificate fingerprint>`. The TXT record holds no secrets (the certificate is shown to anyone who connects anyway). The phone keeps only services whose `fp` is a prefix of its paired `fp`.
 - **Phone candidates:** Bonjour resolutions first, then `lhost:lport` from the pairing URI. Each candidate gets a 3 s connect timeout.
@@ -63,12 +73,13 @@ Both apps have a connection mode setting:
 
 - **Phone, `both`:** if a local session comes up it is used. Otherwise a relay `WAIT` leads to the usual WAIT handling, and a relay failure to the usual backoff. Once a session ends, the next attempt starts with the relay again.
 - **Phone, `local`:** failures back off up to 30 s. With no relay there is no FCM, so the Mac-asleep wait uses the no-FCM probe (60 s). Bonjour seeing the Mac appear, or the network changing, ends any wait early.
+- **Phone, no local network:** a phone with no Wi-Fi or Ethernet network does not try local candidates. In `local` mode it does not connect at all and does not run Bonjour discovery or backoff timers until such a network appears, and then resumes at once; in `both` mode it only skips the local candidates and still uses the relay.
 - The Mac's mode at pairing time goes in the QR code and becomes the phone's initial mode; either side can change its own mode later.
 
 ## 2. Pairing URI
 `droidsync://pair?v=2&did=…&name=…&host=…&port=…&fp=<mac cert sha256>&rfp=<relay cert sha256>&psk=…&room=…&mode=…&lhost=…&lport=…`
 
-- `v=2` is required. The phone rejects an older code with "Pairing code is from an older version — re-pair".
+- `v=2` is required. The phone rejects an older code with "Pairing code is from an older version. Pair again."
 - `mode` is `relay`, `local` or `both` (§1.5). It defaults to `relay` when absent, so older codes stay valid.
 - `host`, `port` and `rfp` are required unless `mode=local`, where they are omitted.
 - `room` is always present.
@@ -94,6 +105,7 @@ Every `Envelope.protocol_version` must equal the negotiated version (2); anythin
 - `files` (section 7)
 - `phone.status` (section 8)
 - `find` (section 9)
+- `open_url` (section 10)
 
 ## 4. Reliable delivery
 Each side keeps a **send stream** identified by `stream_id`. This is a random UUID created when the process starts, or when the Android service starts, and it is never persisted.
@@ -116,8 +128,8 @@ Each side keeps a **send stream** identified by `stream_id`. This is a random UU
 - **`seq > lastProcessed + 1`:** a gap; this can only happen after evictions. Process it, set `lastProcessed = seq`, and count the gap. The inner TLS is ordered, so gaps only come from the sender evicting entries.
 
 ### 4.3 Which payloads are reliable (`seq > 0`)
-- **Phone → Mac:** `action_result`, `clipboard_text`.
-- **Mac → phone:** `notification_action`, `notification_dismiss`, `call_action`, `dial_request`, `mute_list_set`, `open_app_request`, `clipboard_text`.
+- **Phone → Mac:** `action_result`, `clipboard_text`, `open_url`.
+- **Mac → phone:** `notification_action`, `notification_dismiss`, `call_action`, `dial_request`, `mute_list_set`, `open_app_request`, `clipboard_text`, `open_url`.
 
 Everything else is unreliable, because either the snapshot sent on every reconnect restores it or it is latest-wins: notification posted, updated and removed, call state, snapshots, apps list and icons, clipboard blobs, ping and pong, server info, host status, phone status. A clipboard blob transfer interrupted by a disconnect is simply abandoned.
 
@@ -158,7 +170,7 @@ Either side can send files; both directions are symmetric. A sender runs **one t
 - **Accepting:** receivers accept automatically when the feature is enabled.
   - The Mac saves to `~/Downloads`.
   - Android saves to `Download/Droidtosh/` through MediaStore.
-- **Names:** sanitise `name` before using it. Normalise it to Unicode NFC first, then strip path separators and control characters, cap it at 200 UTF-8 bytes, and fall back to `file` if nothing is left. If a file with that name already exists, add ` (1)`, ` (2)`, and so on.
+- **Names:** sanitise `name` before using it. Normalise it to Unicode NFC first, then strip path separators and control characters, cap it at 200 UTF-8 bytes (keeping a final extension of 1 to 20 UTF-8 bytes, not counting its dot; a longer or empty one counts as part of the name), and fall back to `file` if nothing is left. If a file with that name already exists, add ` (1)`, ` (2)`, and so on.
 - **Partial files:** write to a temporary partial file and move it into place only after the SHA-256 checks out. Send `FileComplete{saved_as}` with the final display name.
 - **Errors:**
   - A checksum mismatch sends `FileComplete{ok:false, error:"checksum_mismatch"}` and deletes the partial file.
@@ -193,6 +205,14 @@ The `phone_status{metered}` message from the clipboard feature is unrelated and 
 - **Stale data:** status older than 10 minutes, or from a session that has ended, is shown greyed with "last seen <time>".
 - **Low battery:** an optional macOS notification (default on) when the phone drops to 20% and again at 10% while not charging. Each threshold fires once per discharge; plugging in resets them.
 
+### 8.3 Background health
+`DeviceStatus` carries two optional fields from the phone's background health check (the "Background" checklist on the Connection page):
+
+- `background_restricted` (`bool`, field 14): true while something can stop the connection when the phone is idle.
+- `background_reason` (`BackgroundReason`, field 15): the top open item, in this order: `BATTERY_OPTIMIZED` (not exempt from battery optimization) then `VENDOR_BATTERY` (an OEM battery manager that is likely to kill the app and that the user has not dealt with yet). `UNSPECIFIED` when not restricted. Missing notification permissions are not part of this flag: they do not stop the connection, and the phone shows them on its own.
+
+Both are plain proto3 fields, so this is backward compatible and needs no new capability: an older phone never sends them (the Mac reads that as "nothing known"), and an older Mac ignores them. A change of `background_restricted` is sent within 1 s like the other flags, and it is part of the heartbeat. The Mac shows "Your phone may disconnect when idle. Fix it on the phone: Droidtosh > Connection > Background" while it is true.
+
 ## 9. Find my phone (`find` capability)
 - **Request:** the Mac sends `FindPhoneRequest{request_id, action}`. It is reliable (§4), so it is retransmitted after a reconnect within the outbox TTL.
 - **Start:** the phone rings for **60 s** at full volume, even when the ringer is silent or vibrate:
@@ -208,3 +228,12 @@ The `phone_status{metered}` message from the clipboard feature is unrelated and 
   - If the feature is disabled in the phone settings, it answers `FAILED` with error `disabled`.
   - If audio can't start, it answers `FAILED` with error `audio_failed`.
 - **Mac UI:** a "Find My Phone" button in the popover and the device page. While the phone rings it becomes "Stop Ringing". The Mac shows "Ringing…", then how it ended. If no `FindPhoneState` arrives within 15 s while connected, it shows "Phone didn't respond". While disconnected, the button says the request will be sent when the phone reconnects.
+
+## 10. Links and phone numbers (`open_url` capability)
+Either side can send `OpenUrl{url}` to the other. It is reliable (§4), so it survives a short reconnect within the outbox TTL; a link that waited longer is dropped, which is deliberate.
+
+- **Validation (receiver, strict):** at most 2048 bytes of UTF-8, no control characters (U+0000 to U+001F, U+007F to U+009F), no whitespace and no format, private-use or unassigned code points (these disguise a host), a scheme and (for http and https) a host and no userinfo. The Mac accepts only `http` and `https`. The phone accepts `http` and `https`, and also `tel:` (after `tel:` 1 to 32 characters of only digits, `+`, `*`, `#`, `-`, `.` and parentheses, with at least one digit). Anything else is dropped silently and counted in diagnostics.
+- **Host rule (both sides, no platform URL parser):** after the scheme (`http` or `https`, any case) and `://`, the authority runs up to the first `/`, `?` or `#` (or the end). It must not contain `@`. The host is either a bracketed IPv6 literal (`[` hex digits, `:` and `.`, with at least one `:`, then `]`), or dot-separated non-empty labels (one trailing dot allowed) of ASCII letters, digits, `-` and `_`, and non-ASCII letters, marks and decimal digits, so IDN hosts are accepted as Unicode or as `xn--` punycode, and underscores are accepted. An optional `:port` of 1 to 5 digits with a value from 1 to 65535 may follow. Anything else is rejected. The host shown in the notification is the host as written (with brackets for IPv6, without the port), lowercased for ASCII letters only. Both implementations run the same test corpus.
+- **Never opened automatically:** the receiver shows a notification, "Open link from phone: <host>" on the Mac or "Open link from Mac: <host>" on the phone, and opens the link only when the user clicks or taps it. For `tel:` the phone notification says "Call <number> (from Mac)" and the tap opens the dialer with the number filled in, it does not place the call.
+- **Mac services:** the Mac's "Send to Phone" service sends a selected single link as `OpenUrl` and other selected text as clipboard text; "Send File to Phone" uses the file transfer (section 7). A `tel:` link opened with the Mac app asks first, then sends the existing `DialRequest`, not `OpenUrl`.
+- **Senders:** the phone sends a shared URL from "Send to Mac" (other shared text still goes through the clipboard), and the Mac sends from its "Send to Phone" service. Mac `tel:` links are not sent as `OpenUrl`: they use the existing `DialRequest`.

@@ -23,6 +23,8 @@ public struct PendingNotification: Equatable {
     public let replyPlaceholder: String
     public let actions: [PendingAction]
     public var silent: Bool = false
+    /// A one-time code found in the text; the banner offers to copy it.
+    public var verificationCode: String?
 
     public init(
         identifier: String,

@@ -93,7 +93,7 @@ object BackgroundLauncher {
         val notification = Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_brand_glyph)
             .setContentTitle("Open $label")
-            .setContentText("Requested from your Mac — tap to open")
+            .setContentText("Requested from your Mac. Tap to open.")
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
             .setTimeoutAfter(NOTIFICATION_TIMEOUT_MS)

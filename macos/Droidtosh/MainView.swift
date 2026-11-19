@@ -1,33 +1,34 @@
 import SwiftUI
 import DroidsyncKit
 
-/// The main window's sections. Settings live in the app's Settings window.
+/// The main window's sections. Each page carries its own options; the Settings window keeps
+/// only General and Updates.
 enum MainSection: String, CaseIterable, Identifiable {
-    case overview
+    case home
     case notifications
     case calls
     case files
-    case diagnostics
+    case connection
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .overview: return "Overview"
+        case .home: return "Home"
         case .notifications: return "Notifications"
         case .calls: return "Calls"
         case .files: return "Files"
-        case .diagnostics: return "Diagnostics"
+        case .connection: return "Connection"
         }
     }
 
     var symbol: String {
         switch self {
-        case .overview: return "iphone.gen3"
-        case .notifications: return "bell.badge"
+        case .home: return "house"
+        case .notifications: return "bell"
         case .calls: return "phone"
         case .files: return "folder"
-        case .diagnostics: return "waveform.path.ecg"
+        case .connection: return "arrow.left.arrow.right"
         }
     }
 }
@@ -36,8 +37,10 @@ struct MainView: View {
     @ObservedObject var model: AppModel
     @State private var selection: MainSection?
     @State private var showsPairing = false
+    @Environment(\.openSettings) private var openSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(model: AppModel, initialSection: MainSection = .overview) {
+    init(model: AppModel, initialSection: MainSection = .home) {
         self.model = model
         _selection = State(initialValue: initialSection)
     }
@@ -46,21 +49,41 @@ struct MainView: View {
         NavigationSplitView {
             List(selection: $selection) {
                 Section {
-                    sidebarRow(.overview)
-                }
-                Section("Phone") {
+                    SidebarPhoneCard(model: model)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 10, trailing: 0))
+                        .selectionDisabled()
+                    sidebarRow(.home)
                     sidebarRow(.notifications)
                     sidebarRow(.calls)
                     sidebarRow(.files)
                 }
-                Section("Support") {
-                    sidebarRow(.diagnostics)
+                Section("This Mac") {
+                    sidebarRow(.connection)
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 280)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 228, max: 280)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                SidebarDeviceFooter(model: model)
+                Button {
+                    WindowActivation.present()
+                    openSettings()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "gearshape")
+                            .frame(width: 18)
+                        Text("Settings")
+                        Spacer()
+                        Text("\u{2318},")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(SidebarFooterButtonStyle())
+                .padding(.horizontal, 10)
+                .padding(.bottom, 10)
             }
         } detail: {
             // Fill the column first: empty states size to their content, and the surface would
@@ -69,12 +92,15 @@ struct MainView: View {
                 .scrollContentBackground(.hidden)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Brand.surface)
-                .frame(minWidth: 560, minHeight: 480)
+                .frame(minWidth: 620, minHeight: 520)
+                .id(selection)
+                .transition(.opacity)
         }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: selection)
         .environment(\.selectSection, { selection = $0 })
         .environment(\.showPairing, { showsPairing = true })
         .sheet(isPresented: $showsPairing) {
-            PairingView(model: model, onDone: { showsPairing = false })
+            SetupView(model: model, onDone: { showsPairing = false })
         }
     }
 
@@ -93,58 +119,83 @@ struct MainView: View {
 
     @ViewBuilder
     private var detail: some View {
-        switch selection ?? .overview {
-        case .overview:
-            OverviewView(model: model)
+        switch selection ?? .home {
+        case .home:
+            HomeView(model: model)
         case .notifications:
             NotificationsView(model: model)
         case .calls:
             CallsView(model: model)
         case .files:
             FilesView(model: model)
-        case .diagnostics:
-            DiagnosticsView(diagnostics: model.diagnostics)
+        case .connection:
+            ConnectionView(model: model)
         }
     }
 }
 
-/// The paired phone at the bottom of the sidebar: name, connection state and battery.
-private struct SidebarDeviceFooter: View {
+private struct SidebarFooterButtonStyle: ButtonStyle {
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.1 : hovering ? 0.06 : 0))
+            )
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.15), value: hovering)
+    }
+}
+
+/// The paired phone at the top of the sidebar: the Tether, its name and its state.
+private struct SidebarPhoneCard: View {
     @ObservedObject var model: AppModel
+    @Environment(\.selectSection) private var selectSection
 
     var body: some View {
         let status = DroidtoshStatus(statusText: model.connection.statusText)
-        HStack(spacing: 10) {
-            Image(systemName: "iphone.gen3")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(model.connection.connectedDevice ?? "No phone")
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
-                HStack(spacing: 4) {
-                    Circle().fill(status.color).frame(width: 6, height: 6)
-                    Text(status.title)
-                    if let status = model.device.status, model.device.phoneSupportsStatus || model.device.isStale {
-                        Text("·")
-                        Text(PhoneStatusDisplay.batteryText(status)).monospacedDigit()
-                    }
+        Button {
+            selectSection(.home)
+        } label: {
+            HStack(spacing: 10) {
+                TetherView(state: status.tether, size: 24)
+                    .foregroundStyle(Brand.onInk)
+                    .frame(width: 34, height: 34)
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Brand.ink))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.connection.connectedDevice ?? (model.pairing.isPaired ? "Your phone" : "No phone"))
+                        .font(.callout.weight(.semibold))
+                        .lineLimit(1)
+                    Text(detail(status))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .padding(9)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Brand.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.separator, lineWidth: 0.5))
+            )
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Phone: \(model.connection.connectedDevice ?? "none"), \(status.title)")
+    }
+
+    private func detail(_ status: DroidtoshStatus) -> String {
+        if let device = model.device.status, model.device.phoneSupportsStatus || model.device.isStale {
+            return "\(status.title), \(PhoneStatusDisplay.batteryText(device))"
+        }
+        return status.title
     }
 }
 
 extension EnvironmentValues {
-    /// Shows the pairing sheet in the main window.
+    /// Shows the setup and pairing sheet in the main window.
     @Entry var showPairing: () -> Void = {}
 }
-

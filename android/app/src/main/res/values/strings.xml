@@ -35,7 +35,14 @@
     <string name="clipboard_note">Mac to phone syncs automatically. To send from the phone, use Share → Copy to Mac clipboard, the notification action, or open Droidtosh.</string>
 
     <!-- Files -->
-    <string name="share_clipboard_label">Copy to Mac clipboard</string>
+    <string name="share_clipboard_off">Clipboard sync is off. Turn it on in Droidtosh to send.</string>
+    <string name="share_clipboard_label">Send to Mac</string>
+    <string name="share_link_sent">Link sent to your Mac</string>
+    <string name="share_link_failed">Couldn\'t send the link. Is your Mac connected?</string>
+    <string name="links_channel">Links from your Mac</string>
+    <string name="links_open_from_mac">Open link from Mac: %1$s</string>
+    <string name="links_call_from_mac">Call from Mac: %1$s</string>
+    <string name="links_call_body">Tap to open the dialer with this number</string>
     <string name="share_file_label">Send file to Mac</string>
     <string name="files_title">Files</string>
     <string name="files_receive">Receive files from Mac</string>
@@ -46,6 +53,10 @@
     <string name="files_cancel">Cancel transfer</string>
     <string name="files_share_nothing">Couldn\'t read the shared file</string>
     <string name="files_share_partial">Sending %1$d of %2$d files; the others couldn\'t be read</string>
+    <plurals name="files_share_confirm">
+        <item quantity="one">%d file will go to your Mac</item>
+        <item quantity="other">%d files will go to your Mac</item>
+    </plurals>
     <plurals name="files_share_queued">
         <item quantity="one">Sending %d file to your Mac</item>
         <item quantity="other">Sending %d files to your Mac</item>
@@ -77,7 +88,24 @@
     <string name="home_status_connected">Connected</string>
     <string name="home_status_connecting">Connecting…</string>
     <string name="home_status_disconnected">Disconnected</string>
-    <string name="home_reconnecting_detail">%1$s · Reconnecting automatically</string>
+    <string name="cause_mac_offline">Mac asleep or offline</string>
+    <string name="cause_mac_offline_hint">It connects as soon as the Mac is awake and Droidtosh is running.</string>
+    <string name="cause_relay_unreachable">Relay unreachable</string>
+    <string name="cause_relay_unreachable_hint">Check the phone\'s internet connection. The relay may also be down.</string>
+    <string name="cause_relay_certificate">Relay certificate changed</string>
+    <string name="cause_relay_certificate_hint">The relay is not the one this phone was paired with. Pair again if you moved it.</string>
+    <string name="cause_no_wifi">No Wi-Fi (local mode)</string>
+    <string name="cause_no_wifi_hint">Local mode needs Wi-Fi or Ethernet on the same network as the Mac. It resumes by itself.</string>
+    <string name="cause_mac_not_on_network">Mac not found on this network (local mode)</string>
+    <string name="cause_mac_not_on_network_hint">Join the same network as the Mac, or switch the connection to a relay.</string>
+    <string name="cause_pairing_expired">Pairing expired</string>
+    <string name="cause_pairing_expired_hint">Scan the pairing code on the Mac again.</string>
+    <string name="cause_version_mismatch">App versions don\'t match</string>
+    <string name="cause_version_mismatch_hint">Update Droidtosh on both devices.</string>
+    <string name="cause_connection_lost">Connection lost, reconnecting</string>
+    <string name="cause_connection_lost_hint">It retries automatically.</string>
+    <string name="cause_last_seen">%1$s. Last seen %2$s ago</string>
+    <string name="home_reconnecting_detail">%1$s, Reconnecting automatically</string>
     <string name="home_status_not_paired">Not paired</string>
     <string name="home_mac_fallback">Your Mac</string>
     <string name="home_action_battery_optimization">Battery optimization</string>
@@ -102,10 +130,10 @@
     <string name="home_hero_connecting_detail">Reaching your Mac through the relay</string>
     <string name="home_hero_connected_for">Connected for %1$s</string>
     <string name="home_hero_last_seen">Last seen %1$s ago</string>
-    <string name="home_hero_relay">Relay · %1$s</string>
-    <string name="home_hero_relay_pending">Relay · looking it up</string>
+    <string name="home_hero_relay">Relay, %1$s</string>
+    <string name="home_hero_relay_pending">Relay, looking it up</string>
     <string name="home_hero_local">Connected via local network</string>
-    <string name="home_hero_local_mode">Local network · looking for your Mac</string>
+    <string name="home_hero_local_mode">Local network, looking for your Mac</string>
     <string name="duration_moments">a moment</string>
     <plurals name="duration_minutes">
         <item quantity="one">%d min</item>
@@ -132,8 +160,8 @@
     <string name="home_features">Features</string>
     <string name="home_suggestions">Make it even better</string>
     <plurals name="home_transfers_more">
-        <item quantity="one">%1$s · %2$d more</item>
-        <item quantity="other">%1$s · %2$d more</item>
+        <item quantity="one">%1$s, %2$d more</item>
+        <item quantity="other">%1$s, %2$d more</item>
     </plurals>
     <string name="home_transfers_view">View</string>
 
@@ -148,13 +176,15 @@
     <string name="fix_phone_body">Allow phone access to see, answer and place calls from the Mac.</string>
     <string name="fix_battery_title">Battery optimization may pause Droidtosh</string>
     <string name="fix_battery_body">Let Droidtosh run unrestricted so the connection survives while the phone sleeps.</string>
+    <string name="fix_vendor_battery_title">Your phone’s battery manager may stop Droidtosh</string>
+    <string name="fix_vendor_battery_body">Allow Droidtosh to run in the background in the manufacturer’s battery settings.</string>
     <string name="fix_full_screen_title">Ringing screen can’t show on the lock screen</string>
 
     <!-- Home: feature tiles -->
     <string name="feature_on">On</string>
     <string name="feature_off">Off</string>
     <string name="feature_needs_access">Needs access</string>
-    <string name="feature_limited">On · limited</string>
+    <string name="feature_limited">On, limited</string>
     <string name="feature_notifications">Notifications</string>
     <string name="feature_calls">Calls</string>
     <string name="feature_files">Files</string>
@@ -179,32 +209,60 @@
     <string name="share_sheet_title">On its way</string>
     <string name="share_sheet_title_failed">Nothing was sent</string>
     <string name="share_sheet_more">+%1$d more</string>
+    <string name="share_sheet_title_confirm">Send to your Mac?</string>
+    <string name="share_sheet_send">Send</string>
+    <string name="share_sheet_cancel">Cancel</string>
     <string name="share_sheet_done">Done</string>
     <string name="share_sheet_view">View transfers</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
-    <string name="settings_tap_to_allow">Not allowed · tap to allow</string>
+    <string name="settings_tap_to_allow">Not allowed, tap to allow</string>
     <string name="settings_group_connection">Connection &amp; pairing</string>
+    <string name="background_title">Background</string>
+    <string name="background_footer">These keep Droidtosh connected while the phone is idle. Each Fix opens the right settings screen.</string>
+    <string name="background_all_good">Nothing is likely to stop the connection.</string>
+    <string name="background_notification_access">Notification access</string>
+    <string name="background_notification_access_on">On, notifications reach your Mac</string>
+    <string name="background_notification_access_off">Off, notifications aren’t reaching your Mac</string>
+    <string name="background_post_notifications">Show notifications</string>
+    <string name="background_post_notifications_on">Allowed</string>
+    <string name="background_post_notifications_off">Not allowed, the connection status can’t be shown</string>
+    <string name="background_vendor_title">%1$s battery manager</string>
+    <string name="background_vendor_todo">May stop Droidtosh when idle. Allow it to run in the background there.</string>
+    <string name="background_vendor_done">Opened, tap to review</string>
+    <string name="background_fix">Fix</string>
     <string name="settings_battery_unrestricted">Unrestricted</string>
     <string name="settings_overlay_title">Display over other apps</string>
-    <string name="settings_overlay_on">Allowed · app calls can be answered from your Mac while unlocked</string>
-    <string name="settings_overlay_off">Not allowed · tap to answer app calls from your Mac while unlocked</string>
-    <string name="settings_battery_optimized">Optimized · Android may pause the connection</string>
+    <string name="settings_overlay_on">Allowed, app calls can be answered from your Mac while unlocked</string>
+    <string name="settings_overlay_off">Not allowed, tap to answer app calls from your Mac while unlocked</string>
+    <string name="settings_battery_optimized">Optimized, Android may pause the connection</string>
     <string name="settings_group_notifications">Notifications</string>
-    <string name="settings_notification_access_on">On · relaying to your Mac</string>
+    <string name="settings_notification_access_on">On, relaying to your Mac</string>
     <string name="settings_mute_list_note">Choose which apps stay quiet in Droidtosh on your Mac; the mute list syncs from there.</string>
     <string name="settings_group_calls">Calls</string>
     <string name="settings_clipboard_sync">Sync clipboard</string>
     <string name="settings_group_advanced">Advanced</string>
     <string name="settings_group_connection_mode">How to reach your Mac</string>
     <string name="settings_mode_relay">Relay</string>
-    <string name="settings_mode_relay_summary">Works on any network · wakes when your Mac comes back</string>
+    <string name="settings_mode_relay_summary">Works on any network, wakes when your Mac comes back</string>
     <string name="settings_mode_local">Local network</string>
-    <string name="settings_mode_local_summary">Direct, no relay · only on the same network as your Mac</string>
+    <string name="settings_mode_local_summary">Direct, no relay, only on the same network as your Mac</string>
     <string name="settings_mode_both">Relay, local network as fallback</string>
     <string name="settings_mode_both_summary">Uses the relay; goes direct when the relay can\'t reach your Mac</string>
-    <string name="settings_mode_needs_relay">This pairing has no relay · re-pair with a Mac that uses one</string>
+    <string name="settings_mode_needs_relay">This pairing has no relay, re-pair with a Mac that uses one</string>
+    <string name="wake_title">Wake-ups</string>
+    <string name="wake_fcm">Google (FCM)</string>
+    <string name="wake_fcm_summary">Reconnects when your Mac comes back, through Google Play services</string>
+    <string name="wake_unifiedpush">UnifiedPush</string>
+    <string name="wake_unifiedpush_summary">The same wake-up through your own distributor, such as ntfy, without Google</string>
+    <string name="wake_none">None</string>
+    <string name="wake_none_summary">No wake-ups, the phone checks for your Mac every minute</string>
+    <string name="wake_distributor">Distributor</string>
+    <string name="wake_distributor_ready">Registered, tap to choose another</string>
+    <string name="wake_distributor_missing">Not registered, tap to choose a distributor</string>
+    <string name="wake_relay_outdated">Your relay needs updating for UnifiedPush, wake-ups are off until then</string>
+    <string name="wake_note">The wake-up only tells the phone to reconnect. It carries no data from your Mac.</string>
     <string name="settings_mode_note">Your Mac must allow the same mode in its settings.</string>
     <string name="settings_diagnostics_summary">Connection health, counters and logs</string>
     <string name="settings_group_about">About</string>
@@ -214,13 +272,13 @@
     <string name="update_check">Check for updates</string>
     <string name="update_status_idle">Version %1$s</string>
     <string name="update_status_checking">Checking…</string>
-    <string name="update_status_up_to_date">Up to date · version %1$s</string>
+    <string name="update_status_up_to_date">Up to date, version %1$s</string>
     <string name="update_status_available">Version %1$s is available</string>
     <string name="update_install">Install version %1$s</string>
     <string name="update_install_summary">Downloads the update; Android may ask you to confirm</string>
     <string name="update_downloading">Downloading… %1$d%%</string>
     <string name="update_installing">Installing…</string>
-    <string name="update_retry_summary">%1$s · tap to try again</string>
+    <string name="update_retry_summary">%1$s, tap to try again</string>
     <string name="update_beta">Receive beta versions</string>
     <string name="update_beta_summary">Get pre-releases early; they may be less stable</string>
     <string name="update_suggestion_title">Update to %1$s</string>
@@ -241,4 +299,57 @@
     <string name="home_unpair_message">You’ll need to scan the pairing code again to reconnect.</string>
     <string name="home_unpair_confirm">Unpair</string>
     <string name="home_unpair_cancel">Cancel</string>
+    <!-- Redesign: tabs -->
+    <string name="nav_files">Files</string>
+    <string name="nav_notifications">Notifications</string>
+    <string name="nav_calls">Calls</string>
+    <!-- Redesign: Home -->
+    <string name="home_open_settings">Settings</string>
+    <string name="home_open_connection">Open connection details</string>
+    <string name="home_on_this_phone">On this phone</string>
+    <string name="home_clipboard_on">Copies from your Mac land here automatically</string>
+    <string name="home_clipboard_off">Off. Copies stay on each device.</string>
+    <string name="home_find_on">Rings at full volume for a minute, even on silent</string>
+    <string name="home_find_off">Off. Your Mac can\'t ring this phone.</string>
+    <string name="home_fix">Fix</string>
+    <string name="home_update_ready">Droidtosh %1$s is ready to install</string>
+    <!-- Redesign: Files -->
+    <string name="files_receive_on">Saved to Downloads/Droidtosh</string>
+    <string name="files_receive_off">Off. Send only, the Mac can\'t send files here.</string>
+    <!-- Redesign: Notifications tab -->
+    <string name="notifications_subtitle">Shown on your Mac, answered from either side</string>
+    <string name="notifications_relaying">Relaying to your Mac</string>
+    <string name="notifications_relaying_body">Reply, use actions and dismiss from either side</string>
+    <string name="notifications_not_relaying">Not relaying yet</string>
+    <string name="notifications_not_relaying_body">Turn on notification access so Droidtosh can relay them</string>
+    <string name="section_access">Access</string>
+    <string name="notifications_waiting_body">They will reach your Mac once it is connected</string>
+    <string name="sensitive_hint_title">Verification codes are hidden</string>
+    <string name="sensitive_hint_body">Android hides verification codes from Droidtosh. To allow them, run this on a computer with your phone connected:</string>
+    <string name="sensitive_hint_copy">Copy command</string>
+    <string name="sensitive_hint_dismiss">Dismiss</string>
+    <!-- Redesign: Calls tab -->
+    <string name="calls_subtitle">Answer, decline and place calls from your Mac</string>
+    <string name="calls_ready">Calls ring on your Mac too</string>
+    <string name="calls_ready_body">Cellular and app calls, like WhatsApp</string>
+    <string name="calls_ready_cellular_body">Cellular calls; allow notification access for app calls like WhatsApp</string>
+    <string name="calls_not_ready">Calls stay on this phone</string>
+    <string name="calls_not_ready_body">Allow phone access to see, answer and place calls from the Mac</string>
+    <string name="calls_app_calls_header">App calls</string>
+    <!-- Redesign: Connection -->
+    <string name="connection_title">Connection</string>
+    <string name="connection_relay">Relay</string>
+    <string name="connection_fingerprint">Fingerprint</string>
+    <string name="connection_no_relay">This pairing has no relay</string>
+    <string name="connection_phone_header">This phone</string>
+    <string name="connection_all_diagnostics">All diagnostics</string>
+    <string name="connection_unpair">Unpair this Mac</string>
+    <!-- Redesign: Settings -->
+    <string name="settings_moved_note">Looking for notifications, calls, files or the relay? Their options now live on those tabs, and the connection opens from the Mac card on Home.</string>
+    <!-- Redesign: guided setup -->
+    <string name="setup_scan_title">Scan the code on your Mac</string>
+    <string name="setup_open_scanner">Open the scanner</string>
+    <string name="setup_scan_waiting">Ready when your Mac shows its code</string>
+    <string name="setup_paired">Paired with your Mac, connecting…</string>
+    <string name="setup_permissions_subtitle">Each one turns on a part of Droidtosh. You can change them later on its tab.</string>
 </resources>

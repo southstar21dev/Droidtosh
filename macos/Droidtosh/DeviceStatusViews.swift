@@ -54,10 +54,9 @@ struct PhoneStatusChips: View {
         .accessibilityElement(children: .ignore)
     }
 
+    /// Black and white: a low battery is the only thing that stands out, and only in weight.
     private func batteryTint(_ status: DSDeviceStatus) -> Color? {
-        if device.isStale || onHero { return nil }
-        if status.charging { return .green }
-        return PhoneStatusDisplay.isLowBattery(status) ? .red : nil
+        nil
     }
 
     private func shortRingerLabel(_ status: DSDeviceStatus) -> String {
@@ -70,7 +69,7 @@ struct PhoneStatusChips: View {
         var parts = [PhoneStatusDisplay.networkLabel(status)]
         if let bars = PhoneStatusDisplay.bars(status) { parts.append("\(bars) of 4 bars") }
         if status.networkType == .cellular, !status.carrier.isEmpty { parts.append(status.carrier) }
-        return parts.joined(separator: " · ")
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -107,7 +106,7 @@ enum FindPhoneText {
     @MainActor
     static func tint(_ device: DeviceController) -> Color {
         switch device.findPhase {
-        case .noResponse, .ended(.failed), .ended(.expired): return .orange
+        case .noResponse, .ended(.failed), .ended(.expired): return .primary
         default: return .secondary
         }
     }
@@ -135,9 +134,7 @@ struct FindPhoneCard: View {
                     Label(device.findButtonTitle, systemImage: FindPhoneText.symbol(device))
                         .frame(minWidth: 130)
                 }
-                .controlSize(.large)
                 .droidtoshProminentButton()
-                .tint(device.findCanStop ? .red : nil)
                 .disabled(!device.showsFind)
                 if let text = FindPhoneText.status(device), device.showsFind {
                     Text(text)
@@ -192,7 +189,7 @@ struct PhoneDetailsCard: View {
                 Text(networkText(status))
             }
             if status.networkType == .cellular || !status.carrier.isEmpty {
-                row("Carrier", value: status.carrier.isEmpty ? "—" : status.carrier, symbol: "antenna.radiowaves.left.and.right")
+                row("Carrier", value: status.carrier.isEmpty ? "Unknown" : status.carrier, symbol: "antenna.radiowaves.left.and.right")
             }
             row("Airplane mode", value: status.airplaneMode ? "On" : "Off", symbol: "airplane")
             row("Sound", value: soundText(status), symbol: PhoneStatusDisplay.ringerSymbol(status))
@@ -215,13 +212,13 @@ struct PhoneDetailsCard: View {
     private func batteryValue(_ status: DSDeviceStatus) -> String {
         let percent = PhoneStatusDisplay.batteryText(status)
         guard let charging = PhoneStatusDisplay.chargingText(status) else { return percent }
-        return "\(percent) · \(charging)"
+        return "\(percent), \(charging)"
     }
 
     private func networkText(_ status: DSDeviceStatus) -> String {
         let label = PhoneStatusDisplay.networkLabel(status)
         guard let bars = PhoneStatusDisplay.bars(status) else { return label }
-        return "\(label) · \(bars) of 4 bars"
+        return "\(label), \(bars) of 4 bars"
     }
 
     private func soundText(_ status: DSDeviceStatus) -> String {
@@ -229,6 +226,6 @@ struct PhoneDetailsCard: View {
         var ringer = status
         ringer.doNotDisturb = false
         let mode = PhoneStatusDisplay.ringerLabel(ringer)
-        return mode == "—" ? "Do Not Disturb" : "Do Not Disturb · \(mode)"
+        return mode == "–" ? "Do Not Disturb" : "Do Not Disturb, \(mode)"
     }
 }

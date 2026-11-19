@@ -71,6 +71,12 @@ final class DeviceController: ObservableObject {
         return PhoneStatusDisplay.batteryText(status)
     }
 
+    /// The connected phone reports that Android or its maker may stop the connection while idle.
+    var phoneBackgroundRestricted: Bool {
+        guard connection.phoneConnected, !isStale, let status else { return false }
+        return PhoneStatusDisplay.isBackgroundRestricted(status)
+    }
+
     var lastSeenText: String? {
         guard isStale, let receivedAt else { return nil }
         return PhoneStatusDisplay.lastSeenText(receivedAt, now: Date())

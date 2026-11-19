@@ -122,7 +122,7 @@ final class DiagnosticsTests: XCTestCase {
     func testRedactionShortensAndReplacesSecrets() {
         let fingerprint = String(repeating: "ab", count: 32)
         XCTAssertEqual(DiagnosticsRedaction.short(fingerprint), "abababab…")
-        XCTAssertEqual(DiagnosticsRedaction.short(nil), "—")
+        XCTAssertEqual(DiagnosticsRedaction.short(nil), "-")
         let room = "RoomTokenRoomTokenRoomTokenRoomTokenRoomTok"
         let log = "join room=\(room) fp=\(fingerprint) ok"
         let redacted = DiagnosticsRedaction.redact(log, secrets: [room, fingerprint, "short"])
@@ -155,7 +155,7 @@ final class DiagnosticsTests: XCTestCase {
             XCTAssertTrue(report.contains(section), section)
         }
         XCTAssertTrue(report.contains("Relay: relay.example:7443"))
-        XCTAssertTrue(report.contains("Protocol: v2 · notifications, reliable"))
+        XCTAssertTrue(report.contains("Protocol: v2 (notifications, reliable)"))
         XCTAssertTrue(report.contains("Outbox: 3"))
         XCTAssertTrue(report.contains("cccccccc…"))
         XCTAssertFalse(report.contains(relayFingerprint))

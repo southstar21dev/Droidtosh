@@ -141,14 +141,14 @@ fun DiagnosticsScreen(
 private fun DiagnosticsContent(s: DiagnosticsSnapshot) {
     val now = s.takenAtMs
     Section("Connection") {
-        Stat("State", "${s.state} · ${DiagnosticsReport.duration(now - s.stateSinceMs)}")
-        Stat("Mode", s.endpoint?.mode ?: "—")
-        Stat("Session path", s.sessionPath ?: "—")
+        Stat("State", "${s.state}, ${DiagnosticsReport.duration(now - s.stateSinceMs)}")
+        Stat("Mode", s.endpoint?.mode ?: "None")
+        Stat("Session path", s.sessionPath ?: "None")
         Stat("Relay", DiagnosticsReport.relayText(s.endpoint))
-        Stat("Relay fingerprint", s.endpoint?.relayFingerprint?.let { "$it…" } ?: "—")
-        Stat("Protocol", s.negotiatedVersion?.let { "v$it" } ?: "—")
-        Stat("Capabilities", s.capabilities.joinToString(", ").ifEmpty { "—" })
-        Stat("Session uptime", s.sessionStartedAtMs?.let { DiagnosticsReport.duration(now - it) } ?: "—")
+        Stat("Relay fingerprint", s.endpoint?.relayFingerprint?.let { "$it…" } ?: "None")
+        Stat("Protocol", s.negotiatedVersion?.let { "v$it" } ?: "None")
+        Stat("Capabilities", s.capabilities.joinToString(", ").ifEmpty { "None" })
+        Stat("Session uptime", s.sessionStartedAtMs?.let { DiagnosticsReport.duration(now - it) } ?: "None")
         Stat("Reconnects", DiagnosticsReport.reconnectsText(s))
         Stat("Push token", if (s.pushTokenPresent) "present" else "none")
         Stat("Last push", s.lastPushAtMs?.let { "${DiagnosticsReport.duration(now - it)} ago" } ?: "never")
@@ -173,7 +173,7 @@ private fun DiagnosticsContent(s: DiagnosticsSnapshot) {
         Stat("Frames rejected", s.framesRejected.toString())
         s.inboundByFeature.forEach { (feature, count) ->
             val dropped = s.droppedByFeature[feature] ?: 0L
-            Stat(feature.name.lowercase().replaceFirstChar(Char::titlecase), "$count in · $dropped dropped")
+            Stat(feature.name.lowercase().replaceFirstChar(Char::titlecase), "$count in, $dropped dropped")
         }
     }
     Section("Reliable delivery") {
@@ -206,9 +206,9 @@ private fun DiagnosticsContent(s: DiagnosticsSnapshot) {
         Stat("Text truncated", n.textTruncated.toString())
         Stat(
             "Last snapshot",
-            "${n.lastSnapshotRecords} · ${DiagnosticsReport.bytes(n.lastSnapshotBytes.toLong())}",
+            "${n.lastSnapshotRecords}, ${DiagnosticsReport.bytes(n.lastSnapshotBytes.toLong())}",
         )
-        Stat("Snapshot drops", "${n.snapshotIconsDropped} icons · ${n.snapshotRecordsDropped} records")
+        Stat("Snapshot drops", "${n.snapshotIconsDropped} icons, ${n.snapshotRecordsDropped} records")
     }
     Section("Recent events") {
         if (s.events.isEmpty()) {

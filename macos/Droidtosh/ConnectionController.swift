@@ -124,6 +124,8 @@ final class ConnectionController: ObservableObject {
     private var relayTransport: RelayTransport?
     private var relayTransportGeneration: UInt64 = 0
     private var activeConfig: TransportConfig?
+    /// The transport's latest state, for explaining why no phone is connected.
+    private var transportState: RelayTransport.State = .stopped
     /// One stream for the whole process, so queued reliable envelopes survive reconnects
     /// and transport rebuilds (PROTOCOL-v2.md §4).
     private let reliableStream = ReliableStream()
@@ -232,7 +234,7 @@ final class ConnectionController: ObservableObject {
                 }
             } else if !relayFingerprintIsUsable {
                 guard connectionMode == .both else {
-                    statusText = "Relay fingerprint is invalid — paste the 64-character value from the relay log"
+                    statusText = "Relay fingerprint is invalid. Paste the 64-character value from the relay log"
                     return nil
                 }
             } else {
@@ -387,13 +389,48 @@ final class ConnectionController: ObservableObject {
         relayTransport?.reconnectIfIdle()
     }
 
+    /// Why no phone is connected, in plain words; nil while connected or when there is nothing to say.
+    var disconnectCause: ConnectionCause? {
+        guard !phoneConnected else { return nil }
+        return ConnectionCause.derive(
+            state: transportState,
+            hasRelay: activeConfig?.relay != nil,
+            localListening: localListening,
+            pairingExpired: ConnectionCause.pairingExpiredRecently(events: diagnostics.snapshot().events, now: Date())
+        )
+    }
+
+    /// The status line to show: the cause when there is one, else the raw status text.
+    var statusHeadline: String { disconnectCause?.headline ?? statusText }
+
     private var localListening: Bool {
         if case .listening = localState { return true }
         return false
     }
 
+    /// Bumped when the pairing-expired window ends so views re-read `disconnectCause`.
+    @Published private(set) var causeRevision = 0
+    private var causeExpiryTask: Task<Void, Never>?
+
+    /// The headline derives "Pairing expired" from a time window, so nothing else would redraw
+    /// when it ends: wake once, just after the window closes.
+    private func scheduleCauseExpiry() {
+        causeExpiryTask?.cancel()
+        causeExpiryTask = nil
+        guard let failure = diagnostics.snapshot().events.last(where: { $0.kind == .authFailure }) else { return }
+        let remaining = failure.date.addingTimeInterval(ConnectionCause.pairingExpiredWindow).timeIntervalSinceNow
+        guard remaining > -1 else { return }
+        causeExpiryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64((max(remaining, 0) + 1) * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.causeRevision += 1
+        }
+    }
+
     private func handle(state: RelayTransport.State) {
         relayConnected = state == .connected
+        transportState = state
+        scheduleCauseExpiry()
         switch state {
         case .stopped:
             guard relayTransport != nil else { return }
@@ -407,17 +444,17 @@ final class ConnectionController: ObservableObject {
         case .failed(let message):
             DebugLog.log("relay: state failed \(message)")
             if activeConfig?.relay == nil {
-                statusText = "Local network unavailable — retrying"
+                statusText = "Local network unavailable, retrying"
             } else if localListening {
-                statusText = "Waiting for phone on the local network — relay is down"
+                statusText = "Waiting for phone on the local network, relay is down"
             } else {
-                statusText = "Relay unreachable — retrying"
+                statusText = "Relay unreachable, retrying"
             }
         case .relayCertificateMismatch(let observed):
             DebugLog.log("relay: certificate mismatch, relay presented \(observed)")
-            statusText = "Relay certificate changed — check the fingerprint in Settings"
+            statusText = "Relay certificate changed. Check the fingerprint on the Connection page"
         case .relayRequiresUpgrade:
-            statusText = "Relay needs a newer Droidtosh — update the app"
+            statusText = "Relay needs a newer Droidtosh. Update the app"
         }
     }
 }

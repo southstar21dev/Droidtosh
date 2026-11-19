@@ -60,6 +60,9 @@ class PhoneConnectionLoopTest {
     ) : PhoneConnectionLoop.Host {
         val states = mutableListOf<ConnectionState>()
 
+        @Volatile
+        var localNetwork = true
+
         override fun loadCredentials() = PairingCredentials(
             host = if (relay) "relay.invalid" else null,
             port = if (relay) 443 else null,
@@ -79,6 +82,7 @@ class PhoneConnectionLoopTest {
         }
         override fun onNotPaired() = Unit
         override val isDestroyed = false
+        override fun localNetworkAvailable() = localNetwork
     }
 
     @Before
@@ -109,6 +113,29 @@ class PhoneConnectionLoopTest {
         assertEquals(6, connector.attemptsAt.size)
         advanceTimeBy(2L)
         assertEquals(31_000L + WaitModePolicy.NO_FCM_PROBE_MS, connector.attemptsAt.last())
+        job.cancel()
+    }
+
+    @Test
+    fun aWaitInsideTheGraceReadsAsReconnectingAndPastItAsAsleep() = runTest {
+        val connector = WaitingConnector { testScheduler.currentTime }
+        val host = FakeHost()
+        val loop = PhoneConnectionLoop(
+            host = host,
+            scope = this,
+            reliableStream = ReliableStream(clock = { testScheduler.currentTime }),
+            waitPolicy = WaitModePolicy(fcmEnabled = false),
+            waitSignal = Channel(Channel.CONFLATED),
+            connector = connector,
+            reconnectPolicy = ReconnectPolicy(jitterFraction = { 0.0 }),
+            clock = { testScheduler.currentTime },
+        )
+        val job = launch { loop.run() }
+        runCurrent()
+        // Right after a start the Mac may simply not have re-parked yet.
+        assertEquals(DisconnectCause.ConnectionLost, (host.states.last() as ConnectionState.Disconnected).cause)
+        advanceTimeBy(31_001L)
+        assertEquals(DisconnectCause.MacAsleepOrOffline, (host.states.last() as ConnectionState.Disconnected).cause)
         job.cancel()
     }
 
@@ -150,6 +177,56 @@ class PhoneConnectionLoopTest {
             clock = { testScheduler.currentTime },
         )
 
+    /** An old relay: any join line that carries a token is refused with bad-join, others WAIT. */
+    private class OldRelayConnector : TlsConnector() {
+        val joinLines = mutableListOf<String>()
+
+        override fun connect(
+            host: String,
+            port: Int,
+            joinLine: String,
+            relayFingerprint: String,
+            macFingerprint: String,
+        ): RelayConnectResult {
+            joinLines += joinLine
+            val hasToken = joinLine.trim().split(' ').size > 3
+            return if (hasToken) RelayConnectResult.Failed(RelayErrorException("bad-join")) else RelayConnectResult.Waiting
+        }
+    }
+
+    @Test
+    fun aBadJoinWithATokenRetriesAtOnceWithoutItAndRemembersTheRelay() = runTest {
+        val connector = OldRelayConnector()
+        val host = object : PhoneConnectionLoop.Host by FakeHost() {
+            override fun fcmToken() = "up:https://push.example/long"
+        }
+        val refusals = RelayTokenRefusals(RelayTokenRefusalsTestStore(), "1.0")
+        val job = launch {
+            PhoneConnectionLoop(
+                host = host,
+                scope = this@runTest,
+                reliableStream = ReliableStream(clock = { testScheduler.currentTime }),
+                waitPolicy = WaitModePolicy(fcmEnabled = true),
+                waitSignal = Channel(Channel.CONFLATED),
+                connector = connector,
+                reconnectPolicy = ReconnectPolicy(jitterFraction = { 0.0 }),
+                clock = { testScheduler.currentTime },
+                tokenRefusals = refusals,
+            ).run()
+        }
+        runCurrent()
+        // Same instant: first with the token, then at once without it.
+        assertEquals(
+            listOf("DROIDSYNC/2 room phone up:https://push.example/long\n", "DROIDSYNC/2 room phone\n"),
+            connector.joinLines,
+        )
+        advanceTimeBy(1_001L)
+        // The next attempt skips the refused token straight away.
+        assertEquals("DROIDSYNC/2 room phone\n", connector.joinLines[2])
+        assertEquals(3, connector.joinLines.size)
+        job.cancel()
+    }
+
     @Test
     fun relayModeNeverDialsTheLocalNetwork() = runTest {
         val connector = RecordingConnector { RelayConnectResult.Waiting }
@@ -178,7 +255,7 @@ class PhoneConnectionLoopTest {
         val job = launch { loop(host, connector).run() }
         runCurrent()
         assertEquals(listOf("relay", "local 192.168.1.5:7444"), connector.attempts)
-        assertEquals(ConnectionState.Disconnected("relay down"), host.states.last())
+        assertEquals(ConnectionState.Disconnected("relay down", DisconnectCause.RelayUnreachable), host.states.last())
         job.cancel()
     }
 
@@ -189,7 +266,7 @@ class PhoneConnectionLoopTest {
         val job = launch { loop(host, connector).run() }
         runCurrent()
         assertEquals(listOf("local 192.168.1.5:7444"), connector.attempts)
-        assertEquals(ConnectionState.Disconnected("no route to 192.168.1.5"), host.states.last())
+        assertEquals(ConnectionState.Disconnected("no route to 192.168.1.5", DisconnectCause.MacNotOnNetwork), host.states.last())
         advanceTimeBy(1_001L)
         assertEquals(2, connector.attempts.size)
         job.cancel()
@@ -202,5 +279,54 @@ class PhoneConnectionLoopTest {
         runCurrent()
         assertEquals(listOf("local 192.168.1.5:7444"), connector.attempts)
         job.cancel()
+    }
+
+    @Test
+    fun localModeWithoutWifiDoesNotDialOrWakeUpUntilANetworkAppears() = runTest {
+        val connector = RecordingConnector { error("relay must not be dialled") }
+        val host = FakeHost(ConnectionMode.LOCAL, relay = false).apply { localNetwork = false }
+        val loop = loop(host, connector)
+        val job = launch { loop.run() }
+        runCurrent()
+        assertEquals(emptyList<String>(), connector.attempts)
+        assertEquals(
+            ConnectionState.Disconnected("No Wi-Fi or Ethernet network", DisconnectCause.NoWifiLocal),
+            host.states.last(),
+        )
+        // No backoff wake-ups however long it takes.
+        advanceTimeBy(10 * 60_000L)
+        assertEquals(emptyList<String>(), connector.attempts)
+        // Another kind of network coming up (cellular) wakes the loop once, which finds nothing to dial.
+        loop.signalNetwork()
+        runCurrent()
+        assertEquals(emptyList<String>(), connector.attempts)
+        // Wi-Fi appearing resumes at once.
+        host.localNetwork = true
+        loop.signalNetwork()
+        runCurrent()
+        assertEquals(listOf("local 192.168.1.5:7444"), connector.attempts)
+        job.cancel()
+    }
+
+    @Test
+    fun bothModeWithoutWifiSkipsOnlyTheLocalCandidates() = runTest {
+        val connector = RecordingConnector { RelayConnectResult.Failed(IOException("relay down")) }
+        val host = FakeHost(ConnectionMode.BOTH).apply { localNetwork = false }
+        val job = launch { loop(host, connector).run() }
+        runCurrent()
+        assertEquals(listOf("relay"), connector.attempts)
+        assertEquals(ConnectionState.Disconnected("relay down", DisconnectCause.RelayUnreachable), host.states.last())
+        job.cancel()
+    }
+}
+
+private class RelayTokenRefusalsTestStore : RelayTokenRefusals.Store {
+    private val map = HashMap<String, String>()
+    override fun get(key: String) = map[key]
+    override fun put(key: String, value: String) {
+        map[key] = value
+    }
+    override fun remove(key: String) {
+        map.remove(key)
     }
 }

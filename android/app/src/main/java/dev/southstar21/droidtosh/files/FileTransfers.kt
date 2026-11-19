@@ -106,6 +106,10 @@ object FileTransfers {
         val engine = engine(context)
         var queued = 0
         for (uri in uris) {
+            if (!ShareUriFilter.isAllowed(uri, context.packageName)) {
+                Log.w(TAG, "refusing to send $uri")
+                continue
+            }
             val source = runCatching { UriSource.open(context.contentResolver, uri) }
                 .onFailure { Log.w(TAG, "can't open $uri", it) }
                 .getOrNull() ?: continue

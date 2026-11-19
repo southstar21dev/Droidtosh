@@ -19,3 +19,8 @@ encode notification_record
 encode call_state
 encode resume
 encode device_status
+encode file_offer
+encode file_chunk
+encode find_phone_request
+encode find_phone_state
+encode open_url

@@ -2,6 +2,7 @@ package dev.southstar21.droidtosh.files
 
 import dev.southstar21.droidtosh.protocol.v1.Envelope
 import dev.southstar21.droidtosh.protocol.v1.Envelope.PayloadCase
+import dev.southstar21.droidtosh.protocol.v1.FileAccept
 import dev.southstar21.droidtosh.protocol.v1.FileChunk
 import dev.southstar21.droidtosh.protocol.v1.FileOffer
 import dev.southstar21.droidtosh.transport.newEnvelope
@@ -49,9 +50,11 @@ class FileTransferEngineTest {
 
     private class DirStore(val partials: File, val downloads: File, var space: Long = Long.MAX_VALUE) : IncomingFileStore {
         var failCommit = false
+        var duringCommit: () -> Unit = {}
         override fun partialFile(transferId: String) = File(partials, "$transferId.part")
         override fun usableSpace() = space
         override fun commit(partial: File, name: String, mimeType: String): SavedFile {
+            duringCommit()
             if (failCommit) throw java.io.IOException("read-only")
             downloads.mkdirs()
             val finalName = FileNames.unique(name) { File(downloads, it).exists() }
@@ -273,6 +276,40 @@ class FileTransferEngineTest {
         link.toPhone.clear()
         link.mac.onEnvelope(offer)
         assertEquals(chunk.toLong(), link.toPhone.removeFirst().fileAccept.resumeOffset)
+    }
+
+    @Test
+    fun freeSpaceCheckCountsBytesStillToComeFromOtherTransfers() {
+        // Room for one 1000 byte offer (partial plus copy), not for two at once.
+        val link = Link(space = 2500)
+        link.connect()
+        val offer = { id: String ->
+            newEnvelope { setFileOffer(FileOffer.newBuilder().setTransferId(id).setName("$id.bin").setSize(1000)) }
+        }
+        link.mac.onEnvelope(offer("one"))
+        assertTrue(link.toPhone.removeFirst().hasFileAccept())
+        link.mac.onEnvelope(offer("two"))
+        val reject = link.toPhone.removeFirst()
+        assertEquals("disk_full", reject.fileReject.reason)
+    }
+
+    @Test
+    fun resumeRestartsWhenThePartialFileDoesNotMatchWhatWasReceived() {
+        val link = Link()
+        link.connect()
+        val data = bytes(3 * chunk)
+        val offer = newEnvelope {
+            setFileOffer(FileOffer.newBuilder().setTransferId("t1").setName("a.bin").setSize(data.size.toLong()))
+        }
+        link.mac.onEnvelope(offer)
+        link.toPhone.clear()
+        link.mac.onEnvelope(chunkEnvelope("t1", 0, data.copyOfRange(0, chunk)))
+        // The partial is truncated behind the engine's back.
+        File(link.macStore.partials, "t1.part").writeBytes(ByteArray(10))
+        link.toPhone.clear()
+        link.mac.onEnvelope(offer)
+        assertEquals(0L, link.toPhone.removeFirst().fileAccept.resumeOffset)
+        assertEquals(0L, File(link.macStore.partials, "t1.part").length())
     }
 
     @Test
@@ -592,6 +629,19 @@ class FileTransferEngineTest {
     }
 
     @Test
+    fun commitsAReceivedFileWithoutHoldingTheEngineLock() {
+        val link = Link()
+        var lockHeld: Boolean? = null
+        link.macStore.duringCommit = { lockHeld = Thread.holdsLock(link.mac) }
+        link.connect()
+        link.phone.enqueue(MemorySource("a.bin", bytes(3 * chunk)))
+        link.run()
+        assertEquals(false, lockHeld)
+        assertTrue(link.saved("a.bin").exists())
+        assertEquals(TransferStatus.COMPLETED, link.finished.first { it.direction == TransferDirection.INCOMING }.status)
+    }
+
+    @Test
     fun aFailedSaveEndsWithAFailedCompletion() {
         val link = Link()
         link.macStore.failCommit = true
@@ -676,6 +726,22 @@ class FileTransferEngineTest {
         val reply = link.toPhone.single()
         assertTrue(reply.fileComplete.ok)
         assertEquals("a", reply.fileComplete.savedAs)
+    }
+
+    @Test
+    fun aNegativeResumeOffsetStartsFromZero() {
+        val link = Link()
+        link.connect()
+        val id = link.phone.enqueue(MemorySource("a.bin", bytes(2 * chunk)))
+        assertTrue(link.phone.pump())
+        link.toMac.clear()
+        link.phone.onEnvelope(newEnvelope {
+            setFileAccept(FileAccept.newBuilder().setTransferId(id).setResumeOffset(-5))
+        })
+        assertTrue(link.phone.pump())
+        val first = link.toMac.single()
+        assertEquals(PayloadCase.FILE_CHUNK, first.payloadCase)
+        assertEquals(0L, first.fileChunk.offset)
     }
 
     private fun chunkEnvelope(id: String, offset: Long, data: ByteArray) = newEnvelope {

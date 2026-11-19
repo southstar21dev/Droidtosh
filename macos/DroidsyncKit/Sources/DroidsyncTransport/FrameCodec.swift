@@ -18,20 +18,31 @@ public enum FrameCodec {
 
 public struct FrameDecoder {
     private var buffer = Data()
+    /// Start of the unconsumed bytes; the consumed prefix is dropped once per `append`.
+    private var readOffset = 0
 
     public init() {}
 
     public mutating func append(_ data: Data) throws -> [Data] {
         buffer.append(data)
+        defer {
+            if readOffset > 0 {
+                buffer.removeSubrange(0..<readOffset)
+                readOffset = 0
+            }
+        }
         var frames: [Data] = []
-        while buffer.count >= 4 {
-            let length = buffer.prefix(4).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }.bigEndian
+        while buffer.count - readOffset >= 4 {
+            let length = buffer.withUnsafeBytes {
+                $0.loadUnaligned(fromByteOffset: readOffset, as: UInt32.self)
+            }.bigEndian
             guard Int(length) <= FrameCodec.maxFrameSize else {
                 throw FrameError.frameTooLarge(Int(length))
             }
-            guard buffer.count >= 4 + Int(length) else { break }
-            frames.append(buffer.subdata(in: 4..<(4 + Int(length))))
-            buffer.removeSubrange(0..<(4 + Int(length)))
+            let end = readOffset + 4 + Int(length)
+            guard buffer.count >= end else { break }
+            frames.append(buffer.subdata(in: (readOffset + 4)..<end))
+            readOffset = end
         }
         return frames
     }

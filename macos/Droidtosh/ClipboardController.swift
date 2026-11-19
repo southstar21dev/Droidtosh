@@ -53,6 +53,10 @@ final class ClipboardController: ObservableObject {
     }
 
     func handle(_ envelope: DSEnvelope) {
+        guard ClipboardTransfer.accepts(envelope.payload, enabled: enabled) else {
+            DebugLog.log("clipboard: dropped inbound clipboard payload, sync is off")
+            return
+        }
         switch envelope.payload {
         case .clipboardText(let message)?:
             DebugLog.log("clipboard: applying text bytes=\(message.text.utf8.count)")
@@ -112,6 +116,19 @@ final class ClipboardController: ObservableObject {
         systemPasteboard.writeImage(png: data)
     }
 
+    /// "Send to Phone" for text: sends it as clipboard text now. False when clipboard sync is off or
+    /// the text is too large, so the caller can say so.
+    @discardableResult
+    func sendText(_ text: String) -> Bool {
+        guard enabled, !text.isEmpty, text.utf8.count <= ClipboardTransfer.maxTextBytes else { return false }
+        var message = DSClipboardText()
+        message.text = text
+        message.copiedAtMs = Self.nowMs()
+        connection.send(protocolEnvelope(.clipboardText(message)))
+        DebugLog.log("clipboard: sent text from service bytes=\(text.utf8.count)")
+        return true
+    }
+
     private func handleClipboardEvent(_ event: ClipboardMonitor.Event) {
         switch event {
         case .text(let text):
@@ -132,7 +149,7 @@ final class ClipboardController: ObservableObject {
             DebugLog.log("clipboard: deferred image bytes=\(data.count) metered=true")
             presenter.postLocal(
                 title: "Image not sent",
-                body: "Phone is on cellular — send to phone?",
+                body: "Phone is on cellular. Send to phone?",
                 identifier: "clipboard.sendImage",
                 categoryIdentifier: "clipboard.sendImage"
             )

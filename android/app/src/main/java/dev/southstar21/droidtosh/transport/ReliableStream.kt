@@ -20,7 +20,8 @@ class ReliableStream(
     private val ttlMs: Long = TTL_MS,
     private val ackDelayMs: Long = ACK_DELAY_MS,
 ) {
-    enum class Decision { PROCESS, DUPLICATE }
+    /** [REJECTED]: the seq is negative or jumps implausibly far ahead; drop it and treat it as a protocol error. */
+    enum class Decision { PROCESS, DUPLICATE, REJECTED }
 
     data class Stats(
         val outboxSize: Int,
@@ -91,6 +92,10 @@ class ReliableStream(
         if (peerResumed && !envelope.hasResume()) trimAcked(envelope.ack)
         val seq = envelope.seq
         if (seq == 0L) return Decision.PROCESS
+        // Nothing received yet from this peer stream (first contact, or the peer restarted): its
+        // first seq is the baseline. A long-lived peer's counter can be far past MAX_GAP by then,
+        // and rejecting it would close every session and redial forever.
+        if (seq < 0L || (lastProcessed > 0L && seq - lastProcessed - 1 > MAX_GAP)) return Decision.REJECTED
         if (ackPendingSince == null) ackPendingSince = clock()
         return when {
             seq <= lastProcessed -> {
@@ -125,6 +130,10 @@ class ReliableStream(
         retransmits += outbox.size
         return outbox.map { it.envelope.toBuilder().setAck(lastProcessed).build() }
     }
+
+    /** Whether an ack is owed but not yet sent (see [ackDue] for when it becomes overdue). */
+    @Synchronized
+    fun ackPending(): Boolean = ackPendingSince != null
 
     /** Whether a standalone ack is owed (something reliable arrived and no envelope carried its ack). */
     @Synchronized
@@ -163,6 +172,8 @@ class ReliableStream(
     }
 
     companion object {
+        /** Largest forward jump in the peer's seq accepted as a real gap (same as the Mac). */
+        const val MAX_GAP = 65_536L
         const val MAX_ENTRIES = 256
         const val MAX_BYTES = 4L * 1024 * 1024
         const val TTL_MS = 120_000L
@@ -180,6 +191,7 @@ class ReliableStream(
             PayloadCase.FILE_CANCEL,
             PayloadCase.FIND_PHONE_REQUEST,
             PayloadCase.FIND_PHONE_STATE,
+            PayloadCase.OPEN_URL,
         )
 
         fun isReliable(envelope: Envelope): Boolean = envelope.payloadCase in RELIABLE

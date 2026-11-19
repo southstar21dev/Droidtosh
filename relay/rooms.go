@@ -230,11 +230,16 @@ func (r *Registry) UnparkMac(room string, p *ParkedMac) {
 
 func (r *Registry) PairPhone(room string, fcmToken string, phone Conn) (Conn, bool) {
 	r.mu.Lock()
-	st := r.stateLocked(room)
-	if st == nil {
+	// A phone join never creates a room: anyone can send a well-formed join,
+	// so only a join that proves the room is live may store its token.
+	st, ok := r.rooms[room]
+	if !ok {
 		r.mu.Unlock()
 		return nil, false
 	}
+	// The room exists, so this phone knows a live room id: keep its token
+	// current even when the mac is offline and the join only gets WAIT.
+	st.lastSeen = r.now()
 	if fcmToken != "" {
 		st.fcmToken = fcmToken
 	}

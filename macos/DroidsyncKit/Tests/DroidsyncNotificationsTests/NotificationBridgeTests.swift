@@ -55,6 +55,22 @@ final class NotificationBridgeTests: XCTestCase {
         XCTAssertFalse(pending.actions[1].isReply)
     }
 
+    func testCodeNotificationGetsCopyCodeActionAndOwnCategory() {
+        var plain = record(actions: 0)
+        let plainPending = NotificationBridge.pending(from: plain)
+        XCTAssertNil(plainPending.verificationCode)
+        XCTAssertFalse(plainPending.actions.contains { $0.identifier == NotificationBridge.copyCodeIdentifier })
+
+        plain.text = "Your verification code is 482913"
+        plain.bigText = ""
+        let pending = NotificationBridge.pending(from: plain)
+        XCTAssertEqual(pending.verificationCode, "482913")
+        XCTAssertEqual(pending.actions.first?.identifier, NotificationBridge.copyCodeIdentifier)
+        XCTAssertEqual(pending.actions.first?.title, "Copy Code")
+        XCTAssertNotEqual(pending.categoryIdentifier, plainPending.categoryIdentifier)
+        XCTAssertNil(NotificationBridge.actionEnvelope(key: "k1", identifier: NotificationBridge.copyCodeIdentifier, replyText: nil))
+    }
+
     func testCapsCustomActionsAtFour() {
         let pending = NotificationBridge.pending(from: record(actions: 6))
         XCTAssertEqual(pending.actions.count, NotificationBridge.maxCustomActions)

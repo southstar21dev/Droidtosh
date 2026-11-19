@@ -83,6 +83,7 @@ class ClipboardSyncManager(
 
     fun sendCurrentClipboard(): Boolean {
         val clip = clipboard.primaryClip ?: return false
+        if (isSensitive(clip)) return false
         val item = clip.getItemAt(0)
         val description = clip.description
         if (description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
@@ -138,6 +139,7 @@ class ClipboardSyncManager(
     private suspend fun handleLocalClipboardChanged() {
         if (!isEnabled()) return
         val clip = clipboard.primaryClip ?: return
+        if (isSensitive(clip)) return
         val description = clip.description
         if (description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
             val text = clip.getItemAt(0).coerceToText(context).toString()
@@ -160,6 +162,11 @@ class ClipboardSyncManager(
         val hash = sha256(imageBytes)
         if (hash == lastAppliedHash || hash == lastSentHash) return
         sendImage(imageBytes)
+    }
+
+    private fun isSensitive(clip: ClipData): Boolean {
+        val extras = clip.description.extras ?: return false
+        return ClipboardPolicy.isSensitive { extras.getBoolean(it, false) }
     }
 
     private fun readImageBytes(clip: ClipData): ByteArray? {

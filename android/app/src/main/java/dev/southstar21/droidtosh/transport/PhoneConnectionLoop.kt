@@ -40,10 +40,12 @@ class PhoneConnectionLoop(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Capabilities advertised in the handshake; the e2e harness narrows them to test gating. */
     private val capabilities: List<String> = Capabilities.SUPPORTED,
+    /** Relays that refused the push token; the default forgets on restart (tests). */
+    private val tokenRefusals: RelayTokenRefusals = RelayTokenRefusals(MemoryRefusalStore(), ""),
 ) {
     data class Timing(
         val pingIntervalMs: Long = 45_000L,
-        val ackPollMs: Long = 250L,
+        val ackCheckMs: Long = 1_000L,
         val resumeTimeoutMs: Long = 10_000L,
     )
 
@@ -64,6 +66,12 @@ class PhoneConnectionLoop(
          * Where to find the Mac on the local network, best first (protocol/PROTOCOL-v2.md §1.4). The app
          * puts Bonjour results ahead of this default, the pairing's `lhost:lport`.
          */
+        /**
+         * Whether the phone is on Wi-Fi or Ethernet, the only networks a Mac can be reached on
+         * directly. False makes local mode wait for one instead of probing.
+         */
+        fun localNetworkAvailable(): Boolean = true
+
         suspend fun localCandidates(credentials: PairingCredentials): List<LocalEndpoint> =
             listOfNotNull(
                 credentials.localHost?.let { LocalEndpoint(it, credentials.localPort ?: LocalEndpoint.DEFAULT_PORT) },
@@ -102,6 +110,21 @@ class PhoneConnectionLoop(
                 return
             }
             val mode = credentials.mode
+            val plan = LocalNetworkPlan.decide(mode, credentials.hasRelay, host.localNetworkAvailable())
+            if (plan.waitForLocalNetwork) {
+                // Nothing to dial and nothing to back off from: sleep until a Wi-Fi or Ethernet network
+                // comes up (the owner signals it) or the user asks to reconnect.
+                host.onState(
+                    ConnectionState.Disconnected("No Wi-Fi or Ethernet network", DisconnectCause.NoWifiLocal),
+                    "Waiting for Wi-Fi",
+                )
+                attempt = 0
+                select {
+                    networkSignal.onReceive {}
+                    waitSignal.onReceive {}
+                }
+                continue
+            }
             diagnostics.onEndpoint(
                 credentials.host,
                 credentials.port,
@@ -119,11 +142,11 @@ class PhoneConnectionLoop(
             var authenticated = false
             try {
                 // §1.5: the relay first (unless local-only), then the local network on WAIT or failure.
-                val relayResult = if (mode.usesRelay && credentials.hasRelay) dialRelay(credentials, attempt) else null
+                val relayResult = if (plan.dialRelay) dialRelay(credentials, attempt) else null
                 var socket = (relayResult as? RelayConnectResult.Connected)?.socket
                 var path = SessionPath.RELAY
                 var localError: Exception? = null
-                if (socket == null && mode.usesLocal) {
+                if (socket == null && plan.dialLocal) {
                     try {
                         socket = dialLocal(credentials)
                         path = SessionPath.LOCAL
@@ -148,7 +171,11 @@ class PhoneConnectionLoop(
                         if (retryWaitMs != null) {
                             TransportLog.d(TAG, "relay WAIT soon after a start or session; retrying in ${retryWaitMs}ms")
                             diagnostics.onSessionEnd(DisconnectReason.RELAY_WAIT, "Mac not re-parked yet")
-                            host.onState(ConnectionState.Disconnected("Reconnecting to Mac"), "Disconnected - reconnecting")
+                            host.onState(
+                                // Not "Mac asleep": during the grace the Mac is most likely re-parking.
+                                ConnectionState.Disconnected("Reconnecting to Mac", DisconnectCause.ConnectionLost),
+                                "Disconnected - reconnecting",
+                            )
                         } else {
                             TransportLog.d(TAG, "relay WAIT (no mac parked)")
                             diagnostics.onSessionEnd(DisconnectReason.RELAY_WAIT)
@@ -168,7 +195,10 @@ class PhoneConnectionLoop(
                     "${error.javaClass.simpleName}: ${error.message.orEmpty()}",
                 )
                 host.onState(
-                    ConnectionState.Disconnected(error.message ?: error.javaClass.simpleName),
+                    ConnectionState.Disconnected(
+                        error.message ?: error.javaClass.simpleName,
+                        DisconnectCauses.fromError(error, mode, wasConnected = authenticated),
+                    ),
                     "Disconnected - reconnecting",
                 )
             } finally {
@@ -226,19 +256,24 @@ class PhoneConnectionLoop(
             TransportHub.attach(client, null, capabilities, ready = true)
         }
         host.onState(ConnectionState.Connected(deviceName, path = path), "Connected$via")
+        val ackSignal = Channel<Unit>(Channel.CONFLATED)
         val pinger = scope.launch {
-            var sincePing = 0L
             while (isActive) {
-                delay(timing.ackPollMs)
-                sincePing += timing.ackPollMs
+                delay(timing.pingIntervalMs)
                 runCatching {
-                    if (sincePing >= timing.pingIntervalMs) {
-                        sincePing = 0
-                        client.send(newEnvelope {
-                            setPing(Ping.newBuilder().setSentAtMs(System.currentTimeMillis()))
-                        })
-                    } else if (stream?.ackDue() == true) {
-                        client.send(newEnvelope { setAckOnly(Ack.getDefaultInstance()) })
+                    client.send(newEnvelope {
+                        setPing(Ping.newBuilder().setSentAtMs(System.currentTimeMillis()))
+                    })
+                }
+            }
+        }
+        // The ack check only runs while an ack is owed, instead of polling for the whole session.
+        val acker = if (stream == null) null else scope.launch {
+            for (signal in ackSignal) {
+                while (isActive && stream.ackPending()) {
+                    delay(timing.ackCheckMs)
+                    runCatching {
+                        if (stream.ackDue()) client.send(newEnvelope { setAckOnly(Ack.getDefaultInstance()) })
                     }
                 }
             }
@@ -246,7 +281,12 @@ class PhoneConnectionLoop(
         try {
             while (currentCoroutineContext().isActive) {
                 val envelope = client.receive()
-                if (stream?.onReceive(envelope) == ReliableStream.Decision.DUPLICATE) continue
+                when (stream?.onReceive(envelope)) {
+                    ReliableStream.Decision.DUPLICATE -> continue
+                    ReliableStream.Decision.REJECTED -> throw java.io.IOException("implausible sequence number ${envelope.seq}")
+                    else -> Unit
+                }
+                if (envelope.seq > 0L) ackSignal.trySend(Unit)
                 when {
                     envelope.hasResume() && stream != null -> {
                         val retransmit = stream.onPeerResume(envelope.resume)
@@ -280,15 +320,17 @@ class PhoneConnectionLoop(
                         while (waitSignal.tryReceive().isSuccess) {
                         }
                         diagnostics.onSessionEnd(DisconnectReason.MAC_ASLEEP)
-                        host.onState(ConnectionState.Disconnected("Mac asleep"), "Waiting for Mac")
+                        host.onState(ConnectionState.Disconnected("Mac asleep", DisconnectCause.MacAsleepOrOffline), "Waiting for Mac")
                         macAsleepMode = mode
                         return true
                     }
-                    else -> TransportHub.dispatch(envelope)
+                    else -> TransportHub.dispatchAwait(envelope)
                 }
             }
         } finally {
             pinger.cancel()
+            acker?.cancel()
+            ackSignal.close()
         }
         return false
     }
@@ -297,24 +339,37 @@ class PhoneConnectionLoop(
     private var macAsleepMode = ConnectionMode.RELAY
 
     private suspend fun waitForMac() {
-        host.onState(ConnectionState.Disconnected("Waiting for Mac"), "Waiting for Mac")
+        host.onState(ConnectionState.Disconnected("Waiting for Mac", DisconnectCause.MacAsleepOrOffline), "Waiting for Mac")
         withTimeoutOrNull(waitPolicy.nextDelayMs(fcmUsable = macAsleepMode.usesRelay)) { waitSignal.receive() }
     }
 
     private fun dialRelay(credentials: PairingCredentials, attempt: Int): RelayConnectResult {
-        val token = host.fcmToken()
+        val relayHost = checkNotNull(credentials.host)
+        val relayPort = checkNotNull(credentials.port)
+        val relayFingerprint = checkNotNull(credentials.relayFingerprint)
+        val relayKey = RelayTokenRefusals.relayKey(relayHost, relayPort, relayFingerprint)
+        val wanted = host.fcmToken()
+        val token = tokenRefusals.tokenFor(relayKey, wanted)
         TransportLog.d(
             TAG,
-            "attempt=$attempt room=${credentials.room.take(8)} token=${if (token.isNullOrEmpty()) "none" else "present"}",
+            "attempt=$attempt token=${if (token.isNullOrEmpty()) "none" else "present"}" +
+                if (token == null && !wanted.isNullOrEmpty()) " (relay refused it)" else "",
         )
-        val joinLine = RelayJoinLine.format(credentials.room, PHONE_ROLE, token)
-        return connector.connect(
-            checkNotNull(credentials.host),
-            checkNotNull(credentials.port),
-            joinLine,
-            checkNotNull(credentials.relayFingerprint),
+        fun join(token: String?) = connector.connect(
+            relayHost,
+            relayPort,
+            RelayJoinLine.format(credentials.room, PHONE_ROLE, token),
+            relayFingerprint,
             credentials.fingerprint,
         )
+        val result = join(token)
+        if (token != null && RelayTokenRefusals.shouldRetryWithoutToken(true, result)) {
+            // An older relay caps the token field below a UnifiedPush endpoint; join without it, at once.
+            tokenRefusals.remember(relayKey, token)
+            diagnostics.onInfo("relay refused the wake-up token (bad-join); joining without it, the relay needs updating for UnifiedPush")
+            return join(null)
+        }
+        return result
     }
 
     /** Tries each local candidate in turn (§1.4); throws the last failure when none answers. */
@@ -344,5 +399,16 @@ class PhoneConnectionLoop(
             // Closing a TLS socket writes close_notify, which isn't allowed on the main thread.
             Thread { runCatching { client.close() } }.start()
         }
+    }
+}
+
+private class MemoryRefusalStore : RelayTokenRefusals.Store {
+    private val values = HashMap<String, String>()
+    override fun get(key: String) = values[key]
+    override fun put(key: String, value: String) {
+        values[key] = value
+    }
+    override fun remove(key: String) {
+        values.remove(key)
     }
 }

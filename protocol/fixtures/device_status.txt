@@ -15,4 +15,6 @@ device_status {
   ringer_mode: RINGER_MODE_VIBRATE
   do_not_disturb: true
   sampled_at_ms: 1759999999500
+  background_restricted: true
+  background_reason: BACKGROUND_REASON_VENDOR_BATTERY
 }

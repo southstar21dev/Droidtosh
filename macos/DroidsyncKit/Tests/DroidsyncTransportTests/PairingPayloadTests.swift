@@ -25,6 +25,23 @@ final class PairingPayloadTests: XCTestCase {
         XCTAssertTrue(payload().uri().contains("rfp=\(Self.relayFingerprint)"))
     }
 
+    func testReservedCharactersInTheNameSurviveTheRoundTrip() throws {
+        let original = PairingPayload(
+            deviceID: "mac-1",
+            deviceName: "Tom's Mac+Pro & Co=1 #2 é",
+            host: "192.168.1.20",
+            port: 8765,
+            room: Self.room,
+            fingerprint: String(repeating: "a", count: 64),
+            relayFingerprint: Self.relayFingerprint,
+            psk: Data(repeating: 0x5A, count: 32)
+        )
+        let uri = original.uri()
+        XCTAssertFalse(uri.contains("+"), "a literal plus is read as a space by Android")
+        XCTAssertTrue(uri.contains("name=Tom%27s%20Mac%2BPro%20%26%20Co%3D1%20%232%20%C3%A9"))
+        XCTAssertEqual(try PairingPayload.parse(uri).deviceName, original.deviceName)
+    }
+
     func testRejectsForeignScheme() {
         XCTAssertThrowsError(try PairingPayload.parse("https://example.com")) { error in
             XCTAssertEqual(error as? PairingError, .malformed)

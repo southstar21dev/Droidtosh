@@ -42,6 +42,14 @@ class PairingPayloadParserTest {
     }
 
     @Test
+    fun readsAPercentEncodedPlusInTheNameAsAPlus() {
+        // Exactly what the Mac emits for "Tom's Mac+Pro & Co=1 #2 é".
+        val uri = "droidsync://pair?v=2&did=mac-1&name=Tom%27s%20Mac%2BPro%20%26%20Co%3D1%20%232%20%C3%A9" +
+            "&host=192.168.1.20&port=8765&fp=$fp&rfp=$rfp&room=$room&psk=${Base64URL.encode(psk)}&mode=relay"
+        assertEquals("Tom's Mac+Pro & Co=1 #2 é", PairingPayloadParser.parse(uri).deviceName)
+    }
+
+    @Test
     fun normalizesFingerprintsToLowercase() {
         val parsed = PairingPayloadParser.parse(uri(relayFingerprint = "B".repeat(64)))
         assertEquals(rfp, parsed.relayFingerprint)
@@ -101,7 +109,7 @@ class PairingPayloadParserTest {
         val thrown = assertThrows(PairingVersionException::class.java) {
             PairingPayloadParser.parse(uri(version = 1, relayFingerprint = null))
         }
-        assertEquals("Pairing code is from an older version — re-pair", thrown.message)
+        assertEquals("Pairing code is from an older version. Pair again.", thrown.message)
     }
 
     @Test
@@ -172,6 +180,34 @@ class PairingPayloadParserTest {
     fun rejectsUnknownMode() {
         assertThrows(IllegalArgumentException::class.java) {
             PairingPayloadParser.parse(uri() + "&mode=carrier-pigeon")
+        }
+    }
+
+    @Test
+    fun rejectsHostsThatCouldCorruptTheStoredRecord() {
+        for (bad in listOf("evil%0Ahost", "a%20b", "host%0D", "a/b", "ho%00st")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                PairingPayloadParser.parse(uri().replace("host=192.168.1.20", "host=$bad"))
+            }
+        }
+    }
+
+    @Test
+    fun acceptsHostnamesAndIpLiterals() {
+        for (good in listOf("relay.example.com", "192.168.1.20", "fe80::1", "%5B::1%5D")) {
+            PairingPayloadParser.parse(uri().replace("host=192.168.1.20", "host=$good"))
+        }
+    }
+
+    @Test
+    fun localHostMustBeAnIpLiteral() {
+        val local = uri() + "&mode=both&lport=9000"
+        assertEquals("10.0.0.5", PairingPayloadParser.parse("$local&lhost=10.0.0.5").localHost)
+        assertEquals("fe80::1", PairingPayloadParser.parse("$local&lhost=fe80::1").localHost)
+        for (bad in listOf("mac.local", "10.0.0.5%0Aevil", "10.0.0.5%20x")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                PairingPayloadParser.parse("$local&lhost=$bad")
+            }
         }
     }
 

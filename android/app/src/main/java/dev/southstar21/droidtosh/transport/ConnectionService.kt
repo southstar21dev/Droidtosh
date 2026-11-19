@@ -27,6 +27,7 @@ import dev.southstar21.droidtosh.diagnostics.DisconnectReason
 import dev.southstar21.droidtosh.protocol.v1.Hello
 import dev.southstar21.droidtosh.update.Updates
 import dev.southstar21.droidtosh.push.PushTokenStore
+import dev.southstar21.droidtosh.push.WakeProvider
 import dev.southstar21.droidtosh.R
 import dev.southstar21.droidtosh.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
@@ -51,7 +52,7 @@ sealed interface ConnectionState {
         val macModel: String = "",
         val path: SessionPath = SessionPath.RELAY,
     ) : ConnectionState
-    data class Disconnected(val reason: String) : ConnectionState
+    data class Disconnected(val reason: String, val cause: DisconnectCause = DisconnectCause.Other) : ConnectionState
 }
 
 class ConnectionService : Service() {
@@ -62,7 +63,10 @@ class ConnectionService : Service() {
     private var clipboardManager: ClipboardSyncManager? = null
 
     @Volatile
-    private var notificationText = "Connecting"
+    private var notification = NotificationContent(ConnectionNotificationText.APP_TITLE, "Connecting")
+
+    @Volatile
+    private var lastMacName = ""
 
     @Volatile
     private var connection: PhoneConnectionLoop? = null
@@ -74,6 +78,11 @@ class ConnectionService : Service() {
 
     @Volatile
     private var currentNetwork: Network? = null
+
+    /** Wi-Fi and Ethernet networks, the only ones a Mac is reachable on directly (local mode). */
+    private val localNetwork by lazy {
+        LocalNetworkMonitor(applicationContext) { available -> onLocalNetworkChanged(available) }
+    }
 
     /** Bonjour discovery of the Mac, running while the pairing's mode uses the local network. */
     private val localDiscovery by lazy {
@@ -97,23 +106,23 @@ class ConnectionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (clipboardManager == null) {
             clipboardManager = ClipboardSyncManager(applicationContext) {
-                applicationContext
-                    .getSharedPreferences("droidsync_clipboard", MODE_PRIVATE)
-                    .getBoolean("enabled", true)
+                dev.southstar21.droidtosh.clipboard.ClipboardPreference.isEnabled(applicationContext)
             }.also { it.start() }
         }
         // connectedDevice's runtime prerequisite is met by the CHANGE_NETWORK_STATE manifest permission.
         ServiceCompat.startForeground(
             this,
             NOTIFICATION_ID,
-            buildNotification(notificationText),
+            buildNotification(notification),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
         )
         registerNetworkCallback()
+        localNetwork.start()
         dev.southstar21.droidtosh.calls.CallManager.start(applicationContext)
         dev.southstar21.droidtosh.files.FileTransfers.start(applicationContext, scope)
         dev.southstar21.droidtosh.device.PhoneStatus.start(applicationContext, scope)
         dev.southstar21.droidtosh.device.FindPhone.start(applicationContext, scope)
+        dev.southstar21.droidtosh.link.Links.start(applicationContext, scope)
         if (stateJob?.isActive != true) {
             stateJob = scope.launch { state.collect { diagnostics.onState(diagnosticsLabel(it)) } }
         }
@@ -134,11 +143,13 @@ class ConnectionService : Service() {
             }
         }
         networkCallback = null
+        localNetwork.stop()
         localDiscovery.close()
         loopJob?.cancel()
         dev.southstar21.droidtosh.files.FileTransfers.stop()
         dev.southstar21.droidtosh.device.PhoneStatus.stop()
         dev.southstar21.droidtosh.device.FindPhone.stop()
+        dev.southstar21.droidtosh.link.Links.stop()
         scope.cancel()
         // The loop is blocked in a socket read that coroutine cancellation can't interrupt.
         activeClient?.let(::closeInBackground)
@@ -154,12 +165,12 @@ class ConnectionService : Service() {
         val pushTokens = PushTokenStore(applicationContext)
         // Start Bonjour early so the first local attempt already has results.
         runCatching { credentialStore.load() }.getOrNull()
-            ?.takeIf { it.mode.usesLocal }
+            ?.takeIf { it.mode.usesLocal && localNetwork.available }
             ?.let { localDiscovery.start(it.fingerprint) }
         val loop = PhoneConnectionLoop(
             host = object : PhoneConnectionLoop.Host {
                 override fun loadCredentials() = credentialStore.load()
-                override fun fcmToken(): String? = pushTokens.token
+                override fun fcmToken(): String? = pushTokens.joinToken()
                 override fun deviceName(): String = deviceDisplayName(applicationContext)
                 override fun hello(deviceName: String): Hello = Hello.newBuilder()
                     .setDeviceName(deviceName)
@@ -169,13 +180,15 @@ class ConnectionService : Service() {
                     .build()
                 override fun onState(state: ConnectionState, statusText: String?) {
                     mutableState.value = state
-                    statusText?.let(::updateNotification)
+                    if (state is ConnectionState.Connected && state.macName.isNotBlank()) lastMacName = state.macName
+                    ConnectionNotificationText.forState(state, statusText, lastMacName)?.let(::updateNotification)
                 }
                 override fun onNotPaired() {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 }
                 override val isDestroyed: Boolean get() = destroyed
+                override fun localNetworkAvailable(): Boolean = localNetwork.available
                 override suspend fun localCandidates(credentials: PairingCredentials): List<LocalEndpoint> {
                     localDiscovery.start(credentials.fingerprint)
                     // Give a just-started discovery a moment to resolve the Mac.
@@ -190,11 +203,38 @@ class ConnectionService : Service() {
             },
             scope = scope,
             reliableStream = reliableStream,
-            waitPolicy = WaitModePolicy(BuildConfig.FCM_ENABLED),
+            waitPolicy = WaitModePolicy(pushAvailable = {
+                // A relay that refused the token never sends a wake-up, so the phone has to poll.
+                pushTokens.provider() != WakeProvider.NONE && !runCatching {
+                    val credentials = credentialStore.load()
+                    credentials != null && pushTokens.refusals(APP_VERSION).refused(
+                        RelayTokenRefusals.relayKey(credentials.host, credentials.port, credentials.relayFingerprint),
+                        pushTokens.joinToken(),
+                    )
+                }.getOrDefault(false)
+            }),
             waitSignal = waitSignal,
+            tokenRefusals = pushTokens.refusals(APP_VERSION),
         )
         connection = loop
         loop.run()
+    }
+
+    /**
+     * Wi-Fi or Ethernet came or went. Without one, Bonjour discovery stops (nothing to find) and local
+     * mode waits; when one appears the loop is woken at once and discovery resumes.
+     */
+    private fun onLocalNetworkChanged(available: Boolean) {
+        if (destroyed) return
+        if (available) {
+            runCatching { CredentialStore(applicationContext).load() }.getOrNull()
+                ?.takeIf { it.mode.usesLocal }
+                ?.let { localDiscovery.start(it.fingerprint) }
+        } else {
+            localDiscovery.stop()
+        }
+        connection?.signalNetwork()
+        waitSignal.trySend(Unit)
     }
 
     private fun registerNetworkCallback() {
@@ -226,7 +266,7 @@ class ConnectionService : Service() {
         )
     }
 
-    private fun buildNotification(text: String): Notification {
+    private fun buildNotification(content: NotificationContent): Notification {
         val contentIntent = PendingIntent.getActivity(
             this,
             0,
@@ -234,8 +274,8 @@ class ConnectionService : Service() {
             PendingIntent.FLAG_IMMUTABLE,
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Droidtosh")
-            .setContentText(text)
+            .setContentTitle(content.title)
+            .setContentText(content.text)
             .setSmallIcon(R.drawable.ic_brand_glyph)
             .setContentIntent(contentIntent)
             .setOngoing(true)
@@ -254,14 +294,14 @@ class ConnectionService : Service() {
             .build()
     }
 
-    private fun updateNotification(text: String) {
+    private fun updateNotification(content: NotificationContent) {
         if (destroyed) return
-        notificationText = text
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text))
+        notification = content
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(content))
     }
 
     private fun repostConnectionNotification() {
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(notificationText))
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(notification))
     }
 
     /** Drops the current session (if any) and skips the backoff or wait so a new attempt starts now. */

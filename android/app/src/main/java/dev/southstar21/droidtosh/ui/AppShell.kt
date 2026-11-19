@@ -1,7 +1,10 @@
 package dev.southstar21.droidtosh.ui
 
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -26,8 +29,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.ShortNavigationBarItemDefaults
+import androidx.compose.material3.WideNavigationRailItemDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -41,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailItem
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -58,13 +65,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.southstar21.droidtosh.BuildConfig
+import dev.southstar21.droidtosh.background.BackgroundSettings
 import dev.southstar21.droidtosh.R
+import dev.southstar21.droidtosh.ui.components.LocalAnimationsPaused
 import dev.southstar21.droidtosh.clipboard.SendClipboardActivity
 import dev.southstar21.droidtosh.launch.OverlayPermission
+import dev.southstar21.droidtosh.push.UnifiedPushController
 import dev.southstar21.droidtosh.transport.ConnectionState
 import androidx.compose.foundation.layout.Arrangement
 import dev.southstar21.droidtosh.ui.theme.DroidIcons
@@ -85,6 +99,7 @@ fun MainShell(
     val clipboardEnabled by state.clipboardEnabled.collectAsStateWithLifecycle()
     val batteryOptimizationIgnored by state.batteryOptimizationIgnored.collectAsStateWithLifecycle()
     val overlayAllowed by state.overlayAllowed.collectAsStateWithLifecycle()
+    val vendorBatteryHandled by state.vendorBatteryHandled.collectAsStateWithLifecycle()
     val filesReceiveEnabled by state.filesReceiveEnabled.collectAsStateWithLifecycle()
     val transfers by state.transfers.collectAsStateWithLifecycle()
     val findEnabled by state.findEnabled.collectAsStateWithLifecycle()
@@ -93,6 +108,7 @@ fun MainShell(
     val pairingMode by state.pairingMode.collectAsStateWithLifecycle()
     val update by state.update.collectAsStateWithLifecycle()
     val betaUpdates by state.betaUpdates.collectAsStateWithLifecycle()
+    val wake by state.wake.collectAsStateWithLifecycle()
     var lastMacName by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(connection) {
         (connection as? ConnectionState.Connected)?.macName?.takeIf { it.isNotBlank() }?.let { lastMacName = it }
@@ -108,6 +124,7 @@ fun MainShell(
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         state.refreshPermissions()
+        state.refreshWake()
     }
 
     val ui = DroidUiState(
@@ -121,10 +138,15 @@ fun MainShell(
         findRinging = findRinging,
         fullScreenAllowed = fullScreenAllowed,
         batteryOptimizationIgnored = batteryOptimizationIgnored,
+        oemVendor = state.oemVendor,
+        vendorBatteryHandled = vendorBatteryHandled,
         overlayAllowed = overlayAllowed,
         transfers = transfers,
         connectionMode = pairingMode?.mode,
         relayAvailable = pairingMode?.relayAvailable ?: true,
+        relayAddress = pairingMode?.relayAddress,
+        relayFingerprint = pairingMode?.relayFingerprint,
+        wake = wake.takeIf { pairingMode != null },
         versionName = BuildConfig.VERSION_NAME,
         update = update,
         betaUpdates = betaUpdates,
@@ -133,11 +155,11 @@ fun MainShell(
     val actions = rememberAppActions(state)
 
     var destination by rememberSaveable { mutableStateOf(Destination.Home) }
-    var showDiagnostics by rememberSaveable { mutableStateOf(false) }
+    var page by rememberSaveable { mutableStateOf<Page?>(null) }
     LaunchedEffect(requestedDestination) {
         if (requestedDestination != null) {
             destination = requestedDestination
-            showDiagnostics = false
+            page = null
             onDestinationHandled()
         }
     }
@@ -147,11 +169,11 @@ fun MainShell(
         actions = actions,
         destination = destination,
         onDestinationChange = { destination = it },
-        showDiagnostics = showDiagnostics,
-        onShowDiagnosticsChange = { showDiagnostics = it },
+        page = page,
+        onPageChange = { page = it },
         diagnostics = {
             val snapshot by state.diagnostics.collectAsStateWithLifecycle()
-            DiagnosticsScreen(snapshot = snapshot, actions = actions, onBack = { showDiagnostics = false })
+            DiagnosticsScreen(snapshot = snapshot, actions = actions, onBack = { page = Page.Connection })
         },
     )
 }
@@ -178,6 +200,10 @@ private fun rememberAppActions(state: AppState): AppActions {
             openBatteryOptimization = {
                 context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
             },
+            openVendorBattery = {
+                BackgroundSettings.openVendorSettings(context)
+                state.refreshPermissions()
+            },
             openOverlaySettings = { context.startActivity(OverlayPermission.settingsIntent(context)) },
             openFullScreenSettings = {
                 context.startActivity(
@@ -197,6 +223,12 @@ private fun rememberAppActions(state: AppState): AppActions {
             setFilesReceiveEnabled = state::setFilesReceiveEnabled,
             setFindEnabled = state::setFindEnabled,
             setConnectionMode = state::setConnectionMode,
+            setWakeProvider = state::setWakeProvider,
+            pickDistributor = {
+                var host: Context? = context
+                while (host is ContextWrapper && host !is Activity) host = host.baseContext
+                (host as? Activity)?.let { UnifiedPushController.pickDistributor(it) { state.refreshWake() } }
+            },
             stopRinging = state::stopRinging,
             reconnectNow = state::reconnectNow,
             unpair = state::unpair,
@@ -215,21 +247,26 @@ private fun rememberAppActions(state: AppState): AppActions {
     }
 }
 
+
 private val WideLayoutMinWidth = 600.dp
 
-/** Stateless shell: adaptive navigation (bottom bar or rail) and the Diagnostics detail page. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/**
+ * Stateless shell: adaptive navigation (bottom bar or rail) over four tabs, and the pages that
+ * open over them (Connection from the Mac card, Settings from the gear, Diagnostics from
+ * Connection).
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun MainScaffold(
     ui: DroidUiState,
     actions: AppActions,
     destination: Destination,
     onDestinationChange: (Destination) -> Unit,
-    showDiagnostics: Boolean,
-    onShowDiagnosticsChange: (Boolean) -> Unit,
+    page: Page?,
+    onPageChange: (Page?) -> Unit,
     diagnostics: @Composable () -> Unit,
 ) {
-    BackHandler(enabled = destination != Destination.Home && !showDiagnostics) {
+    BackHandler(enabled = destination != Destination.Home && page == null) {
         onDestinationChange(Destination.Home)
     }
     val activeCount = ui.activeTransfers.size
@@ -238,83 +275,126 @@ fun MainScaffold(
     val fastEffects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= WideLayoutMinWidth
-        val content: @Composable (PaddingValues) -> Unit = { padding ->
-            AnimatedContent(
-                targetState = destination,
-                transitionSpec = {
-                    (fadeIn(effects) + scaleIn(spatial, initialScale = 0.96f)).togetherWith(fadeOut(fastEffects))
-                },
-                label = "destination",
-            ) { target ->
-                val screenModifier = Modifier
-                    .fillMaxSize()
-                    .wrapContentWidth(Alignment.CenterHorizontally)
-                    .widthIn(max = 720.dp)
-                when (target) {
-                    Destination.Home -> HomeScreen(
-                        ui = ui,
-                        actions = actions,
-                        onOpenTransfers = { onDestinationChange(Destination.Transfers) },
-                        onOpenSettings = { onDestinationChange(Destination.Settings) },
-                        modifier = screenModifier,
-                        contentPadding = padding,
-                    )
-                    Destination.Transfers -> TransfersScreen(ui, actions, screenModifier, padding)
-                    Destination.Settings -> SettingsScreen(
-                        ui = ui,
-                        actions = actions,
-                        onOpenDiagnostics = { onShowDiagnosticsChange(true) },
-                        modifier = screenModifier,
-                        contentPadding = padding,
-                    )
-                }
+    // While a page is open the tabs underneath must not be reachable by TalkBack or keyboard focus.
+    val tabsModifier = if (page != null) {
+        Modifier
+            .clearAndSetSemantics {}
+            .focusProperties {
+                canFocus = false
+                enter = { FocusRequester.Cancel }
             }
-        }
-
-        if (wide) {
-            Row(Modifier.fillMaxSize()) {
-                WideNavigationRail(
-                    // The page header already carries the brand mark; keep the rail to navigation.
-                    arrangement = Arrangement.Center,
-                ) {
-                    Destination.entries.forEach { item ->
-                        WideNavigationRailItem(
-                            selected = destination == item,
-                            onClick = { onDestinationChange(item) },
-                            icon = { NavIcon(item, activeCount) },
-                            label = { Text(destinationLabel(item)) },
-                            railExpanded = false,
+            .focusGroup()
+    } else {
+        Modifier
+    }
+    CompositionLocalProvider(LocalAnimationsPaused provides (page != null)) {
+        BoxWithConstraints(Modifier.fillMaxSize().then(tabsModifier)) {
+            val wide = maxWidth >= WideLayoutMinWidth
+            val content: @Composable (PaddingValues) -> Unit = { padding ->
+                AnimatedContent(
+                    targetState = destination,
+                    transitionSpec = {
+                        (fadeIn(effects) + scaleIn(spatial, initialScale = 0.96f)).togetherWith(fadeOut(fastEffects))
+                    },
+                    label = "destination",
+                ) { target ->
+                    val screenModifier = Modifier
+                        .fillMaxSize()
+                        .wrapContentWidth(Alignment.CenterHorizontally)
+                        .widthIn(max = 720.dp)
+                    when (target) {
+                        Destination.Home -> HomeScreen(
+                            ui = ui,
+                            actions = actions,
+                            onOpenTransfers = { onDestinationChange(Destination.Transfers) },
+                            onOpenConnection = { onPageChange(Page.Connection) },
+                            onOpenSettings = { onPageChange(Page.Settings) },
+                            modifier = screenModifier,
+                            contentPadding = padding,
                         )
+                        Destination.Transfers -> TransfersScreen(ui, actions, screenModifier, padding)
+                        Destination.Notifications -> NotificationsScreen(ui, actions, screenModifier, padding)
+                        Destination.Calls -> CallsScreen(ui, actions, screenModifier, padding)
                     }
                 }
-                Scaffold(modifier = Modifier.weight(1f)) { padding -> content(padding) }
             }
-        } else {
-            Scaffold(
-                bottomBar = {
-                    ShortNavigationBar {
+
+            if (wide) {
+                Row(Modifier.fillMaxSize()) {
+                    WideNavigationRail(
+                        arrangement = Arrangement.Center,
+                    ) {
                         Destination.entries.forEach { item ->
-                            ShortNavigationBarItem(
+                            WideNavigationRailItem(
                                 selected = destination == item,
                                 onClick = { onDestinationChange(item) },
                                 icon = { NavIcon(item, activeCount) },
                                 label = { Text(destinationLabel(item)) },
+                                railExpanded = false,
+                                colors = WideNavigationRailItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                    selectedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                ),
                             )
                         }
                     }
-                },
-            ) { padding -> content(padding) }
+                    Scaffold(modifier = Modifier.weight(1f)) { padding -> content(padding) }
+                }
+            } else {
+                Scaffold(
+                    bottomBar = {
+                        ShortNavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                            Destination.entries.forEach { item ->
+                                ShortNavigationBarItem(
+                                    selected = destination == item,
+                                    onClick = { onDestinationChange(item) },
+                                    icon = { NavIcon(item, activeCount) },
+                                    label = { Text(destinationLabel(item)) },
+                                    colors = ShortNavigationBarItemDefaults.colors(
+                                        selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                        selectedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                ) { padding -> content(padding) }
+            }
         }
     }
 
-    DiagnosticsOverlay(visible = showDiagnostics, onDismiss = { onShowDiagnosticsChange(false) }, content = diagnostics)
+    // The last page shown stays on screen while the overlay animates out.
+    var shownPage by remember { mutableStateOf(page) }
+    if (page != null) shownPage = page
+    PageOverlay(
+        visible = page != null,
+        onDismiss = { onPageChange(if (page == Page.Diagnostics) Page.Connection else null) },
+    ) {
+        AnimatedContent(
+            targetState = shownPage,
+            transitionSpec = { (fadeIn(effects) + scaleIn(spatial, initialScale = 0.97f)).togetherWith(fadeOut(fastEffects)) },
+            label = "page",
+        ) { current ->
+            when (current) {
+                Page.Connection -> ConnectionScreen(
+                    ui = ui,
+                    actions = actions,
+                    onBack = { onPageChange(null) },
+                    onOpenDiagnostics = { onPageChange(Page.Diagnostics) },
+                )
+                Page.Settings -> SettingsScreen(ui = ui, actions = actions, onBack = { onPageChange(null) })
+                Page.Diagnostics -> diagnostics()
+                null -> Unit
+            }
+        }
+    }
 }
 
-/** Diagnostics slides over the shell and follows the predictive-back gesture as it goes. */
+/** A page slides over the shell and follows the predictive-back gesture as it goes. */
 @Composable
-private fun DiagnosticsOverlay(visible: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+private fun PageOverlay(visible: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
     var backProgress by remember { mutableFloatStateOf(0f) }
     var swipeEdge by remember { mutableStateOf(BackEventCompat.EDGE_LEFT) }
     PredictiveBackHandler(enabled = visible) { events: Flow<BackEventCompat> ->
@@ -324,6 +404,7 @@ private fun DiagnosticsOverlay(visible: Boolean, onDismiss: () -> Unit, content:
                 swipeEdge = event.swipeEdge
             }
             onDismiss()
+            backProgress = 0f
         } catch (cancelled: CancellationException) {
             backProgress = 0f
             throw cancelled
@@ -357,7 +438,8 @@ private fun NavIcon(destination: Destination, activeTransfers: Int) {
     val icon: ImageVector = when (destination) {
         Destination.Home -> Icons.Default.Home
         Destination.Transfers -> DroidIcons.Transfers
-        Destination.Settings -> Icons.Default.Settings
+        Destination.Notifications -> Icons.Default.Notifications
+        Destination.Calls -> Icons.Default.Call
     }
     if (destination == Destination.Transfers && activeTransfers > 0) {
         BadgedBox(badge = { Badge { Text(activeTransfers.toString()) } }) {
@@ -371,6 +453,7 @@ private fun NavIcon(destination: Destination, activeTransfers: Int) {
 @Composable
 private fun destinationLabel(destination: Destination): String = when (destination) {
     Destination.Home -> stringResource(R.string.nav_home)
-    Destination.Transfers -> stringResource(R.string.nav_transfers)
-    Destination.Settings -> stringResource(R.string.nav_settings)
+    Destination.Transfers -> stringResource(R.string.nav_files)
+    Destination.Notifications -> stringResource(R.string.nav_notifications)
+    Destination.Calls -> stringResource(R.string.nav_calls)
 }

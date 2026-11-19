@@ -47,8 +47,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.southstar21.droidtosh.R
+import dev.southstar21.droidtosh.ui.components.Tether
+import dev.southstar21.droidtosh.ui.components.TetherState
 import dev.southstar21.droidtosh.ui.components.pressScale
-import dev.southstar21.droidtosh.ui.theme.DroidIcons
 
 /**
  * The Find my phone ringing screen: rings ripple out from a big, gently breathing Stop button.
@@ -93,10 +94,12 @@ fun FindPhoneScreen(onStop: () -> Unit, animate: Boolean = true) {
     } else {
         0f
     }
-    val colors = MaterialTheme.colorScheme
+    // Ink on paper reversed: the whole screen is the inverse surface, its marks the inverse content.
+    val ground = MaterialTheme.colorScheme.inverseSurface
+    val ink = MaterialTheme.colorScheme.inverseOnSurface
     val stopLabel = stringResource(R.string.find_stop)
 
-    Surface(modifier = Modifier.fillMaxSize(), color = colors.errorContainer) {
+    Surface(modifier = Modifier.fillMaxSize(), color = ground, contentColor = ink) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -107,20 +110,13 @@ fun FindPhoneScreen(onStop: () -> Unit, animate: Boolean = true) {
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 480.dp)) {
                 Spacer(Modifier.height(24.dp))
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(colors.error),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(DroidIcons.Ring, contentDescription = null, tint = colors.onError, modifier = Modifier.size(32.dp))
-                }
-                Spacer(Modifier.height(20.dp))
+                // The Tether's echo: sound rolling out from this phone.
+                Tether(state = TetherState.Echo, size = 72.dp, color = ink)
+                Spacer(Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.find_ringing_title),
                     style = MaterialTheme.typography.headlineLarge,
-                    color = colors.onErrorContainer,
+                    color = ink,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.semantics { heading() },
                 )
@@ -133,7 +129,7 @@ fun FindPhoneScreen(onStop: () -> Unit, animate: Boolean = true) {
                     val end = size.minDimension / 2
                     ripple.forEach { progress ->
                         drawCircle(
-                            color = colors.error,
+                            color = ink,
                             radius = start + (end - start) * progress,
                             center = center,
                             alpha = (1f - progress) * 0.5f,
@@ -142,19 +138,27 @@ fun FindPhoneScreen(onStop: () -> Unit, animate: Boolean = true) {
                     }
                 }
                 val interaction = remember { MutableInteractionSource() }
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(220.dp).scale(breathe)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(240.dp).scale(breathe)) {
+                    // Two expressive halos turning against each other behind the Stop button.
                     Box(
                         Modifier
-                            .size(220.dp)
+                            .size(240.dp)
+                            .rotate(-spin * 0.6f)
+                            .clip(MaterialShapes.SoftBurst.toShape())
+                            .background(ink.copy(alpha = 0.18f)),
+                    )
+                    Box(
+                        Modifier
+                            .size(212.dp)
                             .rotate(spin)
                             .clip(MaterialShapes.Cookie12Sided.toShape())
-                            .background(colors.error),
+                            .background(ink),
                     )
                     Surface(
                         onClick = onStop,
                         shape = CircleShape,
-                        color = colors.error,
-                        contentColor = colors.onError,
+                        color = ink,
+                        contentColor = ground,
                         interactionSource = interaction,
                         modifier = Modifier
                             .size(184.dp)
@@ -165,7 +169,7 @@ fun FindPhoneScreen(onStop: () -> Unit, animate: Boolean = true) {
                             },
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(stopLabel, style = MaterialTheme.typography.displayMedium, color = colors.onError)
+                            Text(stopLabel, style = MaterialTheme.typography.displayMedium, color = ground)
                         }
                     }
                 }
@@ -175,7 +179,7 @@ fun FindPhoneScreen(onStop: () -> Unit, animate: Boolean = true) {
                 text = stringResource(R.string.find_ringing_hint),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
-                color = colors.onErrorContainer,
+                color = ink.copy(alpha = 0.8f),
                 modifier = Modifier.padding(bottom = 16.dp),
             )
         }

@@ -110,13 +110,17 @@ object Updates {
         }
         work = scope.launch {
             val available = UpdateState.Available(update.version, update.build)
+            val apk = File(File(app.cacheDir, "updates"), APK_NAME)
             try {
-                val apk = download(app, update)
+                download(app, update)
                 mutableState.value = UpdateState.ReadyToInstall(update.version)
                 commit(app, apk, update)
                 mutableState.value = UpdateState.Installing(update.version)
             } catch (error: Exception) {
                 mutableState.value = UpdateState.Failed(error.message ?: "Update failed", available)
+            } finally {
+                // The installer session holds its own copy once committed.
+                apk.delete()
             }
         }
     }
@@ -176,6 +180,8 @@ object Updates {
         val connection = open(update.apk.downloadUrl)
         try {
             val total = update.apk.size.takeIf { it > 0 } ?: connection.contentLengthLong
+            val limit = downloadLimit(update.apk.size)
+            if (connection.contentLengthLong > limit) throw IOException("The download is larger than expected")
             mutableState.value = UpdateState.Downloading(update.version, 0f)
             connection.inputStream.use { input ->
                 file.outputStream().use { output ->
@@ -187,6 +193,7 @@ object Updates {
                         if (read < 0) break
                         output.write(buffer, 0, read)
                         written += read
+                        if (written > limit) throw IOException("The download is larger than expected")
                         val progress = if (total > 0) (written.toFloat() / total).coerceAtMost(1f) else 0f
                         if (progress - lastReported >= 0.01f) {
                             lastReported = progress
@@ -195,6 +202,9 @@ object Updates {
                     }
                 }
             }
+        } catch (error: Exception) {
+            file.delete()
+            throw error
         } finally {
             connection.disconnect()
         }
@@ -216,6 +226,21 @@ object Updates {
             setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
         }
         val sessionId = installer.createSession(params)
+        try {
+            writeAndCommit(app, installer, sessionId, apk, update)
+        } catch (error: Exception) {
+            runCatching { installer.abandonSession(sessionId) }
+            throw error
+        }
+    }
+
+    private fun writeAndCommit(
+        app: Context,
+        installer: PackageInstaller,
+        sessionId: Int,
+        apk: File,
+        update: UpdateCandidate,
+    ) {
         installer.openSession(sessionId).use { session ->
             apk.inputStream().use { input ->
                 session.openWrite("droidtosh.apk", 0, apk.length()).use { output ->
@@ -263,6 +288,12 @@ object Updates {
     internal const val EXTRA_VERSION = "${BuildConfig.APPLICATION_ID}.extra.UPDATE_VERSION"
 }
 
+
+/** Largest APK accepted when the release doesn't say its size. */
+internal const val MAX_APK_BYTES = 200L * 1024 * 1024
+
+/** How many bytes a download may deliver: the size the release declares, else [MAX_APK_BYTES]. */
+internal fun downloadLimit(declaredSize: Long): Long = if (declaredSize > 0) declaredSize else MAX_APK_BYTES
 
 /** Receives the PackageInstaller session result for an update. */
 class UpdateInstallReceiver : BroadcastReceiver() {

@@ -46,7 +46,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 object RelayState {
     private val mutableEnabled = MutableStateFlow(false)
@@ -75,6 +77,7 @@ class RelayNotificationListenerService : NotificationListenerService() {
         )
     }
     private val appLabels = ConcurrentHashMap<String, String>()
+    /** Keys forwarded to the Mac and still active: only these get removals and Mac requests. */
     private val seenKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val truncations = TruncationCounter { Diagnostics.recorder.onTextTruncated() }
     private val voipMatcher by lazy { VoipActionMatcher(VoipProfiles.load(this), VoipProfiles.generic(this)) }
@@ -104,6 +107,9 @@ class RelayNotificationListenerService : NotificationListenerService() {
         CallManager.dialerNotificationAction = { role -> dialerNotificationAction(role) }
         CallManager.voipCallInProgress = { voipCalls.isNotEmpty() }
         if (muteJob?.isActive != true) {
+            // Read the list before anything is forwarded or snapshotted, so muted apps can't leak.
+            mutedSnapshot = runCatching { runBlocking { settingsStore.mutedPackages.first() } }
+                .getOrDefault(mutedSnapshot)
             muteJob = scope.launch { settingsStore.mutedPackages.collect { mutedSnapshot = it } }
         }
         if (relayStatusJob?.isActive != true) {
@@ -164,6 +170,9 @@ class RelayNotificationListenerService : NotificationListenerService() {
             if (sbn.packageName in mutedSnapshot) Diagnostics.recorder.onNotificationMuted()
             return
         }
+        if (SensitiveNotifications.isRedacted(notification.extras.getCharSequence(Notification.EXTRA_TEXT))) {
+            SensitiveNotifications.onRedactedSeen(applicationContext)
+        }
         val record = maybeWithIcon(
             NotificationRecordMapper.toRecord(
                 packageName = sbn.packageName,
@@ -193,7 +202,7 @@ class RelayNotificationListenerService : NotificationListenerService() {
             return
         }
         if (NotificationFilter.isSystemNoise(sbn.packageName)) return
-        seenKeys.remove(sbn.key)
+        val wasForwarded = seenKeys.remove(sbn.key)
         truncations.onRemoved(sbn.key)
         val signal = voipCalls.remove(sbn.key)
         val startedAtMs = voipStartedAt.remove(sbn.key) ?: 0L
@@ -226,9 +235,11 @@ class RelayNotificationListenerService : NotificationListenerService() {
                 }
             }
         }
-        TransportHub.send(newEnvelope {
-            setNotificationRemoved(NotificationRemoved.newBuilder().setKey(sbn.key))
-        })
+        if (wasForwarded) {
+            TransportHub.send(newEnvelope {
+                setNotificationRemoved(NotificationRemoved.newBuilder().setKey(sbn.key))
+            })
+        }
     }
 
     private fun handleRequest(envelope: Envelope) {
@@ -236,11 +247,15 @@ class RelayNotificationListenerService : NotificationListenerService() {
             when {
                 envelope.hasNotificationAction() -> {
                     val request = envelope.notificationAction
-                    val outcome = executor.execute(
-                        key = request.key,
-                        actionIndex = request.actionIndex,
-                        replyText = request.replyText.ifEmpty { null },
-                    )
+                    val outcome = if (request.key in seenKeys) {
+                        executor.execute(
+                            key = request.key,
+                            actionIndex = request.actionIndex,
+                            replyText = request.replyText.ifEmpty { null },
+                        )
+                    } else {
+                        ActionOutcome(false, "notification_not_found", "notification was not forwarded")
+                    }
                     TransportHub.send(newEnvelope {
                         setActionResult(
                             ActionResult.newBuilder()
@@ -251,8 +266,10 @@ class RelayNotificationListenerService : NotificationListenerService() {
                         )
                     })
                 }
-                envelope.hasNotificationDismiss() ->
-                    runCatching { cancelNotification(envelope.notificationDismiss.key) }
+                envelope.hasNotificationDismiss() -> {
+                    val key = envelope.notificationDismiss.key
+                    if (key in seenKeys) runCatching { cancelNotification(key) }
+                }
                 envelope.hasSnapshotRequest() -> sendSnapshot()
                 envelope.hasMuteListSet() -> scope.launch {
                     runCatching {

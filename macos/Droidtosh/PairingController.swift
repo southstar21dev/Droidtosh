@@ -11,6 +11,8 @@ final class PairingController: ObservableObject {
     @Published private(set) var roomToken: String = PairingController.loadOrCreateRoomToken()
     /// Whether a phone has paired (a paired PSK is stored).
     @Published private(set) var isPaired = false
+    /// Set while the paired key could not be stored, so the phone would be unpaired after a relaunch.
+    @Published private(set) var saveFailure: String?
 
     /// The relay endpoint the pairing URI advertises; nil while the relay settings are incomplete.
     var endpointProvider: () -> RelayEndpoint? = { nil }
@@ -73,13 +75,26 @@ final class PairingController: ObservableObject {
     /// and the QR code rotates to a new pending PSK.
     func handleAuthenticated(psk: Data) {
         pskLock.lock()
+        var saveFailure: Error?
+        var saveFailureCleared = false
         let pskMatched = pairedPSK != nil && psk == pairedPSK
         if !pskMatched {
             pairedPSK = psk
-            try? SecretStore.default.save(psk, as: Self.pskName)
+            do {
+                try SecretStore.default.save(psk, as: Self.pskName)
+                saveFailureCleared = true
+            } catch {
+                DebugLog.log("relay: could not save the paired PSK: \(error)")
+                saveFailure = error
+            }
             pendingPSK = randomNonce()
         }
         pskLock.unlock()
+        if let saveFailure {
+            self.saveFailure = saveFailure.localizedDescription
+        } else if saveFailureCleared {
+            self.saveFailure = nil
+        }
         isPaired = true
         DebugLog.log("relay: authenticated pskMatched=\(pskMatched)")
         if !pskMatched {
@@ -88,16 +103,31 @@ final class PairingController: ObservableObject {
     }
 
     /// Forgets the paired phone and moves to a new room so it can no longer reach this Mac.
-    func forgetPairing() {
+    /// The in-memory state is always cleared; throws if the stored key or the new room token
+    /// could not be written, in which case the phone may reconnect after a relaunch.
+    func forgetPairing() throws {
         pskLock.lock()
         pairedPSK = nil
         pendingPSK = randomNonce()
         pskLock.unlock()
         isPaired = false
-        SecretStore.default.delete(Self.pskName)
+        saveFailure = nil
+        var failure: Error?
+        do {
+            try SecretStore.default.delete(Self.pskName)
+        } catch {
+            DebugLog.log("relay: could not delete the paired PSK: \(error)")
+            failure = error
+        }
         let token = RoomToken.generate()
-        try? SecretStore.default.save(Data(token.utf8), as: Self.roomTokenName)
+        do {
+            try SecretStore.default.save(Data(token.utf8), as: Self.roomTokenName)
+        } catch {
+            DebugLog.log("relay: could not save the new room token: \(error)")
+            failure = failure ?? error
+        }
         roomToken = token
+        if let failure { throw failure }
     }
 
     /// No QR code is offered until everything the mode needs is known. With the relay that
@@ -146,7 +176,7 @@ final class PairingController: ObservableObject {
     }
 
     func retryRoomTokenLoad() {
-        onStatus?("Can't read the pairing secrets — retrying")
+        onStatus?("Can’t read the pairing secrets, retrying")
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             guard let self else { return }

@@ -1,11 +1,6 @@
 package dev.southstar21.droidtosh.ui.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -44,7 +39,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -61,20 +55,20 @@ import dev.southstar21.droidtosh.R
 import dev.southstar21.droidtosh.ui.theme.Brand
 import dev.southstar21.droidtosh.ui.theme.LocalExtraShapes
 
-/** The app mark, as on the launcher icon: the dark roast Droid Mac on a cream rounded square. */
+/** The app mark in black and white: the ink Droid Mac on a paper rounded square. */
 @Composable
 fun BrandMark(size: Dp = 40.dp, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(size * 0.3f))
-            .background(Brand.Cream),
+            .background(Brand.Paper),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             painter = painterResource(R.drawable.ic_brand_mark),
             contentDescription = null,
-            tint = Brand.DarkRoast,
+            tint = Brand.Ink,
             modifier = Modifier.size(size * 0.8f),
         )
     }
@@ -95,23 +89,11 @@ fun ShapeIcon(
     spinPeriodMs: Int = 12_000,
 ) {
     val shape = polygon.toShape()
-    val rotation = if (spin) {
-        val transition = rememberInfiniteTransition(label = "shape-spin")
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(spinPeriodMs, easing = LinearEasing)),
-            label = "shape-angle",
-        )
-        angle
-    } else {
-        0f
-    }
     Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
                 .size(size)
-                .rotate(rotation)
+                .spinning(spin, spinPeriodMs, "shape-spin")
                 .clip(shape)
                 .background(containerColor),
         )

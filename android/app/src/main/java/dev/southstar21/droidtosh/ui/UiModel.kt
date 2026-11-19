@@ -2,7 +2,12 @@ package dev.southstar21.droidtosh.ui
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import dev.southstar21.droidtosh.background.BackgroundCheck
+import dev.southstar21.droidtosh.background.BackgroundHealth
+import dev.southstar21.droidtosh.background.BackgroundInputs
+import dev.southstar21.droidtosh.background.OemVendor
 import dev.southstar21.droidtosh.files.TransferInfo
+import dev.southstar21.droidtosh.push.WakeProvider
 import dev.southstar21.droidtosh.transport.ConnectionMode
 import dev.southstar21.droidtosh.transport.ConnectionState
 import dev.southstar21.droidtosh.update.UpdateState
@@ -21,6 +26,10 @@ data class DroidUiState(
     val findRinging: Boolean = false,
     val fullScreenAllowed: Boolean = true,
     val batteryOptimizationIgnored: Boolean = true,
+    /** The manufacturer whose battery manager can kill the app; null on a phone without one. */
+    val oemVendor: OemVendor? = null,
+    /** The user went through the manufacturer's battery settings. */
+    val vendorBatteryHandled: Boolean = false,
     /** "Display over other apps", which lets the Mac answer VoIP calls while the phone is unlocked. */
     val overlayAllowed: Boolean = true,
     val transfers: List<TransferInfo> = emptyList(),
@@ -28,6 +37,12 @@ data class DroidUiState(
     val connectionMode: ConnectionMode? = null,
     /** Whether the pairing includes a relay, so the relay modes can be chosen. */
     val relayAvailable: Boolean = true,
+    /** The relay from the pairing ("relay.example.com:443"); null when the pairing has none. */
+    val relayAddress: String? = null,
+    /** The pinned relay certificate's fingerprint, shortened for display; null without a relay. */
+    val relayFingerprint: String? = null,
+    /** The wake-up choices on the Connection page; null while unpaired (nothing to show). */
+    val wake: WakeUiState? = null,
     val versionName: String = "",
     /** The over-the-air updater (docs/RELEASING.md). */
     val update: UpdateState = UpdateState.Idle,
@@ -52,14 +67,41 @@ data class DroidUiState(
             UpdateState.Idle, UpdateState.Checking, UpdateState.UpToDate -> null
         }
 
+    /** What Home's attention lines ask about: the most important problem, then any update on offer. */
+    val attentions: List<Attention>
+        get() = buildList {
+            issues.firstOrNull()?.let { add(Attention.Problem(it)) }
+            val offered = when (val state = update) {
+                is UpdateState.Available -> state.version
+                is UpdateState.ReadyToInstall -> state.version
+                is UpdateState.Failed -> state.available?.version
+                else -> null
+            }
+            offered?.let { add(Attention.Update(it)) }
+        }
+
+    /** The inputs of the Background checklist; the Connection page and Home's attention line both read it. */
+    val backgroundInputs: BackgroundInputs
+        get() = BackgroundInputs(
+            notificationAccess = permissions.notificationAccess,
+            postNotifications = permissions.notifications,
+            batteryIgnored = batteryOptimizationIgnored,
+            vendor = oemVendor,
+            vendorHandled = vendorBatteryHandled,
+        )
+
     /** Things that stop a feature from working, most important first. */
     val issues: List<Issue>
-        get() = buildList {
-            if (!permissions.notificationAccess) add(Issue.NotificationAccess)
-            if (!permissions.notifications) add(Issue.PostNotifications)
-            if (!permissions.phone) add(Issue.Phone)
-            if (!batteryOptimizationIgnored) add(Issue.BatteryOptimization)
-            if (findEnabled && !fullScreenAllowed) add(Issue.FullScreenIntent)
+        get() {
+            val failing = BackgroundHealth.failing(backgroundInputs).toSet()
+            return buildList {
+                if (BackgroundCheck.NotificationAccess in failing) add(Issue.NotificationAccess)
+                if (BackgroundCheck.PostNotifications in failing) add(Issue.PostNotifications)
+                if (!permissions.phone) add(Issue.Phone)
+                if (BackgroundCheck.BatteryOptimization in failing) add(Issue.BatteryOptimization)
+                if (BackgroundCheck.VendorBattery in failing) add(Issue.VendorBattery)
+                if (findEnabled && !fullScreenAllowed) add(Issue.FullScreenIntent)
+            }
         }
 
     /** Optional extras that make features richer. */
@@ -72,7 +114,13 @@ data class DroidUiState(
         }
 }
 
-enum class Issue { NotificationAccess, PostNotifications, Phone, BatteryOptimization, FullScreenIntent, CallLog, OutgoingCalls, Contacts, Overlay }
+/** What Home's single attention line is about. */
+sealed interface Attention {
+    data class Problem(val issue: Issue) : Attention
+    data class Update(val version: String) : Attention
+}
+
+enum class Issue { NotificationAccess, PostNotifications, Phone, BatteryOptimization, VendorBattery, FullScreenIntent, CallLog, OutgoingCalls, Contacts, Overlay }
 
 /** The app's user actions, so screens and screenshot tests can run without [AppState]. */
 @Stable
@@ -80,6 +128,7 @@ class AppActions(
     val requestPermissions: (Array<String>) -> Unit = {},
     val openNotificationAccess: () -> Unit = {},
     val openBatteryOptimization: () -> Unit = {},
+    val openVendorBattery: () -> Unit = {},
     val openOverlaySettings: () -> Unit = {},
     val openFullScreenSettings: () -> Unit = {},
     val sendFiles: () -> Unit = {},
@@ -91,6 +140,8 @@ class AppActions(
     val setFilesReceiveEnabled: (Boolean) -> Unit = {},
     val setFindEnabled: (Boolean) -> Unit = {},
     val setConnectionMode: (ConnectionMode) -> Unit = {},
+    val setWakeProvider: (WakeProvider) -> Unit = {},
+    val pickDistributor: () -> Unit = {},
     val stopRinging: () -> Unit = {},
     val reconnectNow: () -> Unit = {},
     val unpair: () -> Unit = {},
@@ -101,5 +152,17 @@ class AppActions(
     val shareDiagnosticsLogs: () -> Unit = {},
 )
 
-/** The bottom-bar destinations. */
-enum class Destination { Home, Transfers, Settings }
+/** The wake-up providers that can be chosen here, the one in use, and whether UnifiedPush has an endpoint. */
+data class WakeUiState(
+    val options: List<WakeProvider>,
+    val selected: WakeProvider,
+    val unifiedPushRegistered: Boolean = false,
+    /** The paired relay refused the push token (an older relay), so wake-ups are off until it is updated. */
+    val relayRefusesToken: Boolean = false,
+)
+
+/** The bottom-bar tabs. [Transfers] is the Files tab (its name is kept for notification intents). */
+enum class Destination { Home, Transfers, Notifications, Calls }
+
+/** Pages that open over the tabs: the connection (from the Mac card), Settings, and Diagnostics. */
+enum class Page { Connection, Settings, Diagnostics }

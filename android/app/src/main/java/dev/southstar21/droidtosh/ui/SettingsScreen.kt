@@ -1,250 +1,224 @@
 package dev.southstar21.droidtosh.ui
 
-import android.Manifest
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import dev.southstar21.droidtosh.background.BackgroundCheck
+import dev.southstar21.droidtosh.background.BackgroundHealth
+import dev.southstar21.droidtosh.push.WakeProvider
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.southstar21.droidtosh.R
 import dev.southstar21.droidtosh.transport.ConnectionMode
 import dev.southstar21.droidtosh.transport.ConnectionState
+import dev.southstar21.droidtosh.ui.components.FeatureStatusCard
 import dev.southstar21.droidtosh.ui.components.GroupRow
 import dev.southstar21.droidtosh.ui.components.ListGroup
-import dev.southstar21.droidtosh.ui.components.PageHeader
 import dev.southstar21.droidtosh.ui.components.RowTone
+import dev.southstar21.droidtosh.ui.components.SectionHeader
+import dev.southstar21.droidtosh.ui.components.ShapeTether
 import dev.southstar21.droidtosh.ui.components.SwitchRow
 import dev.southstar21.droidtosh.ui.theme.DroidIcons
 import dev.southstar21.droidtosh.update.UpdateState
 import kotlin.math.roundToInt
 
+/** A page over the tabs: a large flexible top app bar with Back, and a scrolling body. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun DetailPage(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    Scaffold(
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeFlexibleTopAppBar(
+                title = { Text(title) },
+                subtitle = subtitle?.let { { Text(it) } },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.diagnostics_back))
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+            content = content,
+        )
+    }
+}
+
+/** Settings, slimmed to what belongs to the app itself: updates and about. */
 @Composable
 fun SettingsScreen(
     ui: DroidUiState,
     actions: AppActions,
-    onOpenDiagnostics: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(),
-    initialUnpairDialog: Boolean = false,
 ) {
-    var showUnpairDialog by rememberSaveable { mutableStateOf(initialUnpairDialog) }
-    val granted = stringResource(R.string.permission_granted)
-    val notGranted = stringResource(R.string.settings_tap_to_allow)
-
-    Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(contentPadding)
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        PageHeader(title = stringResource(R.string.settings_title))
-
-        // Connection & pairing
+    DetailPage(title = stringResource(R.string.settings_title), onBack = onBack, modifier = modifier) {
+        UpdatesGroup(ui, actions)
         ListGroup(
-            title = stringResource(R.string.settings_group_connection),
+            title = stringResource(R.string.settings_group_about),
+            footer = stringResource(R.string.settings_moved_note),
             content = {
                 item { shape ->
                     GroupRow(
                         shape = shape,
-                        icon = DroidIcons.Laptop,
-                        title = ui.macName.ifBlank { stringResource(R.string.home_mac_fallback) },
-                        supporting = connectionLabel(ui.connection) +
-                            (ui.details.relay?.let { " · $it" } ?: ""),
-                        tone = if (ui.connection is ConnectionState.Connected) RowTone.Good else RowTone.Neutral,
-                    )
-                }
-                item { shape ->
-                    GroupRow(
-                        shape = shape,
-                        icon = DroidIcons.Battery,
-                        title = stringResource(R.string.home_action_battery_optimization),
-                        supporting = if (ui.batteryOptimizationIgnored) {
-                            stringResource(R.string.settings_battery_unrestricted)
-                        } else {
-                            stringResource(R.string.settings_battery_optimized)
-                        },
-                        tone = if (ui.batteryOptimizationIgnored) RowTone.Good else RowTone.Attention,
-                        onClick = actions.openBatteryOptimization,
-                    )
-                }
-                item { shape ->
-                    GroupRow(
-                        shape = shape,
-                        icon = Icons.Default.Refresh,
-                        title = stringResource(R.string.diagnostics_reconnect),
-                        onClick = actions.reconnectNow,
-                        showChevron = false,
-                    )
-                }
-                item { shape ->
-                    GroupRow(
-                        shape = shape,
-                        icon = Icons.Default.Delete,
-                        title = stringResource(R.string.home_action_unpair),
-                        supporting = stringResource(R.string.home_unpair_message),
-                        tone = RowTone.Destructive,
-                        titleColor = MaterialTheme.colorScheme.error,
-                        onClick = { showUnpairDialog = true },
-                        showChevron = false,
+                        icon = Icons.Default.Info,
+                        title = stringResource(R.string.app_name),
+                        supporting = stringResource(R.string.home_version, ui.versionName),
                     )
                 }
             },
         )
+    }
+}
+
+/** How the phone reaches the Mac, the relay, the phone's own side, diagnostics and unpairing. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ConnectionScreen(
+    ui: DroidUiState,
+    actions: AppActions,
+    onBack: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
+    modifier: Modifier = Modifier,
+    initialUnpairDialog: Boolean = false,
+) {
+    var showUnpairDialog by rememberSaveable { mutableStateOf(initialUnpairDialog) }
+    DetailPage(
+        title = stringResource(R.string.connection_title),
+        subtitle = ui.macName.ifBlank { null },
+        onBack = onBack,
+        modifier = modifier,
+    ) {
+        val disconnected = ui.connection as? ConnectionState.Disconnected
+        FeatureStatusCard(
+            title = disconnected?.let { disconnectTitle(it) } ?: connectionLabel(ui.connection),
+            body = disconnected?.let { disconnectHint(it) } ?: modeLabel(ui),
+        ) {
+            ShapeTether(
+                state = tetherFor(ui.connection),
+                polygon = MaterialShapes.Cookie12Sided,
+                size = 64.dp,
+                tetherSize = 40.dp,
+                spin = ui.connection is ConnectionState.Connected,
+            )
+        }
+
+        if (disconnected != null) {
+            FilledTonalButton(
+                onClick = actions.reconnectNow,
+                shapes = ButtonDefaults.shapes(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text(stringResource(R.string.diagnostics_reconnect))
+            }
+        }
 
         ui.connectionMode?.let { current ->
             ConnectionModeGroup(current, ui.relayAvailable, actions.setConnectionMode)
         }
 
-        // Notifications
+        ui.wake?.let { WakeUpGroup(it, actions.setWakeProvider, actions.pickDistributor) }
+
         ListGroup(
-            title = stringResource(R.string.settings_group_notifications),
-            footer = stringResource(R.string.settings_mute_list_note),
+            title = stringResource(R.string.connection_relay),
             content = {
                 item { shape ->
                     GroupRow(
                         shape = shape,
-                        icon = Icons.Default.Notifications,
-                        title = stringResource(R.string.permission_notification_access_title),
-                        supporting = if (ui.permissions.notificationAccess) {
-                            stringResource(R.string.settings_notification_access_on)
-                        } else {
-                            stringResource(R.string.permission_notification_access_description)
-                        },
-                        tone = if (ui.permissions.notificationAccess) RowTone.Good else RowTone.Attention,
-                        onClick = actions.openNotificationAccess,
+                        icon = DroidIcons.Cloud,
+                        title = stringResource(R.string.connection_relay),
+                        supporting = ui.relayAddress ?: stringResource(R.string.connection_no_relay),
                     )
                 }
-                item { shape ->
-                    PermissionRow(
-                        shape = shape,
-                        icon = Icons.Default.Notifications,
-                        title = stringResource(R.string.permission_notifications_title),
-                        granted = ui.permissions.notifications,
-                        grantedText = granted,
-                        notGrantedText = notGranted,
-                        onClick = { actions.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS)) },
-                    )
+                ui.relayFingerprint?.let { fingerprint ->
+                    item { shape ->
+                        GroupRow(
+                            shape = shape,
+                            icon = DroidIcons.Shield,
+                            title = stringResource(R.string.connection_fingerprint),
+                            supporting = fingerprint,
+                        )
+                    }
                 }
             },
         )
 
-        // Calls
-        ListGroup(
-            title = stringResource(R.string.settings_group_calls),
-            content = {
-                item { shape ->
-                    PermissionRow(
-                        shape, Icons.Default.Phone, stringResource(R.string.permission_phone_title),
-                        ui.permissions.phone, granted, notGranted,
-                    ) { actions.requestPermissions(PhonePermissions) }
-                }
-                item { shape ->
-                    PermissionRow(
-                        shape, Icons.Default.Call, stringResource(R.string.permission_call_log_title),
-                        ui.permissions.callLog, granted, notGranted,
-                    ) { actions.requestPermissions(CallLogPermissions) }
-                }
-                item { shape ->
-                    PermissionRow(
-                        shape, Icons.Default.Call, stringResource(R.string.permission_outgoing_calls_title),
-                        ui.permissions.outgoingCalls, granted, notGranted,
-                    ) { actions.requestPermissions(OutgoingCallPermissions) }
-                }
-                item { shape ->
-                    PermissionRow(
-                        shape, Icons.Default.Person, stringResource(R.string.permission_contacts_title),
-                        ui.permissions.contacts, granted, notGranted,
-                    ) { actions.requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS)) }
-                }
-                item { shape ->
-                    PermissionRow(
-                        shape, Icons.Default.Call, stringResource(R.string.settings_overlay_title),
-                        ui.overlayAllowed, stringResource(R.string.settings_overlay_on),
-                        stringResource(R.string.settings_overlay_off), actions.openOverlaySettings,
-                    )
-                }
-            },
-        )
+        BackgroundGroup(ui, actions)
 
-        // Clipboard
         ListGroup(
-            title = stringResource(R.string.clipboard_title),
-            footer = stringResource(R.string.clipboard_note),
+            title = stringResource(R.string.connection_phone_header),
             content = {
-                item { shape ->
-                    SwitchRow(
-                        shape = shape,
-                        icon = DroidIcons.Clipboard,
-                        title = stringResource(R.string.settings_clipboard_sync),
-                        checked = ui.clipboardEnabled,
-                        onCheckedChange = actions.setClipboardEnabled,
-                    )
-                }
-            },
-        )
-
-        // Files
-        ListGroup(
-            title = stringResource(R.string.files_title),
-            footer = stringResource(R.string.files_note),
-            content = {
-                item { shape ->
-                    SwitchRow(
-                        shape = shape,
-                        icon = DroidIcons.Download,
-                        title = stringResource(R.string.files_receive),
-                        checked = ui.filesReceiveEnabled,
-                        onCheckedChange = actions.setFilesReceiveEnabled,
-                    )
-                }
-            },
-        )
-
-        // Find my phone
-        ListGroup(
-            title = stringResource(R.string.feature_find),
-            footer = stringResource(R.string.find_note),
-            content = {
-                item { shape ->
-                    SwitchRow(
-                        shape = shape,
-                        icon = DroidIcons.Ring,
-                        title = stringResource(R.string.find_allow),
-                        checked = ui.findEnabled,
-                        onCheckedChange = actions.setFindEnabled,
-                    )
-                }
                 if (ui.findEnabled && !ui.fullScreenAllowed) {
                     item { shape ->
                         GroupRow(
@@ -260,38 +234,37 @@ fun SettingsScreen(
             },
         )
 
-        UpdatesGroup(ui, actions)
+        Column {
+            SectionHeader(stringResource(R.string.diagnostics_title), modifier = Modifier.padding(bottom = 4.dp))
+            DiagnosticsButtons(actions)
+            Spacer(Modifier.size(2.dp))
+            GroupRow(
+                shape = RoundedCornerShape(28.dp),
+                icon = DroidIcons.Pulse,
+                title = stringResource(R.string.connection_all_diagnostics),
+                supporting = stringResource(R.string.settings_diagnostics_summary),
+                onClick = onOpenDiagnostics,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Text(
+                text = stringResource(R.string.diagnostics_privacy_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+            )
+        }
 
-        // Advanced
-        ListGroup(
-            title = stringResource(R.string.settings_group_advanced),
-            content = {
-                item { shape ->
-                    GroupRow(
-                        shape = shape,
-                        icon = DroidIcons.Pulse,
-                        title = stringResource(R.string.home_action_diagnostics),
-                        supporting = stringResource(R.string.settings_diagnostics_summary),
-                        onClick = onOpenDiagnostics,
-                    )
-                }
-            },
-        )
-
-        // About
-        ListGroup(
-            title = stringResource(R.string.settings_group_about),
-            content = {
-                item { shape ->
-                    GroupRow(
-                        shape = shape,
-                        icon = Icons.Default.Info,
-                        title = stringResource(R.string.app_name),
-                        supporting = stringResource(R.string.home_version, ui.versionName),
-                    )
-                }
-            },
-        )
+        OutlinedButton(
+            onClick = { showUnpairDialog = true },
+            shapes = ButtonDefaults.shapes(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp),
+        ) {
+            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text(stringResource(R.string.connection_unpair))
+        }
     }
 
     if (showUnpairDialog) {
@@ -302,6 +275,133 @@ fun SettingsScreen(
             },
             onDismiss = { showUnpairDialog = false },
         )
+    }
+}
+
+/** The "Background" checklist: what can stop the connection while the phone is idle, each with a Fix. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun BackgroundGroup(ui: DroidUiState, actions: AppActions) {
+    val inputs = ui.backgroundInputs
+    val checks = BackgroundHealth.applicable(inputs)
+    val allGood = BackgroundHealth.failing(inputs).isEmpty()
+    ListGroup(
+        title = stringResource(R.string.background_title),
+        footer = stringResource(if (allGood) R.string.background_all_good else R.string.background_footer),
+        content = {
+            checks.forEach { check ->
+                item { shape ->
+                    val ok = BackgroundHealth.isOk(check, inputs)
+                    val spec = backgroundRowSpec(check, ui, actions)
+                    GroupRow(
+                        shape = shape,
+                        icon = spec.icon,
+                        title = spec.title,
+                        supporting = if (ok) spec.good else spec.bad,
+                        tone = if (ok) RowTone.Good else RowTone.Attention,
+                        onClick = spec.onClick,
+                        trailing = if (ok) null else {
+                            {
+                                FilledTonalButton(
+                                    onClick = spec.onClick,
+                                    shapes = ButtonDefaults.shapes(),
+                                    modifier = Modifier.heightIn(min = 40.dp),
+                                ) { Text(stringResource(R.string.background_fix)) }
+                            }
+                        },
+                        showChevron = ok,
+                    )
+                }
+            }
+        },
+    )
+}
+
+private class BackgroundRowSpec(
+    val icon: ImageVector,
+    val title: String,
+    val good: String,
+    val bad: String,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun backgroundRowSpec(check: BackgroundCheck, ui: DroidUiState, actions: AppActions): BackgroundRowSpec = when (check) {
+    BackgroundCheck.NotificationAccess -> BackgroundRowSpec(
+        Icons.Default.Notifications,
+        stringResource(R.string.background_notification_access),
+        stringResource(R.string.background_notification_access_on),
+        stringResource(R.string.background_notification_access_off),
+        actions.openNotificationAccess,
+    )
+    BackgroundCheck.PostNotifications -> BackgroundRowSpec(
+        Icons.Default.Notifications,
+        stringResource(R.string.background_post_notifications),
+        stringResource(R.string.background_post_notifications_on),
+        stringResource(R.string.background_post_notifications_off),
+    ) { actions.requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS)) }
+    BackgroundCheck.BatteryOptimization -> BackgroundRowSpec(
+        DroidIcons.Battery,
+        stringResource(R.string.home_action_battery_optimization),
+        stringResource(R.string.settings_battery_unrestricted),
+        stringResource(R.string.settings_battery_optimized),
+        actions.openBatteryOptimization,
+    )
+    BackgroundCheck.VendorBattery -> BackgroundRowSpec(
+        DroidIcons.Battery,
+        stringResource(R.string.background_vendor_title, ui.oemVendor?.label.orEmpty()),
+        stringResource(R.string.background_vendor_done),
+        stringResource(R.string.background_vendor_todo),
+        actions.openVendorBattery,
+    )
+}
+
+/** Reconnect, Copy report and Share logs as one connected button group. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun DiagnosticsButtons(actions: AppActions) {
+    val buttons: List<Triple<ImageVector, Int, () -> Unit>> = listOf(
+        Triple(Icons.Default.Refresh, R.string.diagnostics_reconnect, actions.reconnectNow),
+        Triple(DroidIcons.Copy, R.string.diagnostics_copy_report, actions.copyDiagnosticsReport),
+        Triple(Icons.Default.Share, R.string.diagnostics_share_logs, actions.shareDiagnosticsLogs),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
+        buttons.forEachIndexed { index, (icon, label, onClick) ->
+            val shapes = when (index) {
+                0 -> ButtonDefaults.shapes(
+                    shape = ButtonGroupDefaults.connectedLeadingButtonShape,
+                    pressedShape = ButtonGroupDefaults.connectedLeadingButtonPressShape,
+                )
+                buttons.lastIndex -> ButtonDefaults.shapes(
+                    shape = ButtonGroupDefaults.connectedTrailingButtonShape,
+                    pressedShape = ButtonGroupDefaults.connectedTrailingButtonPressShape,
+                )
+                else -> ButtonDefaults.shapes(
+                    shape = RoundedCornerShape(10.dp),
+                    pressedShape = ButtonGroupDefaults.connectedMiddleButtonPressShape,
+                )
+            }
+            FilledTonalButton(
+                onClick = onClick,
+                shapes = shapes,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 64.dp),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        stringResource(label),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -442,33 +542,59 @@ private fun ConnectionModeGroup(
     )
 }
 
+/** How the relay wakes the phone when the Mac returns: Google's FCM, UnifiedPush, or not at all. */
 @Composable
-private fun PermissionRow(
-    shape: Shape,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    granted: Boolean,
-    grantedText: String,
-    notGrantedText: String,
-    onClick: () -> Unit,
+private fun WakeUpGroup(
+    wake: WakeUiState,
+    onSelect: (WakeProvider) -> Unit,
+    onPickDistributor: () -> Unit,
 ) {
-    GroupRow(
-        shape = shape,
-        icon = icon,
-        title = title,
-        supporting = if (granted) grantedText else notGrantedText,
-        tone = if (granted) RowTone.Good else RowTone.Attention,
-        onClick = onClick,
-        trailing = if (granted) {
-            {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+    ListGroup(
+        title = stringResource(R.string.wake_title),
+        footer = stringResource(R.string.wake_note),
+        content = {
+            for (option in wake.options) {
+                item { shape ->
+                    val selected = option == wake.selected
+                    GroupRow(
+                        shape = shape,
+                        icon = if (option == WakeProvider.NONE) DroidIcons.Wifi else DroidIcons.Cloud,
+                        title = stringResource(
+                            when (option) {
+                                WakeProvider.FCM -> R.string.wake_fcm
+                                WakeProvider.UNIFIEDPUSH -> R.string.wake_unifiedpush
+                                WakeProvider.NONE -> R.string.wake_none
+                            }
+                        ),
+                        supporting = stringResource(
+                            when (option) {
+                                WakeProvider.FCM -> R.string.wake_fcm_summary
+                                WakeProvider.UNIFIEDPUSH -> R.string.wake_unifiedpush_summary
+                                WakeProvider.NONE -> R.string.wake_none_summary
+                            }
+                        ),
+                        tone = if (selected) RowTone.Good else RowTone.Neutral,
+                        onClick = if (selected) null else { { onSelect(option) } },
+                        showChevron = false,
+                        trailing = { RadioButton(selected = selected, onClick = null) },
+                    )
+                }
             }
-        } else {
-            null
+            if (wake.selected == WakeProvider.UNIFIEDPUSH) {
+                item { shape ->
+                    GroupRow(
+                        shape = shape,
+                        icon = DroidIcons.Shield,
+                        title = stringResource(R.string.wake_distributor),
+                        supporting = stringResource(
+                            if (wake.relayRefusesToken) R.string.wake_relay_outdated
+                            else if (wake.unifiedPushRegistered) R.string.wake_distributor_ready
+                            else R.string.wake_distributor_missing
+                        ),
+                        onClick = onPickDistributor,
+                    )
+                }
+            }
         },
     )
 }
@@ -477,13 +603,11 @@ private fun PermissionRow(
 private fun UnpairDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+        icon = { Icon(Icons.Default.Delete, contentDescription = null) },
         title = { Text(stringResource(R.string.home_unpair_title)) },
         text = { Text(stringResource(R.string.home_unpair_message)) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.home_unpair_confirm), color = MaterialTheme.colorScheme.error)
-            }
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.home_unpair_confirm)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.home_unpair_cancel)) }

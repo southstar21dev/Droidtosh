@@ -1,12 +1,17 @@
 package dev.southstar21.droidtosh.protocol
 
+import dev.southstar21.droidtosh.protocol.v1.BackgroundReason
 import dev.southstar21.droidtosh.protocol.v1.CallDirection
 import dev.southstar21.droidtosh.protocol.v1.CallKind
 import dev.southstar21.droidtosh.protocol.v1.CallPhase
 import dev.southstar21.droidtosh.protocol.v1.ChargeSource
 import dev.southstar21.droidtosh.protocol.v1.Envelope
+import dev.southstar21.droidtosh.protocol.v1.FindAction
+import dev.southstar21.droidtosh.protocol.v1.FindEndReason
 import dev.southstar21.droidtosh.protocol.v1.NetworkType
 import dev.southstar21.droidtosh.protocol.v1.RingerMode
+import dev.southstar21.droidtosh.transport.Capabilities
+import dev.southstar21.droidtosh.transport.ReliableStream
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -74,7 +79,7 @@ class FixtureDecodeTest {
 
     @Test
     fun everyFixtureIsProtocolV2() {
-        for (name in listOf("hello", "ping", "notification_record", "call_state", "resume", "device_status")) {
+        for (name in listOf("hello", "ping", "notification_record", "call_state", "resume", "device_status", "open_url")) {
             assertEquals(name, 2, Envelope.parseFrom(load(name)).protocolVersion)
         }
     }
@@ -111,9 +116,77 @@ class FixtureDecodeTest {
         assertEquals("5G", status.cellularGeneration)
         assertEquals("Telekom.de", status.carrier)
         assertFalse(status.airplaneMode)
+        assertTrue(status.backgroundRestricted)
+        assertEquals(BackgroundReason.BACKGROUND_REASON_VENDOR_BATTERY, status.backgroundReason)
         assertEquals(RingerMode.RINGER_MODE_VIBRATE, status.ringerMode)
         assertTrue(status.doNotDisturb)
         assertEquals(1_759_999_999_500L, status.sampledAtMs)
         assertArrayEquals(bytes, envelope.toByteArray())
+    }
+
+    @Test
+    fun fileOfferFixtureDecodesAndReEncodes() {
+        val bytes = load("file_offer")
+        val envelope = Envelope.parseFrom(bytes)
+        assertEquals("fixture-file-offer", envelope.messageId)
+        assertTrue(envelope.hasFileOffer())
+        val offer = envelope.fileOffer
+        assertEquals("11111111-2222-3333-4444-555555555555", offer.transferId)
+        assertEquals("holiday photo.jpg", offer.name)
+        assertEquals("image/jpeg", offer.mimeType)
+        assertEquals(4096L, offer.size)
+        assertEquals(1_759_999_000_000L, offer.modifiedAtMs)
+        assertArrayEquals(bytes, envelope.toByteArray())
+    }
+
+    @Test
+    fun fileChunkFixtureDecodesAndReEncodes() {
+        val bytes = load("file_chunk")
+        val envelope = Envelope.parseFrom(bytes)
+        assertEquals("fixture-file-chunk", envelope.messageId)
+        assertTrue(envelope.hasFileChunk())
+        val chunk = envelope.fileChunk
+        assertEquals("11111111-2222-3333-4444-555555555555", chunk.transferId)
+        assertEquals(1024L, chunk.offset)
+        val expected = "droidtosh".toByteArray() + byteArrayOf(0, 0xFF.toByte()) + "chunk".toByteArray()
+        assertArrayEquals(expected, chunk.data.toByteArray())
+        assertArrayEquals(bytes, envelope.toByteArray())
+    }
+
+    @Test
+    fun findPhoneRequestFixtureDecodesAndReEncodes() {
+        val bytes = load("find_phone_request")
+        val envelope = Envelope.parseFrom(bytes)
+        assertEquals("fixture-find-phone-request", envelope.messageId)
+        assertTrue(envelope.hasFindPhoneRequest())
+        assertEquals("find-req-1", envelope.findPhoneRequest.requestId)
+        assertEquals(FindAction.FIND_ACTION_START, envelope.findPhoneRequest.action)
+        assertArrayEquals(bytes, envelope.toByteArray())
+    }
+
+    @Test
+    fun findPhoneStateFixtureDecodesAndReEncodes() {
+        val bytes = load("find_phone_state")
+        val envelope = Envelope.parseFrom(bytes)
+        assertEquals("fixture-find-phone-state", envelope.messageId)
+        assertTrue(envelope.hasFindPhoneState())
+        val state = envelope.findPhoneState
+        assertEquals("find-req-1", state.requestId)
+        assertFalse(state.ringing)
+        assertEquals(FindEndReason.FIND_END_STOPPED_ON_PHONE, state.ended)
+        assertArrayEquals(bytes, envelope.toByteArray())
+    }
+
+    @Test
+    fun openUrlFixtureDecodesAndReEncodes() {
+        val bytes = load("open_url")
+        val envelope = Envelope.parseFrom(bytes)
+        assertEquals("fixture-open-url", envelope.messageId)
+        assertTrue(envelope.hasOpenUrl())
+        assertEquals("https://example.com/path?q=1", envelope.openUrl.url)
+        assertArrayEquals(bytes, envelope.toByteArray())
+        assertEquals(Capabilities.OPEN_URL, Capabilities.requiredFor(envelope))
+        assertTrue(ReliableStream.isReliable(envelope))
+        assertTrue(Capabilities.OPEN_URL in Capabilities.SUPPORTED)
     }
 }

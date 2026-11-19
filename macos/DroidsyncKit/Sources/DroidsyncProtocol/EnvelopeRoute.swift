@@ -10,6 +10,8 @@ public enum PhoneFeature: CaseIterable, Sendable {
     case files
     /// Phone status and Find my phone (§8, §9).
     case device
+    /// Links and phone numbers sent from the phone (§10).
+    case link
 }
 
 public enum EnvelopeRoute {
@@ -36,6 +38,8 @@ public enum EnvelopeRoute {
             return [.files]
         case .deviceStatus, .findPhoneState:
             return [.device]
+        case .openURL:
+            return [.link]
         // Handshake and keepalive are consumed by the transport; the rest only flow Mac → phone.
         case .authChallenge, .authResponse, .authOk, .ping, .pong, .error, .resume, .ackOnly,
              .notificationAction, .notificationDismiss, .snapshotRequest, .appsListRequest,

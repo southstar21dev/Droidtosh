@@ -1,0 +1,10 @@
+data/
+*.md
+.git
+*.pem
+*.key
+docker-compose.yml
+Dockerfile
+.dockerignore
+relay
+droidtosh-relay

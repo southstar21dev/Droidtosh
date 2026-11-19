@@ -1,0 +1,10 @@
+{
+  "name": "droidtosh-release-tools",
+  "private": true,
+  "description": "semantic-release and its plugins for release.yml, installed with npm ci --ignore-scripts from the lockfile.",
+  "devDependencies": {
+    "@semantic-release/exec": "7.1.0",
+    "conventional-changelog-conventionalcommits": "8.0.0",
+    "semantic-release": "25.0.9"
+  }
+}

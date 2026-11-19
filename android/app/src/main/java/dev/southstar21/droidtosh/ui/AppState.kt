@@ -11,6 +11,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.southstar21.droidtosh.LegacyCompanionCleanup
+import dev.southstar21.droidtosh.background.BackgroundSettings
+import dev.southstar21.droidtosh.background.OemVendor
 import dev.southstar21.droidtosh.data.CredentialStore
 import dev.southstar21.droidtosh.data.PairingCredentials
 import dev.southstar21.droidtosh.device.FindPhone
@@ -21,6 +23,11 @@ import dev.southstar21.droidtosh.diagnostics.DiagnosticsSnapshot
 import dev.southstar21.droidtosh.files.FileTransfers
 import dev.southstar21.droidtosh.files.TransferInfo
 import dev.southstar21.droidtosh.launch.OverlayPermission
+import dev.southstar21.droidtosh.BuildConfig
+import dev.southstar21.droidtosh.push.PushTokenStore
+import dev.southstar21.droidtosh.transport.RelayTokenRefusals
+import dev.southstar21.droidtosh.push.UnifiedPushController
+import dev.southstar21.droidtosh.push.WakeProvider
 import dev.southstar21.droidtosh.transport.ConnectionMode
 import dev.southstar21.droidtosh.transport.ConnectionService
 import dev.southstar21.droidtosh.transport.ConnectionState
@@ -56,8 +63,24 @@ data class PermissionStatus(
         get() = notifications && phone && callLog && outgoingCalls && contacts && notificationAccess
 }
 
-/** The pairing's connection mode, and whether it has a relay to choose at all. */
-data class PairingMode(val mode: ConnectionMode, val relayAvailable: Boolean)
+/** The pairing's connection mode, whether it has a relay to choose at all, and which relay. */
+data class PairingMode(
+    val mode: ConnectionMode,
+    val relayAvailable: Boolean,
+    val relayAddress: String? = null,
+    val relayFingerprint: String? = null,
+)
+
+private fun PairingCredentials.toPairingMode() = PairingMode(
+    mode = mode,
+    relayAvailable = hasRelay,
+    relayAddress = if (host != null && port != null) "$host:$port" else null,
+    relayFingerprint = relayFingerprint?.let(::shortFingerprint),
+)
+
+/** "AB12 CD34 EF56 7890": the start of a SHA-256 fingerprint, enough to compare by eye. */
+internal fun shortFingerprint(fingerprint: String): String =
+    fingerprint.filter { it.isLetterOrDigit() }.uppercase().take(16).chunked(4).joinToString(" ")
 
 /** What Home shows under the Mac's name: the relay host and when the current state began. */
 data class ConnectionDetails(val relay: String? = null, val stateSinceMs: Long? = null)
@@ -76,17 +99,32 @@ class AppState(application: Application) : AndroidViewModel(application) {
     private val findEnabledState = MutableStateFlow(FindPhone.enabled(application))
     private val fullScreenAllowedState = MutableStateFlow(readFullScreenAllowed())
     private val batteryOptimizationIgnoredState = MutableStateFlow(readBatteryOptimizationIgnored())
+    private val vendorHandledState = MutableStateFlow(BackgroundSettings.vendorHandled(application))
     private val overlayAllowedState = MutableStateFlow(OverlayPermission.granted(application))
     private val pairingModeState = MutableStateFlow(readPairingMode())
+    private val setupPreferences = application.getSharedPreferences("droidtosh_setup", Context.MODE_PRIVATE)
+
+    // Whoever was paired before the guided setup existed has been through it already.
+    private val setupDoneState = MutableStateFlow(setupPreferences.getBoolean(SETUP_DONE, paired.value))
 
     init {
         LegacyCompanionCleanup.run(application)
         if (paired.value) {
             ConnectionService.start(getApplication())
         }
+        runCatching { UnifiedPushController.ensureRegistered(application) }
     }
 
     val isPaired: StateFlow<Boolean> = paired
+
+    /** False from a fresh scan until the setup's permissions step is finished or skipped. */
+    val setupDone: StateFlow<Boolean> = setupDoneState.asStateFlow()
+
+    /** Ends the guided setup (its permissions step's Continue or Skip). */
+    fun finishSetup() {
+        setupDoneState.value = true
+        setupPreferences.edit().putBoolean(SETUP_DONE, true).apply()
+    }
 
     /** True when a pairing from an older app version was discarded and the user must scan again. */
     val repairNeeded: StateFlow<Boolean> = repairNeededState.asStateFlow()
@@ -96,6 +134,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     /** Whether the user turned battery optimization off for us, which keeps the connection alive in the background. */
     val batteryOptimizationIgnored: StateFlow<Boolean> = batteryOptimizationIgnoredState.asStateFlow()
+
+    /** The manufacturer whose own battery manager needs a visit, or null on a phone without one. */
+    val oemVendor: OemVendor? = BackgroundSettings.vendor()
+
+    /** Whether the user went through the manufacturer's battery settings. */
+    val vendorBatteryHandled: StateFlow<Boolean> = vendorHandledState.asStateFlow()
 
     /** Whether "Display over other apps" is allowed, so VoIP calls can be answered from the Mac while unlocked. */
     val overlayAllowed: StateFlow<Boolean> = overlayAllowedState.asStateFlow()
@@ -108,6 +152,49 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val transfers: StateFlow<List<TransferInfo>> = FileTransfers.transfers(application)
     val update: StateFlow<UpdateState> = Updates.state
     val betaUpdates: StateFlow<Boolean> = Updates.betaEnabled
+
+    private val pushStore = PushTokenStore(application)
+    private val wakeState = MutableStateFlow(readWake())
+    val wake: StateFlow<WakeUiState> = wakeState.asStateFlow()
+
+    private fun readWake(): WakeUiState {
+        val app = getApplication<Application>()
+        val provider = pushStore.provider()
+        val options = buildList {
+            if (BuildConfig.FCM_ENABLED) add(WakeProvider.FCM)
+            if (provider == WakeProvider.UNIFIEDPUSH || UnifiedPushController.distributorAvailable(app)) {
+                add(WakeProvider.UNIFIEDPUSH)
+            }
+            add(WakeProvider.NONE)
+        }
+        val refused = runCatching {
+            val credentials = credentialStore.load()
+            credentials != null && pushStore.refusals().refused(
+                RelayTokenRefusals.relayKey(credentials.host, credentials.port, credentials.relayFingerprint),
+                pushStore.joinToken(),
+            )
+        }.getOrDefault(false)
+        return WakeUiState(options, provider, pushStore.unifiedPushEndpoint != null, relayRefusesToken = refused)
+    }
+
+    /** Re-reads the wake-up state (a distributor may have been installed or registered meanwhile). */
+    fun refreshWake() {
+        wakeState.value = readWake()
+    }
+
+    /** Switches the wake-up provider and rejoins the relay with the matching token. */
+    fun setWakeProvider(provider: WakeProvider) {
+        val app = getApplication<Application>()
+        val previous = pushStore.provider()
+        pushStore.chosenProvider = provider
+        if (provider == WakeProvider.UNIFIEDPUSH) {
+            UnifiedPushController.ensureRegistered(app)
+        } else if (previous == WakeProvider.UNIFIEDPUSH) {
+            UnifiedPushController.unregister(app)
+        }
+        refreshWake()
+        if (paired.value) ConnectionService.restart(app)
+    }
 
     fun checkForUpdates() = Updates.checkNow(getApplication())
 
@@ -145,6 +232,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
         fullScreenAllowedState.value = readFullScreenAllowed()
         batteryOptimizationIgnoredState.value = readBatteryOptimizationIgnored()
         overlayAllowedState.value = OverlayPermission.granted(getApplication())
+        vendorHandledState.value = BackgroundSettings.vendorHandled(getApplication())
     }
 
     fun setFindEnabled(enabled: Boolean) {
@@ -196,7 +284,10 @@ class AppState(application: Application) : AndroidViewModel(application) {
             localPort = payload.localPort,
         )
         credentialStore.save(credentials)
-        pairingModeState.value = PairingMode(credentials.mode, credentials.hasRelay)
+        pairingModeState.value = credentials.toPairingMode()
+        // A fresh pairing goes on to the setup's permissions step.
+        setupDoneState.value = false
+        setupPreferences.edit().putBoolean(SETUP_DONE, false).apply()
         repairNeededState.value = false
         paired.value = true
         ConnectionService.start(getApplication())
@@ -241,7 +332,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     }
 
     private fun readPairingMode(): PairingMode? =
-        runCatching { credentialStore.load() }.getOrNull()?.let { PairingMode(it.mode, it.hasRelay) }
+        runCatching { credentialStore.load() }.getOrNull()?.toPairingMode()
 
     private fun readPermissions(): PermissionStatus {
         val context = getApplication<Application>()
@@ -260,6 +351,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     private companion object {
         const val DETAILS_REFRESH_MS = 1_000L
+        const val SETUP_DONE = "setup_done"
     }
 
     private fun Context.isGranted(permission: String): Boolean =

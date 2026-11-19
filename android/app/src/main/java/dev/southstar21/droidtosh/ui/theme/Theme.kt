@@ -26,100 +26,93 @@ import androidx.compose.ui.unit.sp
 import dev.southstar21.droidtosh.R
 
 /**
- * The Droidtosh brand, from the logo kit: the Droid Mac in dark roast on cream, flat colour only
- * (no gradients, shadows or glows), and Jost for type.
+ * The Droidtosh brand in black and white: ink on paper, flat colour only (no gradients, shadows or
+ * glows), and Jost for type. Every role below is a grey, so the app reads the same on any wallpaper.
  */
 object Brand {
-    /** Cream #F5ECD7: the app-icon tile, light backgrounds, the mark on dark. */
-    val Cream = Color(0xFFF5ECD7)
+    /** Paper #FFFFFF: the app-icon tile, cards on light, the mark on dark. */
+    val Paper = Color(0xFFFFFFFF)
 
-    /** Dark roast #1F1A17: the logo itself, dark backgrounds. */
-    val DarkRoast = Color(0xFF1F1A17)
-
-    /** Ring cream #E6D8B8, a deeper cream for containers on light. */
-    val RingCream = Color(0xFFE6D8B8)
-
-    /** Tan #A8946A, the quiet accent of the southstar21 family. */
-    val Tan = Color(0xFFA8946A)
+    /** Ink #000000: the logo itself, the hero card on light, dark backgrounds. */
+    val Ink = Color(0xFF000000)
 }
 
-// Roast & Cream: dark roast carries the primary role on cream, and cream on dark roast. Neutrals
-// are warm and taken from the cream–roast ramp; tan is the secondary accent, and a warm amber
-// tertiary carries "needs attention" without the alarm of the error role.
+// Black and white: ink carries the primary role on paper, and paper on ink. Every container is a
+// grey tone, so Material 3 Expressive keeps its shapes, motion and hierarchy without any hue.
 private val LightScheme = lightColorScheme(
-    primary = Brand.DarkRoast,
-    onPrimary = Brand.Cream,
-    primaryContainer = Brand.RingCream,
-    onPrimaryContainer = Brand.DarkRoast,
-    inversePrimary = Brand.RingCream,
-    secondary = Color(0xFF6E5E44),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFEDE2C8),
-    onSecondaryContainer = Color(0xFF3A3129),
-    tertiary = Color(0xFF8A5300),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFFFDDB3),
-    onTertiaryContainer = Color(0xFF4A2A00),
-    error = Color(0xFFBA1A1A),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color(0xFF93000A),
-    background = Color(0xFFFBF7EE),
-    onBackground = Brand.DarkRoast,
-    surface = Color(0xFFFBF7EE),
-    onSurface = Brand.DarkRoast,
-    surfaceVariant = Color(0xFFEFE6D3),
-    onSurfaceVariant = Color(0xFF5A4F43),
-    outline = Color(0xFF857867),
-    outlineVariant = Color(0xFFD8CDB6),
-    inverseSurface = Brand.DarkRoast,
-    inverseOnSurface = Brand.Cream,
-    surfaceTint = Brand.DarkRoast,
-    surfaceDim = Color(0xFFE6DCC8),
-    surfaceBright = Color(0xFFFBF7EE),
-    surfaceContainerLowest = Color(0xFFFFFDF8),
-    surfaceContainerLow = Color(0xFFF8F1E3),
-    surfaceContainer = Brand.Cream,
-    surfaceContainerHigh = Color(0xFFF0E6CF),
-    surfaceContainerHighest = Color(0xFFEADFC6),
+    primary = Brand.Ink,
+    onPrimary = Brand.Paper,
+    primaryContainer = Color(0xFFE0E0E0),
+    onPrimaryContainer = Brand.Ink,
+    inversePrimary = Brand.Paper,
+    secondary = Color(0xFF444444),
+    onSecondary = Brand.Paper,
+    secondaryContainer = Color(0xFFEAEAEA),
+    onSecondaryContainer = Color(0xFF1A1A1A),
+    tertiary = Color(0xFF2A2A2A),
+    onTertiary = Brand.Paper,
+    tertiaryContainer = Color(0xFFD6D6D6),
+    onTertiaryContainer = Brand.Ink,
+    error = Brand.Ink,
+    onError = Brand.Paper,
+    errorContainer = Color(0xFFE0E0E0),
+    onErrorContainer = Brand.Ink,
+    background = Color(0xFFF4F4F4),
+    onBackground = Brand.Ink,
+    surface = Color(0xFFF4F4F4),
+    onSurface = Brand.Ink,
+    surfaceVariant = Color(0xFFEAEAEA),
+    onSurfaceVariant = Color(0xFF555555),
+    outline = Color(0xFF6E6E6E),
+    outlineVariant = Color(0xFFD0D0D0),
+    inverseSurface = Brand.Ink,
+    inverseOnSurface = Brand.Paper,
+    surfaceTint = Brand.Ink,
+    surfaceDim = Color(0xFFE0E0E0),
+    surfaceBright = Brand.Paper,
+    surfaceContainerLowest = Brand.Paper,
+    surfaceContainerLow = Color(0xFFFAFAFA),
+    surfaceContainer = Brand.Paper,
+    surfaceContainerHigh = Color(0xFFEAEAEA),
+    surfaceContainerHighest = Color(0xFFE0E0E0),
 )
 
 private val DarkScheme = darkColorScheme(
-    primary = Brand.Cream,
-    onPrimary = Brand.DarkRoast,
-    primaryContainer = Color(0xFF4A3F33),
-    onPrimaryContainer = Brand.Cream,
-    inversePrimary = Brand.DarkRoast,
-    secondary = Color(0xFFD8CDB6),
-    onSecondary = Color(0xFF2A2320),
-    secondaryContainer = Color(0xFF3A3129),
-    onSecondaryContainer = Brand.RingCream,
-    tertiary = Color(0xFFFFB960),
-    onTertiary = Color(0xFF472A00),
-    tertiaryContainer = Color(0xFF653F00),
-    onTertiaryContainer = Color(0xFFFFDDB8),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6),
-    background = Brand.DarkRoast,
-    onBackground = Brand.Cream,
-    surface = Brand.DarkRoast,
-    onSurface = Brand.Cream,
-    surfaceVariant = Color(0xFF3A3129),
-    onSurfaceVariant = Color(0xFFD0C5B0),
-    outline = Color(0xFF9A8E7C),
-    outlineVariant = Color(0xFF4A4038),
-    inverseSurface = Brand.Cream,
-    inverseOnSurface = Brand.DarkRoast,
-    surfaceTint = Brand.Cream,
-    surfaceDim = Brand.DarkRoast,
-    surfaceBright = Color(0xFF453B33),
-    surfaceContainerLowest = Color(0xFF171310),
-    surfaceContainerLow = Color(0xFF241F1B),
-    surfaceContainer = Color(0xFF2A2320),
-    surfaceContainerHigh = Color(0xFF332B26),
-    surfaceContainerHighest = Color(0xFF3D342D),
+    primary = Brand.Paper,
+    onPrimary = Brand.Ink,
+    primaryContainer = Color(0xFF3A3A3A),
+    onPrimaryContainer = Brand.Paper,
+    inversePrimary = Brand.Ink,
+    secondary = Color(0xFFC4C4C4),
+    onSecondary = Brand.Ink,
+    secondaryContainer = Color(0xFF2E2E2E),
+    onSecondaryContainer = Color(0xFFEEEEEE),
+    tertiary = Color(0xFFD6D6D6),
+    onTertiary = Brand.Ink,
+    tertiaryContainer = Color(0xFF444444),
+    onTertiaryContainer = Brand.Paper,
+    error = Brand.Paper,
+    onError = Brand.Ink,
+    errorContainer = Color(0xFF3A3A3A),
+    onErrorContainer = Brand.Paper,
+    background = Color(0xFF0A0A0A),
+    onBackground = Brand.Paper,
+    surface = Color(0xFF0A0A0A),
+    onSurface = Brand.Paper,
+    surfaceVariant = Color(0xFF2A2A2A),
+    onSurfaceVariant = Color(0xFFBDBDBD),
+    outline = Color(0xFF8A8A8A),
+    outlineVariant = Color(0xFF3A3A3A),
+    inverseSurface = Brand.Paper,
+    inverseOnSurface = Brand.Ink,
+    surfaceTint = Brand.Paper,
+    surfaceDim = Color(0xFF0A0A0A),
+    surfaceBright = Color(0xFF2E2E2E),
+    surfaceContainerLowest = Brand.Ink,
+    surfaceContainerLow = Color(0xFF121212),
+    surfaceContainer = Color(0xFF1A1A1A),
+    surfaceContainerHigh = Color(0xFF242424),
+    surfaceContainerHighest = Color(0xFF2E2E2E),
 )
 
 /** Jost, the brand typeface (SIL OFL 1.1), as one variable font set to each weight. */
@@ -156,14 +149,14 @@ private val DroidtoshShapes = Shapes(
     small = RoundedCornerShape(12.dp),
     medium = RoundedCornerShape(20.dp),
     large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp),
+    extraLarge = RoundedCornerShape(32.dp),
 )
 
 /** Corner radii beyond the M3 scale, used by the grouped settings lists and the hero card. */
 @Immutable
 data class DroidtoshExtraShapes(
-    val hero: RoundedCornerShape = RoundedCornerShape(36.dp),
-    val groupOuter: androidx.compose.ui.unit.Dp = 24.dp,
+    val hero: RoundedCornerShape = RoundedCornerShape(32.dp),
+    val groupOuter: androidx.compose.ui.unit.Dp = 28.dp,
     val groupInner: androidx.compose.ui.unit.Dp = 6.dp,
 )
 
@@ -179,8 +172,8 @@ val HeroTitleStyle: TextStyle
 fun droidtoshColorScheme(darkTheme: Boolean): ColorScheme = if (darkTheme) DarkScheme else LightScheme
 
 /**
- * The app always wears the brand palette: wallpaper-based dynamic colour would replace the dark
- * roast and cream with whatever the wallpaper suggests.
+ * The app always wears black and white: wallpaper-based dynamic colour would bring in whatever hue
+ * the wallpaper suggests.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

@@ -122,4 +122,11 @@ class CellularCallActionTest {
         assertFalse(tracker.handleAction("voip:x", CallActionType.CALL_ACTION_ACCEPT))
         assertEquals(0, control.acceptCalls)
     }
+
+    @Test
+    fun actionsForAnEarlierCellularCallAreRefused() {
+        ringingCallId()
+        assertFalse(tracker.handleAction("cellular:old", CallActionType.CALL_ACTION_END))
+        assertEquals(0, control.endCalls)
+    }
 }

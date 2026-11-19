@@ -192,4 +192,11 @@ class UpdateCoreTest {
         assertTrue(Sha256.matches(digest, digest.uppercase()))
         assertFalse(Sha256.matches(digest, sha))
     }
+
+    @Test
+    fun downloadsAreBoundedByTheDeclaredSizeOrAHardCap() {
+        assertEquals(1234L, downloadLimit(1234))
+        assertEquals(MAX_APK_BYTES, downloadLimit(0))
+        assertEquals(MAX_APK_BYTES, downloadLimit(-1))
+    }
 }

@@ -8,6 +8,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import dev.southstar21.droidtosh.ui.Destination
 import dev.southstar21.droidtosh.ui.MainActivity
 import dev.southstar21.droidtosh.ui.ShareResult
@@ -16,39 +20,59 @@ import dev.southstar21.droidtosh.ui.theme.DroidtoshTheme
 import kotlinx.coroutines.delay
 
 /**
- * Share target "Send file to Mac": queues any shared files (one or many) for the Mac, then shows a
- * short confirmation sheet that closes itself.
+ * Share target "Send file to Mac": shows the shared file names and waits for the user to tap Send
+ * (any foreground app can fire this share, so nothing is queued unprompted), then queues the files
+ * and shows a short confirmation that closes itself.
  */
 class SendFileToMacActivity : ComponentActivity() {
+    private var sent: ShareResult? = null
+    private var pending: Pending? = null
+
+    /** What the share offers: the allowed URIs, their names, and how many were shared in all. */
+    private class Pending(val uris: List<Uri>, val names: List<String>, val total: Int)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Queue once: a recreated sheet (rotation) only shows the earlier result again.
-        val result = savedInstanceState?.restoreResult() ?: queueShared()
+        // Queue once: a recreated sheet (rotation) shows the earlier result, or asks again if unsent.
+        sent = savedInstanceState?.restoreResult()
+        if (sent == null) pending = readShared()
         setContent {
             DroidtoshTheme {
-                LaunchedEffect(Unit) {
-                    delay(AUTO_DISMISS_MS)
-                    finish()
+                var result by remember { mutableStateOf(sent) }
+                val offer = pending
+                if (result != null) {
+                    LaunchedEffect(Unit) {
+                        delay(AUTO_DISMISS_MS)
+                        finish()
+                    }
                 }
+                val shown = result ?: ShareResult(
+                    queued = offer?.uris?.size ?: 0,
+                    total = offer?.total ?: 0,
+                    names = offer?.names.orEmpty(),
+                )
                 ShareSheet(
-                    result = result,
+                    result = shown,
                     onDone = ::finish,
                     onOpenTransfers = {
                         startActivity(MainActivity.intent(this, Destination.Transfers))
                         finish()
                     },
+                    onSend = if (result == null && offer != null && offer.uris.isNotEmpty()) {
+                        // Two taps can land before the recomposition that hides Send; queue once.
+                        { if (result == null && sent == null) result = send(offer) }
+                    } else {
+                        null
+                    },
                 )
             }
         }
-        lastResult = result
     }
-
-    private var lastResult: ShareResult? = null
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        lastResult?.let { result ->
+        sent?.let { result ->
             outState.putInt(KEY_QUEUED, result.queued)
             outState.putInt(KEY_TOTAL, result.total)
             outState.putStringArrayList(KEY_NAMES, ArrayList(result.names))
@@ -62,17 +86,24 @@ class SendFileToMacActivity : ComponentActivity() {
             null
         }
 
-    private fun queueShared(): ShareResult {
-        val uris = when (intent?.action) {
+    private fun readShared(): Pending {
+        val requested = when (intent?.action) {
             Intent.ACTION_SEND -> listOfNotNull(intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
             Intent.ACTION_SEND_MULTIPLE ->
                 intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
             else -> emptyList()
         }
-        // Read names and open the files now: the share grant ends with this activity.
-        val names = uris.mapNotNull(::displayName)
-        val queued = if (uris.isEmpty()) 0 else FileTransfers.send(applicationContext, uris)
-        return ShareResult(queued = queued, total = uris.size, names = if (queued == 0) emptyList() else names)
+        // Exported target: drop file:// and this app's own provider URIs before touching them.
+        val uris = requested.filter { ShareUriFilter.isAllowed(it, packageName) }
+        // Read names now; the files are opened on Send, while the share grant still lives with this activity.
+        return Pending(uris, uris.mapNotNull(::displayName), requested.size)
+    }
+
+    private fun send(offer: Pending): ShareResult {
+        val queued = if (offer.uris.isEmpty()) 0 else FileTransfers.send(applicationContext, offer.uris)
+        val result = ShareResult(queued = queued, total = offer.total, names = if (queued == 0) emptyList() else offer.names)
+        sent = result
+        return result
     }
 
     private fun displayName(uri: Uri): String? = runCatching {

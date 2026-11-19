@@ -20,8 +20,19 @@ final class SecretStoreTests: XCTestCase {
         XCTAssertEqual(try store.load("secret"), Data([1, 2, 3]))
         try store.save(Data([4]), as: "secret")
         XCTAssertEqual(try store.load("secret"), Data([4]))
-        store.delete("secret")
+        try store.delete("secret")
         XCTAssertNil(try store.load("secret"))
+        try store.delete("secret")
+    }
+
+    func testDeleteThrowsWhenTheSecretCannotBeRemoved() throws {
+        try store.save(Data([1]), as: "secret")
+        let manager = FileManager.default
+        try manager.setAttributes([.posixPermissions: 0o500], ofItemAtPath: store.directory.path)
+        defer { try? manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: store.directory.path) }
+        XCTAssertThrowsError(try store.delete("secret"))
+        try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: store.directory.path)
+        XCTAssertEqual(try store.load("secret"), Data([1]))
     }
 
     func testOnlyTheUserCanReadTheSecrets() throws {

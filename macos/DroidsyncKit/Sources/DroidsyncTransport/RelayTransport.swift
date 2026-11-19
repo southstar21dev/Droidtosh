@@ -702,6 +702,11 @@ public final class RelayTransport {
             return
         }
         let disposition = reliableStream.receive(envelope, applyAck: !awaitingPeerResume)
+        if disposition == .rejected {
+            onDebugLog?("protocol error: implausible sequence jump (seq \(envelope.seq)); closing session")
+            channel.close(promise: nil)
+            return
+        }
         if envelope.seq > 0 { scheduleStandaloneAckLocked(channel: channel) }
         switch envelope.payload {
         case .ackOnly?:
