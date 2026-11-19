@@ -118,6 +118,11 @@ struct ConnectionView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
+            if status != .connected && status != .notPaired {
+                Button("Reconnect now") { connection.reconnectNow() }
+                    .buttonStyle(OutlineButtonStyle(compact: true))
+                    .help("Drop the connection to the relay and dial again at once")
+            }
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Brand.hero))
@@ -142,7 +147,9 @@ struct ConnectionView: View {
         case .connected:
             return "Encrypted end to end. A relay only ever sees bytes."
         default:
-            return model.connectionConfigured ? connection.statusText : "Choose how the phone connects below, then pair it."
+            guard model.connectionConfigured else { return "Choose how the phone connects below, then pair it." }
+            guard let cause = connection.disconnectCause else { return connection.statusText }
+            return "\(cause.headline). \(cause.detail)"
         }
     }
 

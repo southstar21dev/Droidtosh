@@ -158,6 +158,17 @@ private struct PhoneCard: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                if status != .connected {
+                    if let detail = model.connection.disconnectCause?.detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Button("Reconnect now") { model.connection.reconnectNow() }
+                        .buttonStyle(OutlineButtonStyle(compact: true))
+                        .help("Drop the connection to the relay and dial again at once")
+                }
                 if model.device.showsStatus {
                     PhoneStatusChips(device: model.device)
                         .padding(.top, 2)
@@ -206,7 +217,7 @@ private struct PhoneCard: View {
     }
 
     private func subtitle(_ status: DroidtoshStatus) -> String {
-        guard status == .connected else { return model.connection.statusText }
+        guard status == .connected else { return model.connection.statusHeadline }
         if model.connection.sessionPath == .local { return "Over the local network" }
         let host = model.connection.relayHost
         switch model.connection.connectionMode {

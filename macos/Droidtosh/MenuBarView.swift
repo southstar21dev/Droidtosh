@@ -63,6 +63,10 @@ struct MenuBarView: View {
                 HStack(spacing: 5) {
                     Text(statusLine)
                         .lineLimit(1)
+                    if status == .offline || status == .connecting {
+                        Button("Reconnect") { model.connection.reconnectNow() }
+                            .buttonStyle(.link)
+                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -95,7 +99,7 @@ struct MenuBarView: View {
         case .notPaired:
             return model.connectionConfigured ? "Not paired" : "Relay not configured"
         default:
-            return model.connection.statusText
+            return model.connection.statusHeadline
         }
     }
 

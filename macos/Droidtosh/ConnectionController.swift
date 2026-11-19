@@ -124,6 +124,8 @@ final class ConnectionController: ObservableObject {
     private var relayTransport: RelayTransport?
     private var relayTransportGeneration: UInt64 = 0
     private var activeConfig: TransportConfig?
+    /// The transport's latest state, for explaining why no phone is connected.
+    private var transportState: RelayTransport.State = .stopped
     /// One stream for the whole process, so queued reliable envelopes survive reconnects
     /// and transport rebuilds (PROTOCOL-v2.md §4).
     private let reliableStream = ReliableStream()
@@ -387,6 +389,20 @@ final class ConnectionController: ObservableObject {
         relayTransport?.reconnectIfIdle()
     }
 
+    /// Why no phone is connected, in plain words; nil while connected or when there is nothing to say.
+    var disconnectCause: ConnectionCause? {
+        guard !phoneConnected else { return nil }
+        return ConnectionCause.derive(
+            state: transportState,
+            hasRelay: activeConfig?.relay != nil,
+            localListening: localListening,
+            pairingExpired: ConnectionCause.pairingExpiredRecently(events: diagnostics.snapshot().events, now: Date())
+        )
+    }
+
+    /// The status line to show: the cause when there is one, else the raw status text.
+    var statusHeadline: String { disconnectCause?.headline ?? statusText }
+
     private var localListening: Bool {
         if case .listening = localState { return true }
         return false
@@ -394,6 +410,7 @@ final class ConnectionController: ObservableObject {
 
     private func handle(state: RelayTransport.State) {
         relayConnected = state == .connected
+        transportState = state
         switch state {
         case .stopped:
             guard relayTransport != nil else { return }

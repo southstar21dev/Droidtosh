@@ -148,7 +148,10 @@ class PhoneConnectionLoop(
                         if (retryWaitMs != null) {
                             TransportLog.d(TAG, "relay WAIT soon after a start or session; retrying in ${retryWaitMs}ms")
                             diagnostics.onSessionEnd(DisconnectReason.RELAY_WAIT, "Mac not re-parked yet")
-                            host.onState(ConnectionState.Disconnected("Reconnecting to Mac"), "Disconnected - reconnecting")
+                            host.onState(
+                                ConnectionState.Disconnected("Reconnecting to Mac", DisconnectCause.MacAsleepOrOffline),
+                                "Disconnected - reconnecting",
+                            )
                         } else {
                             TransportLog.d(TAG, "relay WAIT (no mac parked)")
                             diagnostics.onSessionEnd(DisconnectReason.RELAY_WAIT)
@@ -168,7 +171,10 @@ class PhoneConnectionLoop(
                     "${error.javaClass.simpleName}: ${error.message.orEmpty()}",
                 )
                 host.onState(
-                    ConnectionState.Disconnected(error.message ?: error.javaClass.simpleName),
+                    ConnectionState.Disconnected(
+                        error.message ?: error.javaClass.simpleName,
+                        DisconnectCauses.fromError(error, mode, wasConnected = authenticated),
+                    ),
                     "Disconnected - reconnecting",
                 )
             } finally {
@@ -290,7 +296,7 @@ class PhoneConnectionLoop(
                         while (waitSignal.tryReceive().isSuccess) {
                         }
                         diagnostics.onSessionEnd(DisconnectReason.MAC_ASLEEP)
-                        host.onState(ConnectionState.Disconnected("Mac asleep"), "Waiting for Mac")
+                        host.onState(ConnectionState.Disconnected("Mac asleep", DisconnectCause.MacAsleepOrOffline), "Waiting for Mac")
                         macAsleepMode = mode
                         return true
                     }
@@ -309,7 +315,7 @@ class PhoneConnectionLoop(
     private var macAsleepMode = ConnectionMode.RELAY
 
     private suspend fun waitForMac() {
-        host.onState(ConnectionState.Disconnected("Waiting for Mac"), "Waiting for Mac")
+        host.onState(ConnectionState.Disconnected("Waiting for Mac", DisconnectCause.MacAsleepOrOffline), "Waiting for Mac")
         withTimeoutOrNull(waitPolicy.nextDelayMs(fcmUsable = macAsleepMode.usesRelay)) { waitSignal.receive() }
     }
 

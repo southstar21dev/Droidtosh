@@ -158,9 +158,10 @@ fun ConnectionScreen(
         onBack = onBack,
         modifier = modifier,
     ) {
+        val disconnected = ui.connection as? ConnectionState.Disconnected
         FeatureStatusCard(
-            title = connectionLabel(ui.connection),
-            body = modeLabel(ui),
+            title = disconnected?.let { disconnectTitle(it) } ?: connectionLabel(ui.connection),
+            body = disconnected?.let { disconnectHint(it) } ?: modeLabel(ui),
         ) {
             ShapeTether(
                 state = tetherFor(ui.connection),
@@ -169,6 +170,18 @@ fun ConnectionScreen(
                 tetherSize = 40.dp,
                 spin = ui.connection is ConnectionState.Connected,
             )
+        }
+
+        if (disconnected != null) {
+            FilledTonalButton(
+                onClick = actions.reconnectNow,
+                shapes = ButtonDefaults.shapes(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text(stringResource(R.string.diagnostics_reconnect))
+            }
         }
 
         ui.connectionMode?.let { current ->

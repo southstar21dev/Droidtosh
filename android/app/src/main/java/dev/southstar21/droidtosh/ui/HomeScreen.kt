@@ -60,6 +60,7 @@ import dev.southstar21.droidtosh.files.TransferDirection
 import dev.southstar21.droidtosh.files.TransferInfo
 import dev.southstar21.droidtosh.files.TransferStatus
 import dev.southstar21.droidtosh.transport.ConnectionMode
+import dev.southstar21.droidtosh.transport.DisconnectCause
 import dev.southstar21.droidtosh.transport.ConnectionState
 import dev.southstar21.droidtosh.transport.SessionPath
 import dev.southstar21.droidtosh.ui.components.AttentionLine
@@ -288,7 +289,9 @@ private fun macCardDetail(ui: DroidUiState): String? {
     return when (connection) {
         is ConnectionState.Connected -> elapsed?.let { stringResource(R.string.home_hero_connected_for, it) }
             ?: connection.macModel.ifBlank { null }
-        is ConnectionState.Disconnected -> elapsed?.let { stringResource(R.string.home_hero_last_seen, it) } ?: connection.reason
+        is ConnectionState.Disconnected -> disconnectTitle(connection).let { title ->
+            elapsed?.let { stringResource(R.string.cause_last_seen, title, it) } ?: title
+        }
         ConnectionState.Connecting -> stringResource(R.string.home_hero_connecting_detail)
         ConnectionState.NotPaired -> null
     }
@@ -304,6 +307,34 @@ fun modeLabel(ui: DroidUiState): String {
         else -> ui.details.relay?.let { stringResource(R.string.home_hero_relay, it) }
             ?: stringResource(R.string.home_hero_relay_pending)
     }
+}
+
+/** Why the phone is not connected, in plain words; the loop's own text when the cause is unknown. */
+@Composable
+fun disconnectTitle(state: ConnectionState.Disconnected): String = when (state.cause) {
+    DisconnectCause.MacAsleepOrOffline -> stringResource(R.string.cause_mac_offline)
+    DisconnectCause.RelayUnreachable -> stringResource(R.string.cause_relay_unreachable)
+    DisconnectCause.RelayCertificate -> stringResource(R.string.cause_relay_certificate)
+    DisconnectCause.NoWifiLocal -> stringResource(R.string.cause_no_wifi)
+    DisconnectCause.MacNotOnNetwork -> stringResource(R.string.cause_mac_not_on_network)
+    DisconnectCause.PairingExpired -> stringResource(R.string.cause_pairing_expired)
+    DisconnectCause.VersionMismatch -> stringResource(R.string.cause_version_mismatch)
+    DisconnectCause.ConnectionLost -> stringResource(R.string.cause_connection_lost)
+    DisconnectCause.Other -> state.reason
+}
+
+/** What to do about it, or null when there is nothing useful to add. */
+@Composable
+fun disconnectHint(state: ConnectionState.Disconnected): String? = when (state.cause) {
+    DisconnectCause.MacAsleepOrOffline -> stringResource(R.string.cause_mac_offline_hint)
+    DisconnectCause.RelayUnreachable -> stringResource(R.string.cause_relay_unreachable_hint)
+    DisconnectCause.RelayCertificate -> stringResource(R.string.cause_relay_certificate_hint)
+    DisconnectCause.NoWifiLocal -> stringResource(R.string.cause_no_wifi_hint)
+    DisconnectCause.MacNotOnNetwork -> stringResource(R.string.cause_mac_not_on_network_hint)
+    DisconnectCause.PairingExpired -> stringResource(R.string.cause_pairing_expired_hint)
+    DisconnectCause.VersionMismatch -> stringResource(R.string.cause_version_mismatch_hint)
+    DisconnectCause.ConnectionLost -> stringResource(R.string.cause_connection_lost_hint)
+    DisconnectCause.Other -> null
 }
 
 @Composable

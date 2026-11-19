@@ -178,7 +178,7 @@ class PhoneConnectionLoopTest {
         val job = launch { loop(host, connector).run() }
         runCurrent()
         assertEquals(listOf("relay", "local 192.168.1.5:7444"), connector.attempts)
-        assertEquals(ConnectionState.Disconnected("relay down"), host.states.last())
+        assertEquals(ConnectionState.Disconnected("relay down", DisconnectCause.RelayUnreachable), host.states.last())
         job.cancel()
     }
 
@@ -189,7 +189,7 @@ class PhoneConnectionLoopTest {
         val job = launch { loop(host, connector).run() }
         runCurrent()
         assertEquals(listOf("local 192.168.1.5:7444"), connector.attempts)
-        assertEquals(ConnectionState.Disconnected("no route to 192.168.1.5"), host.states.last())
+        assertEquals(ConnectionState.Disconnected("no route to 192.168.1.5", DisconnectCause.MacNotOnNetwork), host.states.last())
         advanceTimeBy(1_001L)
         assertEquals(2, connector.attempts.size)
         job.cancel()

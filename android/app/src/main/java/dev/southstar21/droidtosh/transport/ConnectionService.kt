@@ -52,7 +52,7 @@ sealed interface ConnectionState {
         val macModel: String = "",
         val path: SessionPath = SessionPath.RELAY,
     ) : ConnectionState
-    data class Disconnected(val reason: String) : ConnectionState
+    data class Disconnected(val reason: String, val cause: DisconnectCause = DisconnectCause.Other) : ConnectionState
 }
 
 class ConnectionService : Service() {
