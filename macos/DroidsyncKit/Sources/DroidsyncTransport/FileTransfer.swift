@@ -676,7 +676,14 @@ public final class FileTransferEngine {
             sendReject(id, reason: "too_large")
             return
         }
-        if let free = availableCapacity(configuration.downloadsDirectory), free < Int64(clamping: offer.size) {
+        // Bytes other in-flight transfers still have to write also count against free space.
+        let pendingBytes = incoming.values.reduce(UInt64(0)) { total, other in
+            let (sum, overflow) = total.addingReportingOverflow(other.snapshot.size - min(other.written, other.snapshot.size))
+            return overflow ? UInt64.max : sum
+        }
+        let (needed, neededOverflow) = offer.size.addingReportingOverflow(pendingBytes)
+        if let free = availableCapacity(configuration.downloadsDirectory),
+           free < Int64(clamping: neededOverflow ? UInt64.max : needed) {
             sendReject(id, reason: "disk_full")
             return
         }

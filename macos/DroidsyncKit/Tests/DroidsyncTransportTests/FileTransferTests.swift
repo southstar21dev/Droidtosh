@@ -361,6 +361,22 @@ final class FileTransferEngineTests: XCTestCase {
         XCTAssertEqual(reject(offer), "disabled")
     }
 
+    func testFreeSpaceCheckCountsBytesStillToComeFromOtherTransfers() throws {
+        let link = try Link()
+        link.b.availableCapacity = { _ in 1500 }
+        var first = DSFileOffer()
+        first.transferID = "one"
+        first.name = "a.bin"
+        first.size = 1000
+        link.b.handle(.fileOffer(first))
+        var second = first
+        second.transferID = "two"
+        second.name = "b.bin"
+        link.b.handle(.fileOffer(second))
+        guard case .fileReject(let reject)? = link.sent(from: "b").last else { return XCTFail("expected reject") }
+        XCTAssertEqual(reject.reason, "disk_full")
+    }
+
     func testRejectedOfferFailsSenderAndStartsNext() throws {
         let link = try Link()
         link.b.isReceivingEnabled = { false }
