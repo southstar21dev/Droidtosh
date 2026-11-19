@@ -1,7 +1,5 @@
 package dev.southstar21.droidtosh.link
 
-import java.net.URI
-
 /**
  * What an `OpenUrl` may carry (protocol/PROTOCOL-v2.md section 10), checked by the receiver and
  * before sending. Strict on purpose: a link is only ever opened by a user tap, but the notification
@@ -52,16 +50,63 @@ object LinkPolicy {
     }
 
     private fun web(raw: String): Link? {
-        val scheme = raw.substringBefore("://", missingDelimiterValue = "")
+        val separator = raw.indexOf("://")
+        if (separator < 0) return null
+        val scheme = raw.substring(0, separator)
         if (!scheme.equals("http", ignoreCase = true) && !scheme.equals("https", ignoreCase = true)) return null
-        val uri = try {
-            URI(raw)
-        } catch (_: Exception) {
-            return null
-        }
-        if (uri.rawUserInfo != null) return null
-        val host = uri.host?.lowercase()?.takeIf { it.isNotEmpty() } ?: return null
+        val rest = raw.substring(separator + 3)
+        val end = rest.indexOfFirst { it == '/' || it == '?' || it == '#' }
+        val authority = if (end < 0) rest else rest.substring(0, end)
+        val host = parseHost(authority) ?: return null
         return Web(raw, host)
+    }
+
+    /**
+     * The host of an authority under the one rule both platforms share (PROTOCOL-v2.md section 10),
+     * or null. No userinfo; a bracketed IPv6 literal or dot-separated non-empty labels (one trailing
+     * dot allowed) of ASCII letters, digits, `-`, `_` and non-ASCII letters, marks and digits; an
+     * optional `:port` of 1 to 5 digits in 1..65535. Lowercased for ASCII only.
+     */
+    internal fun parseHost(authority: String): String? {
+        if (authority.isEmpty() || authority.contains('@')) return null
+        val host: String
+        val port: String?
+        if (authority.startsWith("[")) {
+            val close = authority.indexOf(']')
+            if (close < 0) return null
+            host = authority.substring(0, close + 1)
+            val tail = authority.substring(close + 1)
+            port = when {
+                tail.isEmpty() -> null
+                tail.startsWith(":") -> tail.substring(1)
+                else -> return null
+            }
+            val literal = host.substring(1, host.length - 1)
+            if (literal.isEmpty() || !literal.contains(':')) return null
+            if (!literal.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' || it == ':' || it == '.' }) return null
+        } else {
+            val colon = authority.indexOf(':')
+            host = if (colon < 0) authority else authority.substring(0, colon)
+            port = if (colon < 0) null else authority.substring(colon + 1)
+            val labels = host.removeSuffix(".").split('.')
+            if (labels.any { label -> label.isEmpty() || !label.codePoints().allMatch(::isHostChar) }) return null
+        }
+        if (port != null) {
+            if (port.isEmpty() || port.length > 5 || !port.all { it in '0'..'9' }) return null
+            if (port.toInt() !in 1..65535) return null
+        }
+        return buildString(host.length) { host.forEach { append(if (it in 'A'..'Z') it + 32 else it) } }
+    }
+
+    private fun isHostChar(c: Int): Boolean {
+        if (c < 0x80) return c.toChar().let { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_' }
+        return when (Character.getType(c).toByte()) {
+            Character.UPPERCASE_LETTER, Character.LOWERCASE_LETTER, Character.TITLECASE_LETTER,
+            Character.MODIFIER_LETTER, Character.OTHER_LETTER,
+            Character.NON_SPACING_MARK, Character.COMBINING_SPACING_MARK, Character.ENCLOSING_MARK,
+            Character.DECIMAL_DIGIT_NUMBER -> true
+            else -> false
+        }
     }
 
     private fun tel(raw: String): Link? {

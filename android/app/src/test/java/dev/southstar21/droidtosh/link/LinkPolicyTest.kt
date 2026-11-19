@@ -83,4 +83,74 @@ class LinkPolicyTest {
         assertNull(LinkPolicy.singleWebUrl("tel:+491701234567"))
         assertNull(LinkPolicy.singleWebUrl(""))
     }
+
+    // The same corpus is in DroidsyncKit LinkPolicyTests.swift; keep the two lists identical.
+    private val acceptedHosts = listOf(
+        "https://example.com/" to "example.com",
+        "HTTPS://EXAMPLE.com" to "example.com",
+        "HtTp://x.y" to "x.y",
+        "http://example.com:8080/x" to "example.com",
+        "https://example.com?x=1" to "example.com",
+        "https://example.com#frag" to "example.com",
+        "https://example.com/@x" to "example.com",
+        "https://example.com?x=a@b" to "example.com",
+        "https://example.com/a:b" to "example.com",
+        "https://BÜCHER.example/" to "bÜcher.example",
+        "https://bücher.example/" to "bücher.example",
+        "https://xn--bcher-kva.example/" to "xn--bcher-kva.example",
+        "https://日本語.jp/" to "日本語.jp",
+        "https://my_host.example/" to "my_host.example",
+        "https://under_score/" to "under_score",
+        "https://[::1]/" to "[::1]",
+        "https://[2001:DB8::1]:8443/x" to "[2001:db8::1]",
+        "https://[::ffff:1.2.3.4]" to "[::ffff:1.2.3.4]",
+        "https://example.com:1/" to "example.com",
+        "https://example.com:65535/" to "example.com",
+        "https://example.com:00080/" to "example.com",
+        "https://example.com./" to "example.com.",
+        "https://192.168.0.1:3000/" to "192.168.0.1",
+        "https://a-b.c-d/" to "a-b.c-d",
+    )
+
+    private val rejectedHosts = listOf(
+        "https://",
+        "https:///path",
+        "https://?q=1",
+        "https://#f",
+        "https://:80/",
+        "https://user:pass@example.com/",
+        "https://google.com@evil.example/",
+        "https://@example.com/",
+        "https://[::1",
+        "https://[]/",
+        "https://[zz::1]/",
+        "https://[::1]x/",
+        "https://[1.2.3.4]/",
+        "https://[::1]:/",
+        "https://[::1]:0/",
+        "https://example.com:0/",
+        "https://example.com:65536/",
+        "https://example.com:123456/",
+        "https://example.com:/",
+        "https://example.com:80a/",
+        "https://example.com::80/",
+        "https://example.com../",
+        "https://.example.com/",
+        "https://a..b/",
+        "https://./",
+        "https://ex!ample.com/",
+        "https://example.com\\@evil.example/",
+        "https://exa%6dple.com/",
+        "https://ex*ample.com/",
+        "https://😀.example/",
+        "https://example。com/",
+        "https://exa(mple.com/",
+        "https://example.com\\path",
+    )
+
+    @Test
+    fun hostRuleCorpusMatchesTheMac() {
+        for ((url, host) in acceptedHosts) assertEquals(url, host, (web(url) as? LinkPolicy.Web)?.host)
+        for (url in rejectedHosts) assertNull(url, web(url))
+    }
 }
