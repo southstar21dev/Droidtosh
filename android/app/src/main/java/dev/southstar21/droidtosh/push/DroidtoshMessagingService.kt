@@ -15,8 +15,9 @@ class DroidtoshMessagingService : FirebaseMessagingService() {
         ensureServiceRunning()
         if (BuildConfig.FCM_ENABLED && CredentialStore(applicationContext).isPaired()) {
             // A rotated token only reaches the relay in a fresh join line, so
-            // bounce the service to reconnect and re-register it immediately.
-            runCatching { ConnectionService.restart(applicationContext) }
+            // drop the session and redial (dialRelay reads the token each attempt).
+            // Never stop the service here: it cannot be restarted from the background.
+            runCatching { ConnectionService.reconnectNow(applicationContext) }
         }
         ConnectionService.wakeForMacOnline()
     }
