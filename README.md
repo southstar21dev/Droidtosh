@@ -40,7 +40,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/android-dark.png">
-    <img alt="Home, file transfers and connection settings on Android" src=".github/screenshots/android-light.png" width="860">
+    <img alt="Home, file transfers and Find my phone on Android" src=".github/screenshots/android-light.png" width="860">
   </picture>
 </p>
 
