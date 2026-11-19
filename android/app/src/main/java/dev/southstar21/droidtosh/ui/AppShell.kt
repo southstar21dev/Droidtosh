@@ -61,6 +61,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -228,7 +232,7 @@ private val WideLayoutMinWidth = 600.dp
  * open over them (Connection from the Mac card, Settings from the gear, Diagnostics from
  * Connection).
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun MainScaffold(
     ui: DroidUiState,
@@ -248,7 +252,19 @@ fun MainScaffold(
     val fastEffects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // While a page is open the tabs underneath must not be reachable by TalkBack or keyboard focus.
+    val tabsModifier = if (page != null) {
+        Modifier
+            .clearAndSetSemantics {}
+            .focusProperties {
+                canFocus = false
+                enter = { FocusRequester.Cancel }
+            }
+            .focusGroup()
+    } else {
+        Modifier
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().then(tabsModifier)) {
         val wide = maxWidth >= WideLayoutMinWidth
         val content: @Composable (PaddingValues) -> Unit = { padding ->
             AnimatedContent(
